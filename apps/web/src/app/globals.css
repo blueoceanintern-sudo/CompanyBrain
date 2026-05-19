@@ -1,0 +1,204 @@
+@import "tailwindcss";
+
+/* ─── Brand & neutral tokens ────────────────────────────────────────────────── */
+:root {
+  --color-brand:           oklch(52% 0.18 250);
+  --color-brand-subtle:    oklch(95% 0.04 250);
+  --color-brand-fg:        oklch(100% 0 0);
+
+  --color-bg:              oklch(99% 0 0);
+  --color-surface:         oklch(97% 0 0);
+  --color-surface-raised:  oklch(100% 0 0);
+  --color-border:          oklch(90% 0 0);
+  --color-border-strong:   oklch(80% 0 0);
+
+  --color-text:            oklch(15% 0 0);
+  --color-text-muted:      oklch(50% 0 0);
+  --color-text-disabled:   oklch(70% 0 0);
+
+  --color-success:         oklch(55% 0.16 155);
+  --color-success-subtle:  oklch(95% 0.05 155);
+  --color-warning:         oklch(70% 0.16 70);
+  --color-warning-subtle:  oklch(97% 0.04 70);
+  --color-danger:          oklch(55% 0.20 25);
+  --color-danger-subtle:   oklch(97% 0.04 25);
+
+  --color-internal:        oklch(55% 0.16 270);
+  --color-internal-subtle: oklch(96% 0.04 270);
+  --color-external:        oklch(55% 0.16 155);
+  --color-external-subtle: oklch(96% 0.04 155);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-brand:           oklch(65% 0.18 250);
+    --color-brand-subtle:    oklch(25% 0.06 250);
+    --color-brand-fg:        oklch(100% 0 0);
+
+    --color-bg:              oklch(10% 0 0);
+    --color-surface:         oklch(14% 0 0);
+    --color-surface-raised:  oklch(18% 0 0);
+    --color-border:          oklch(22% 0 0);
+    --color-border-strong:   oklch(35% 0 0);
+
+    --color-text:            oklch(95% 0 0);
+    --color-text-muted:      oklch(55% 0 0);
+    --color-text-disabled:   oklch(35% 0 0);
+
+    --color-success:         oklch(65% 0.16 155);
+    --color-success-subtle:  oklch(20% 0.06 155);
+    --color-warning:         oklch(75% 0.16 70);
+    --color-warning-subtle:  oklch(20% 0.05 70);
+    --color-danger:          oklch(65% 0.20 25);
+    --color-danger-subtle:   oklch(20% 0.06 25);
+
+    --color-internal:        oklch(65% 0.16 270);
+    --color-internal-subtle: oklch(20% 0.05 270);
+    --color-external:        oklch(65% 0.16 155);
+    --color-external-subtle: oklch(20% 0.05 155);
+  }
+}
+
+/* ─── Typography ────────────────────────────────────────────────────────────── */
+:root {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --text-xs:   clamp(0.6875rem, 0.65rem + 0.1vw, 0.75rem);
+  --text-sm:   clamp(0.8125rem, 0.78rem + 0.15vw, 0.875rem);
+  --text-base: clamp(0.9375rem, 0.9rem + 0.15vw, 1rem);
+  --text-lg:   clamp(1rem, 0.95rem + 0.2vw, 1.125rem);
+  --text-xl:   clamp(1.125rem, 1.05rem + 0.3vw, 1.25rem);
+  --text-2xl:  clamp(1.25rem, 1.1rem + 0.5vw, 1.5rem);
+
+  --font-normal:   400;
+  --font-medium:   500;
+  --font-semibold: 600;
+
+  --leading-tight:   1.25;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.625;
+}
+
+/* ─── Spacing ───────────────────────────────────────────────────────────────── */
+:root {
+  --space-1:  clamp(0.2rem,  0.2rem + 0.05vw, 0.25rem);
+  --space-2:  clamp(0.4rem,  0.4rem + 0.1vw,  0.5rem);
+  --space-3:  clamp(0.6rem,  0.6rem + 0.15vw, 0.75rem);
+  --space-4:  clamp(0.8rem,  0.8rem + 0.2vw,  1rem);
+  --space-5:  clamp(1rem,    1rem + 0.2vw,    1.25rem);
+  --space-6:  clamp(1.125rem,1.1rem + 0.25vw, 1.5rem);
+  --space-8:  clamp(1.5rem,  1.4rem + 0.4vw,  2rem);
+  --space-10: clamp(1.75rem, 1.6rem + 0.6vw,  2.5rem);
+  --space-12: clamp(2rem,    1.8rem + 0.8vw,  3rem);
+  --space-16: clamp(2.5rem,  2.2rem + 1.2vw,  4rem);
+}
+
+/* ─── Density ───────────────────────────────────────────────────────────────── */
+:root {
+  --row-height-default: 40px;
+  --row-height-compact: 32px;
+  --target-min:         32px;
+  --sidebar-item-h:     36px;
+  --header-h:           56px;
+  --input-h:            36px;
+}
+
+/* ─── Radii & shadows ───────────────────────────────────────────────────────── */
+:root {
+  --radius-sm:   0.25rem;
+  --radius-md:   0.5rem;
+  --radius-lg:   0.75rem;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.06);
+  --shadow-md: 0 4px 12px oklch(0% 0 0 / 0.08);
+  --shadow-lg: 0 8px 24px oklch(0% 0 0 / 0.12);
+}
+
+/* ─── Sidebar widths ────────────────────────────────────────────────────────── */
+:root {
+  --sidebar-w:        240px;
+  --sidebar-w-xl:     260px;
+  --sidebar-w-icon:   48px;
+  --sidebar-w-closed: 0px;
+}
+
+@media (min-width: 1280px) {
+  :root { --sidebar-w: var(--sidebar-w-xl); }
+}
+@media (max-width: 1023px) and (min-width: 768px) {
+  :root { --sidebar-w: var(--sidebar-w-icon); }
+}
+@media (max-width: 767px) {
+  :root { --sidebar-w: var(--sidebar-w-closed); }
+}
+
+/* ─── Shadcn semantic bridge (maps to our design tokens) ───────────────────── */
+:root {
+  --background:              var(--color-bg);
+  --foreground:              var(--color-text);
+  --card:                    var(--color-surface-raised);
+  --card-foreground:         var(--color-text);
+  --popover:                 var(--color-surface-raised);
+  --popover-foreground:      var(--color-text);
+  --primary:                 var(--color-brand);
+  --primary-foreground:      var(--color-brand-fg);
+  --secondary:               var(--color-surface);
+  --secondary-foreground:    var(--color-text-muted);
+  --muted:                   var(--color-surface);
+  --muted-foreground:        var(--color-text-muted);
+  --accent:                  var(--color-brand-subtle);
+  --accent-foreground:       var(--color-brand);
+  --destructive:             var(--color-danger);
+  --destructive-foreground:  oklch(100% 0 0);
+  --input:                   var(--color-border);
+  --ring:                    var(--color-brand);
+  --radius:                  var(--radius-md);
+}
+
+@theme inline {
+  --color-background:             var(--background);
+  --color-foreground:             var(--foreground);
+  --color-card:                   var(--card);
+  --color-card-foreground:        var(--card-foreground);
+  --color-popover:                var(--popover);
+  --color-popover-foreground:     var(--popover-foreground);
+  --color-primary:                var(--primary);
+  --color-primary-foreground:     var(--primary-foreground);
+  --color-secondary:              var(--secondary);
+  --color-secondary-foreground:   var(--secondary-foreground);
+  --color-muted:                  var(--muted);
+  --color-muted-foreground:       var(--muted-foreground);
+  --color-accent:                 var(--accent);
+  --color-accent-foreground:      var(--accent-foreground);
+  --color-destructive:            var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-input:                  var(--input);
+  --color-ring:                   var(--ring);
+}
+
+/* ─── Base resets ───────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

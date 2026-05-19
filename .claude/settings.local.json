@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Test-Path *)",
+      "PowerShell(Get-ChildItem -Recurse -Depth 2 C:\\\\Users\\\\jachi\\\\CompanyBrain | Where-Object { $_.Name -notmatch '^\\\\.' } | Select-Object FullName)",
+      "PowerShell(cmd /c \"dir C:\\\\Users\\\\jachi\\\\CompanyBrain\")",
+      "PowerShell(cmd /c \"dir /s /b C:\\\\Users\\\\jachi\\\\CompanyBrain\\\\apps C:\\\\Users\\\\jachi\\\\CompanyBrain\\\\services C:\\\\Users\\\\jachi\\\\CompanyBrain\\\\workers C:\\\\Users\\\\jachi\\\\CompanyBrain\\\\db C:\\\\Users\\\\jachi\\\\CompanyBrain\\\\shared 2>nul | findstr /v node_modules | findstr /v .next\")",
+      "Bash(bun install *)",
+      "Bash(bunx tsc *)",
+      "Bash(bun dev *)",
+      "Bash(npx shadcn@latest add button input textarea select dialog sheet tooltip table tabs badge skeleton avatar card sonner toggle-group separator label scroll-area --overwrite --yes)"
+    ]
+  }
+}

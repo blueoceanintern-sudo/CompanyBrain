@@ -1,0 +1,12 @@
+{
+  "name": "@company-brain/retrieval",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "dependencies": {
+    "@company-brain/db": "workspace:*",
+    "@company-brain/shared": "workspace:*",
+    "@company-brain/access-control": "workspace:*",
+    "openai": "^4.52.0"
+  }
+}

@@ -1,0 +1,14 @@
+node_modules/
+.next/
+dist/
+build/
+
+.env
+.env.local
+.env.production
+.env.*.local
+
+*.log
+.DS_Store
+
+db/migrations/*.sql

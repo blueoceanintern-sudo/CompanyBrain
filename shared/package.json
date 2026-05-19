@@ -1,0 +1,6 @@
+{
+  "name": "@company-brain/shared",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts"
+}

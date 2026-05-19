@@ -1,0 +1,9 @@
+{
+  "name": "@company-brain/access-control",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "dependencies": {
+    "@company-brain/shared": "workspace:*"
+  }
+}

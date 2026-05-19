@@ -1,0 +1,11 @@
+{
+  "name": "@company-brain/payments",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "dependencies": {
+    "@company-brain/db": "workspace:*",
+    "@company-brain/shared": "workspace:*",
+    "stripe": "^16.2.0"
+  }
+}
