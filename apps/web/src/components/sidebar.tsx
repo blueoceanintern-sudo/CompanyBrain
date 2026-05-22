@@ -11,7 +11,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { getAuthUser, clearAuth } from '@/lib/auth'
 import { initials } from '@/lib/utils'
-import { MOCK_USER } from '@/lib/mock-data'
 
 interface NavItem {
   label: string
@@ -103,10 +102,10 @@ function PlaneSwitcher({ iconOnly }: { iconOnly?: boolean }) {
 
 function SidebarContent({ mode, onClose }: { mode: Mode; onClose?: () => void }) {
   const pathname = usePathname()
-  const user = getAuthUser() ?? MOCK_USER
+  const user = getAuthUser()
   const isIconOnly = mode === 'icon-only'
-  const visible = NAV.filter((n) => n.roles.includes(user.role))
-  const isAdmin = user.role === 'super_admin' || user.role === 'org_admin'
+  const visible = NAV.filter((n) => n.roles.includes(user?.role ?? ''))
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'org_admin'
 
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)' }}>
@@ -183,25 +182,25 @@ function SidebarContent({ mode, onClose }: { mode: Mode; onClose?: () => void })
             <TooltipTrigger asChild>
               <Avatar className="size-8 cursor-default" style={{ background: 'var(--color-brand-subtle)' }}>
                 <AvatarFallback className="text-xs font-medium" style={{ color: 'var(--color-brand)', background: 'var(--color-brand-subtle)' }}>
-                  {initials(user.email)}
+                  {initials(user?.email ?? '')}
                 </AvatarFallback>
               </Avatar>
             </TooltipTrigger>
             <TooltipContent side="right">
-              <p>{user.email}</p>
-              <p className="opacity-60 text-xs">{user.role.replace(/_/g, ' ')}</p>
+              <p>{user?.email}</p>
+              <p className="opacity-60 text-xs">{user?.role?.replace(/_/g, ' ')}</p>
             </TooltipContent>
           </Tooltip>
         ) : (
           <>
             <Avatar className="size-8 shrink-0" style={{ background: 'var(--color-brand-subtle)' }}>
               <AvatarFallback className="text-xs font-medium" style={{ color: 'var(--color-brand)', background: 'var(--color-brand-subtle)' }}>
-                {initials(user.email)}
+                {initials(user?.email ?? '')}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text)' }}>{user.email}</p>
-              <p className="text-xs capitalize" style={{ color: 'var(--color-text-muted)' }}>{user.role.replace(/_/g, ' ')}</p>
+              <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text)' }}>{user?.email}</p>
+              <p className="text-xs capitalize" style={{ color: 'var(--color-text-muted)' }}>{user?.role?.replace(/_/g, ' ')}</p>
             </div>
           </>
         )}

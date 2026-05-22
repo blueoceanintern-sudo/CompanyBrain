@@ -1,19 +1,36 @@
 'use client'
 
 import { useState } from 'react'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useCompartments, useCreateCompartment } from '@/hooks/use-compartments'
 import { getAuthUser } from '@/lib/auth'
-import { MOCK_USER, MOCK_SUBSCRIPTION } from '@/lib/mock-data'
+import { getSubscription, cancelSubscription } from '@/lib/api'
 
 type Tab = 'general' | 'compartments' | 'subscription' | 'danger'
 
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true' || process.env.NEXT_PUBLIC_API_URL === undefined
-
 function useSubscription(orgId: string) {
-  if (USE_MOCK) return { data: MOCK_SUBSCRIPTION, isLoading: false }
-  // Real implementation via getSubscription() would go here
-  return { data: null, isLoading: false }
+  return useQuery({
+    queryKey: ['subscription', orgId],
+    queryFn: async () => {
+      const result = await getSubscription(orgId)
+      if (!result.success) throw new Error(result.error.message)
+      return result.data
+    },
+    enabled: !!orgId,
+  })
+}
+
+function useCancelSubscription(orgId: string) {
+  return useMutation({
+    mutationFn: async () => {
+      const result = await cancelSubscription(orgId)
+      if (!result.success) throw new Error(result.error.message)
+      return null
+    },
+    onSuccess: () => toast.success('Subscription cancelled. Your data will be retained for 30 days.'),
+    onError: (err: Error) => toast.error(err.message),
+  })
 }
 
 function TabBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
@@ -37,8 +54,8 @@ function TabBtn({ label, active, onClick }: { label: string; active: boolean; on
 }
 
 export default function SettingsPage() {
-  const user = getAuthUser() ?? MOCK_USER
-  const orgId = user.orgId
+  const user = getAuthUser()
+  const orgId = user?.orgId ?? ''
   const [tab, setTab] = useState<Tab>('general')
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
@@ -46,6 +63,7 @@ export default function SettingsPage() {
   const { data: compartments = [] } = useCompartments(orgId)
   const { data: sub } = useSubscription(orgId)
   const createComp = useCreateCompartment(orgId)
+  const cancelSub = useCancelSubscription(orgId)
 
   const inputStyle: React.CSSProperties = {
     width: '100%', height: 'var(--input-h)', padding: '0 var(--space-3)',
@@ -61,7 +79,6 @@ export default function SettingsPage() {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-8)' }}>
         <div style={{ width: 'min(680px, 100%)', margin: '0 auto' }}>
-          {/* Tab list */}
           <div role="tablist" aria-label="Settings sections" style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', marginBottom: 'var(--space-8)' }}>
             {(['general', 'compartments', 'subscription', 'danger'] as Tab[]).map((t) => (
               <TabBtn key={t} label={t.charAt(0).toUpperCase() + t.slice(1)} active={tab === t} onClick={() => setTab(t)} />
@@ -72,15 +89,13 @@ export default function SettingsPage() {
           {tab === 'general' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <div>
-                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>Organisation name</label>
-                <input type="text" defaultValue="Equest School Network" style={inputStyle} aria-label="Organisation name" />
+                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>Email</label>
+                <input type="text" readOnly value={user?.email ?? ''} style={{ ...inputStyle, color: 'var(--color-text-muted)' }} aria-label="Email" />
               </div>
-              <button
-                onClick={() => toast.success('Settings saved')}
-                style={{ alignSelf: 'flex-start', height: 'var(--input-h)', padding: '0 var(--space-5)', border: 'none', borderRadius: 'var(--radius-md)', background: 'var(--color-brand)', color: 'var(--color-brand-fg)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', cursor: 'pointer' }}
-              >
-                Save
-              </button>
+              <div>
+                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>Role</label>
+                <input type="text" readOnly value={user?.role?.replace(/_/g, ' ') ?? ''} style={{ ...inputStyle, color: 'var(--color-text-muted)', textTransform: 'capitalize' }} aria-label="Role" />
+              </div>
             </div>
           )}
 
@@ -93,7 +108,7 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              {compartments.length === 0 && (
+              {compartments.length === 0 && !showCreate && (
                 <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: 'var(--space-8)' }}>No compartments. Create one to organise your knowledge.</p>
               )}
 
@@ -116,7 +131,7 @@ export default function SettingsPage() {
                     <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} style={inputStyle} placeholder="e.g. HR Department" aria-label="Compartment name" />
                   </div>
                   <button
-                    onClick={() => { createComp.mutate({ name: newName }, { onSuccess: () => { setShowCreate(false); setNewName('') } }) }}
+                    onClick={() => createComp.mutate({ name: newName }, { onSuccess: () => { setShowCreate(false); setNewName('') } })}
                     disabled={!newName.trim() || createComp.isPending}
                     style={{ height: 'var(--input-h)', padding: '0 var(--space-4)', border: 'none', borderRadius: 'var(--radius-md)', background: 'var(--color-brand)', color: 'var(--color-brand-fg)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', cursor: 'pointer' }}
                   >
@@ -135,15 +150,10 @@ export default function SettingsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <div style={{ padding: 'var(--space-6)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface-raised)' }}>
                 <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', margin: '0 0 var(--space-2)' }}>Current plan</p>
-                <p style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-semibold)', margin: 0, textTransform: 'capitalize' }}>{sub?.plan ?? 'Free'}</p>
+                <p style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-semibold)', margin: 0, textTransform: 'capitalize' }}>{sub?.plan ?? '—'}</p>
                 {sub?.status && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', margin: 'var(--space-1) 0 0' }}>Status: {sub.status}</p>}
+                {sub?.subscriptionId && <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', margin: 'var(--space-1) 0 0' }}>{sub.subscriptionId}</p>}
               </div>
-              <button
-                onClick={() => toast.info('Wire STRIPE_PORTAL_URL to open billing portal in production')}
-                style={{ alignSelf: 'flex-start', height: 'var(--input-h)', padding: '0 var(--space-5)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'transparent', fontSize: 'var(--text-sm)', cursor: 'pointer', color: 'var(--color-text)' }}
-              >
-                Manage billing →
-              </button>
             </div>
           )}
 
@@ -155,10 +165,15 @@ export default function SettingsPage() {
                 Cancelling your subscription will downgrade your org to the free tier. Your data will be quarantined for 30 days then permanently deleted.
               </p>
               <button
-                onClick={() => { if (confirm('Are you sure? This cannot be undone.')) toast.error('Cancellation — wire up the subscription cancel endpoint') }}
-                style={{ height: 'var(--input-h)', padding: '0 var(--space-5)', border: 'none', borderRadius: 'var(--radius-md)', background: 'var(--color-danger)', color: 'var(--color-brand-fg)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', cursor: 'pointer' }}
+                disabled={cancelSub.isPending || sub?.plan === 'free'}
+                onClick={() => {
+                  if (confirm('Are you sure? This cannot be undone.')) {
+                    cancelSub.mutate()
+                  }
+                }}
+                style={{ height: 'var(--input-h)', padding: '0 var(--space-5)', border: 'none', borderRadius: 'var(--radius-md)', background: 'var(--color-danger)', color: 'var(--color-brand-fg)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', cursor: cancelSub.isPending || sub?.plan === 'free' ? 'not-allowed' : 'pointer', opacity: sub?.plan === 'free' ? 0.5 : 1 }}
               >
-                Cancel subscription
+                {cancelSub.isPending ? 'Cancelling…' : sub?.plan === 'free' ? 'No active subscription' : 'Cancel subscription'}
               </button>
             </div>
           )}

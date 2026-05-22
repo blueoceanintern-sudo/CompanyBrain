@@ -8,7 +8,6 @@ import { Upload, Trash2 } from 'lucide-react'
 import { useDocuments, useUploadDocument, useDeleteDocument } from '@/hooks/use-documents'
 import { useCompartments } from '@/hooks/use-compartments'
 import { getAuthUser } from '@/lib/auth'
-import { MOCK_USER } from '@/lib/mock-data'
 import { formatDate } from '@/lib/utils'
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
@@ -126,8 +125,8 @@ function UploadDialog({ orgId, onClose }: { orgId: string; onClose: () => void }
 }
 
 export default function DocumentsPage() {
-  const user = getAuthUser() ?? MOCK_USER
-  const orgId = user.orgId
+  const user = getAuthUser()
+  const orgId = user?.orgId ?? ''
   const [showUpload, setShowUpload] = useState(false)
 
   const { data: docs = [], isLoading } = useDocuments(orgId)

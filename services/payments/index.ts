@@ -123,6 +123,35 @@ export async function getSubscriptionStatus(
   }
 }
 
+// ─── Cancel subscription ──────────────────────────────────────────────────────
+
+export async function cancelOrgSubscription(
+  orgId: string
+): Promise<ServiceResult<null>> {
+  try {
+    const org = await db
+      .select({ stripeSubscriptionId: orgs.stripeSubscriptionId })
+      .from(orgs)
+      .where(eq(orgs.id, orgId))
+      .limit(1)
+
+    const subId = org[0]?.stripeSubscriptionId
+    if (subId) {
+      await stripe.subscriptions.cancel(subId)
+    }
+
+    await db
+      .update(orgs)
+      .set({ plan: 'free', stripeSubscriptionId: null, cancelledAt: new Date(), updatedAt: new Date() })
+      .where(eq(orgs.id, orgId))
+
+    return { success: true, data: null }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Cancellation failed'
+    return { success: false, error: { code: 'STRIPE_CANCEL_ERROR', message } }
+  }
+}
+
 // ─── Handle Stripe webhook ────────────────────────────────────────────────────
 
 export async function handleStripeWebhook(params: {
@@ -165,11 +194,21 @@ export async function handleStripeWebhook(params: {
     })
 
     // Handle subscription lifecycle events
+    if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
+      const sub = event.data.object as Stripe.Subscription
+      if (sub.status === 'active' || sub.status === 'trialing') {
+        await db
+          .update(orgs)
+          .set({ plan: 'paid', stripeSubscriptionId: sub.id, cancelledAt: null, updatedAt: new Date() })
+          .where(eq(orgs.stripeCustomerId, sub.customer as string))
+      }
+    }
+
     if (event.type === 'customer.subscription.deleted') {
       const sub = event.data.object as Stripe.Subscription
       await db
         .update(orgs)
-        .set({ plan: 'free', stripeSubscriptionId: null, updatedAt: new Date() })
+        .set({ plan: 'free', stripeSubscriptionId: null, cancelledAt: new Date(), updatedAt: new Date() })
         .where(eq(orgs.stripeSubscriptionId, sub.id))
     }
 

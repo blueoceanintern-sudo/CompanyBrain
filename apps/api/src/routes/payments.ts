@@ -4,7 +4,7 @@ import { z } from 'zod'
 import {
   createSubscription,
   getSubscriptionStatus,
-  handleStripeWebhook,
+  cancelOrgSubscription,
   ensureStripeCustomer,
 } from '@company-brain/payments'
 import { db } from '@company-brain/db'
@@ -65,6 +65,14 @@ paymentsRoute.get('/subscriptions', async (c) => {
   const result = await getSubscriptionStatus(orgId)
   if (!result.success) return c.json({ success: false, error: result.error }, 500)
   return c.json({ success: true, data: result.data })
+})
+
+// DELETE /orgs/:id/subscriptions
+paymentsRoute.delete('/subscriptions', async (c) => {
+  const orgId = c.req.param('id')
+  const result = await cancelOrgSubscription(orgId)
+  if (!result.success) return c.json({ success: false, error: result.error }, 500)
+  return c.json({ success: true, data: null })
 })
 
 export default paymentsRoute

@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useAnalyticsOverview, useTopUnanswered } from '@/hooks/use-analytics'
 import { getAuthUser } from '@/lib/auth'
-import { MOCK_USER } from '@/lib/mock-data'
 import { formatDate, formatPercent } from '@/lib/utils'
 
 const DAY_OPTIONS = [7, 30, 90] as const
@@ -24,8 +23,8 @@ function StatCard({ label, value, alert }: { label: string; value: string; alert
 }
 
 export default function AnalyticsPage() {
-  const user = getAuthUser() ?? MOCK_USER
-  const orgId = user.orgId
+  const user = getAuthUser()
+  const orgId = user?.orgId ?? ''
   const [days, setDays] = useState<7 | 30 | 90>(30)
 
   const { data: overview, isLoading: overviewLoading } = useAnalyticsOverview(orgId, days)
@@ -74,7 +73,7 @@ export default function AnalyticsPage() {
 
             {unansweredLoading ? (
               <div style={{ padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} h={var_row_compact()} />)}
+                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} h={32} />)}
               </div>
             ) : (
               <table aria-label="Top unanswered queries" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)' }}>
@@ -107,4 +106,3 @@ export default function AnalyticsPage() {
   )
 }
 
-function var_row_compact() { return 32 }

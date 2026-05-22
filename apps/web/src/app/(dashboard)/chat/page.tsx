@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { SendHorizontal } from 'lucide-react'
 import { useSubmitQuery } from '@/hooks/use-queries'
+import { getAuthUser } from '@/lib/auth'
 import type { QueryResponse } from '@company-brain/shared'
 
 interface HistoryEntry {
@@ -31,7 +32,7 @@ function ThreeDotPulse() {
   )
 }
 
-function CitationLink({ index, citation }: { index: number; citation: { documentId: string; chunkId: string; excerpt?: string } }) {
+function CitationLink({ index, citation }: { index: number; citation: { chunkId: string; excerpt?: string } }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -70,7 +71,7 @@ function AnswerBubble({ response }: { response: QueryResponse }) {
         <div className="flex flex-wrap gap-2">
           {citations.map((c, i) => (
             <span key={c.chunkId} className="text-xs rounded" style={{ color: 'var(--color-text-muted)', background: 'var(--color-surface)', padding: '2px var(--space-2)', fontFamily: 'var(--font-mono)' }}>
-              [{i + 1}] {c.documentId}
+              [{i + 1}] {c.filename}
             </span>
           ))}
         </div>
@@ -98,9 +99,12 @@ function HistoryItem({ entry, onToggle }: { entry: HistoryEntry; onToggle: () =>
 }
 
 export default function ChatPage() {
+  const user = getAuthUser()
+  const orgId = user?.orgId ?? ''
+
   const [input, setInput] = useState('')
   const [history, setHistory] = useState<HistoryEntry[]>([])
-  const submit = useSubmitQuery()
+  const submit = useSubmitQuery(orgId)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 

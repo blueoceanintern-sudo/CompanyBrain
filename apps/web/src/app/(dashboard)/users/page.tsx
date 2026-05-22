@@ -6,7 +6,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useUsers, useInviteUser, useUpdateUserRole } from '@/hooks/use-users'
 import { getAuthUser } from '@/lib/auth'
-import { MOCK_USER } from '@/lib/mock-data'
 import { formatDate } from '@/lib/utils'
 
 const ROLE_STYLE: Record<string, { bg: string; color: string }> = {
@@ -91,8 +90,8 @@ function InviteDialog({ orgId, onClose }: { orgId: string; onClose: () => void }
 }
 
 export default function UsersPage() {
-  const user = getAuthUser() ?? MOCK_USER
-  const orgId = user.orgId
+  const user = getAuthUser()
+  const orgId = user?.orgId ?? ''
   const [showInvite, setShowInvite] = useState(false)
 
   const { data: users = [], isLoading } = useUsers(orgId)

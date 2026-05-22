@@ -135,3 +135,16 @@ export async function getSubscription(orgId: string) {
     `/api/v1/orgs/${orgId}/subscriptions`
   )
 }
+
+export async function cancelSubscription(orgId: string) {
+  return apiFetch<null>(`/api/v1/orgs/${orgId}/subscriptions`, { method: 'DELETE' })
+}
+
+export async function exportAuditLog(orgId: string): Promise<Blob> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+  const res = await fetch(`${API_URL}/api/v1/orgs/${orgId}/analytics/export`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) throw new Error('Failed to export audit log')
+  return res.blob()
+}

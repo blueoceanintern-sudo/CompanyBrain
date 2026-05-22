@@ -14,7 +14,7 @@ export const sourceTypeEnum = pgEnum('source_type', [
   'product_doc',
   'other',
 ])
-export const ingestionStatusEnum = pgEnum('ingestion_status', ['queued', 'running', 'complete', 'failed'])
+export const ingestionStatusEnum = pgEnum('ingestion_status', ['queued', 'running', 'complete', 'failed', 'archived'])
 export const userRoleEnum = pgEnum('user_role', [
   'super_admin',
   'org_admin',

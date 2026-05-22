@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { createHash } from 'crypto'
 import { db } from '@company-brain/db'
-import { documents, ingestionJobs } from '@company-brain/db'
+import { documents, ingestionJobs, chunks } from '@company-brain/db'
 import { eq, and, desc } from 'drizzle-orm'
 import { ingestDocument } from '@company-brain/ingestion'
 import { canManageDocuments } from '@company-brain/access-control'
@@ -61,25 +61,45 @@ documentsRoute.post('/', async (c) => {
   const buffer = Buffer.from(await file.arrayBuffer())
   const contentHash = createHash('sha256').update(buffer).digest('hex')
 
-  // Dedup at document level
-  const existing = await db
+  // Exact duplicate: same content already exists for this org
+  const exactDupe = await db
     .select({ id: documents.id })
     .from(documents)
     .where(and(eq(documents.contentHash, contentHash), eq(documents.orgId, orgId)))
     .limit(1)
 
-  if (existing.length > 0) {
+  if (exactDupe.length > 0) {
     return c.json(
       { success: false, error: { code: 'DUPLICATE_DOCUMENT', message: 'This document has already been uploaded' } },
       409
     )
   }
 
+  // Check for a previous version: same filename in same org + compartment
+  const previousDoc = await db
+    .select({ id: documents.id, version: documents.version })
+    .from(documents)
+    .where(
+      and(
+        eq(documents.orgId, orgId),
+        eq(documents.compartmentId, compartmentId),
+        eq(documents.filename, file.name),
+        eq(documents.status, 'complete')
+      )
+    )
+    .limit(1)
+
   const defaultVisibility = {
     allowedGroups: ['super_admin', 'org_admin', 'dept_admin', 'staff'] as Parameters<typeof ingestDocument>[0]['visibility']['allowedGroups'],
     deniedGroups: [] as Parameters<typeof ingestDocument>[0]['visibility']['deniedGroups'],
     allowedPrincipals: [],
     classification: 'restricted' as const,
+  }
+
+  // Archive previous version's chunks before creating the new record
+  if (previousDoc[0]) {
+    await db.update(chunks).set({ status: 'archived' }).where(eq(chunks.documentId, previousDoc[0].id))
+    await db.update(documents).set({ status: 'archived', updatedAt: new Date() }).where(eq(documents.id, previousDoc[0].id))
   }
 
   // Create document record
@@ -94,6 +114,8 @@ documentsRoute.post('/', async (c) => {
       contentHash,
       status: 'running',
       uploadedBy: userId,
+      version: previousDoc[0] ? previousDoc[0].version + 1 : 1,
+      previousVersionId: previousDoc[0]?.id ?? null,
     })
     .returning()
 
@@ -171,9 +193,10 @@ documentsRoute.delete('/:docId', async (c) => {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
+  await db.update(chunks).set({ status: 'archived' }).where(eq(chunks.documentId, docId))
   await db
     .update(documents)
-    .set({ status: 'failed', updatedAt: new Date() })
+    .set({ status: 'archived', updatedAt: new Date() })
     .where(and(eq(documents.id, docId), eq(documents.orgId, orgId)))
 
   return c.json({ success: true, data: null })
