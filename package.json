@@ -1,0 +1,31 @@
+{
+  "name": "companys-brain",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["apps/*", "services", "workers", "shared"],
+  "scripts": {
+    "dev": "bun run --filter=* dev",
+    "test": "bun test",
+    "workers": "bun run workers/index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.51.0",
+    "drizzle-orm": "^0.44.2",
+    "hono": "^4.7.11",
+    "openai": "^4.97.0",
+    "postgres": "^3.4.5",
+    "stripe": "^17.7.0",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/bun": "latest",
+    "@types/react": "^19.1.4",
+    "@types/react-dom": "^19.1.2",
+    "drizzle-kit": "^0.31.1",
+    "happy-dom": "^17.4.4",
+    "typescript": "^5.8.3"
+  }
+}

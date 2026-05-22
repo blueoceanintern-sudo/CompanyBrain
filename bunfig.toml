@@ -1,0 +1,6 @@
+[test]
+environment = "happy-dom"
+preload = []
+
+[install]
+exact = true
