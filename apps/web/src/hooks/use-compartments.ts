@@ -10,7 +10,7 @@ export function useCompartments(orgId: string) {
     queryFn: async () => {
       const result = await getCompartments(orgId)
       if (!result.success) throw new Error(result.error.message)
-      return result.data as Array<{ id: string; name: string; description?: string | null; mode: string; orgId: string; createdAt: string; updatedAt: string }>
+      return result.data
     },
     enabled: !!orgId,
   })

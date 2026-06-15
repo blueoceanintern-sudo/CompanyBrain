@@ -2,15 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import type { Route } from 'next'
 import { usePathname } from 'next/navigation'
-import {
-  MessageSquare, FileText, BarChart2, Shield, Users, Settings, Menu, X, type LucideIcon,
-} from 'lucide-react'
+import { MessageSquare, FileText, BarChart2, Shield, Users, Settings, Menu, X, type LucideIcon } from 'lucide-react'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { getAuthUser, clearAuth } from '@/lib/auth'
-import { initials } from '@/lib/utils'
+import { getAuthUser } from '@/lib/auth'
 
 interface NavItem {
   label: string
@@ -54,51 +51,40 @@ function PlaneSwitcher({ iconOnly }: { iconOnly?: boolean }) {
   const [plane, setPlane] = useState<Plane>('internal')
   if (iconOnly) {
     return (
-      <div
-        className="flex justify-center py-3 border-t"
-        style={{ borderColor: 'var(--color-border)' }}
-      >
+      <div className="flex justify-center py-3" style={{ borderTop: '1px solid var(--color-border)' }}>
         <div
           title={`Plane: ${plane}`}
-          className="size-2 rounded-full cursor-default"
+          className="size-2 rounded-full"
           style={{ background: plane === 'internal' ? 'var(--color-internal)' : 'var(--color-external)' }}
         />
       </div>
     )
   }
   return (
-    <div className="px-4 py-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
-      <p className="text-xs mb-2" style={{ color: 'var(--color-text-muted)' }}>Knowledge plane</p>
-      <div
-        className="flex rounded-md overflow-hidden border text-xs font-medium"
-        style={{ borderColor: 'var(--color-border)', height: 28 }}
-      >
-        {(['internal', 'external'] as Plane[]).map((p) => {
-          const active = plane === p
-          return (
-            <button
-              key={p}
-              onClick={() => setPlane(p)}
-              className="flex-1 capitalize transition-colors"
-              style={{
-                background: active
-                  ? p === 'internal' ? 'var(--color-internal-subtle)' : 'var(--color-external-subtle)'
-                  : 'transparent',
-                color: active
-                  ? p === 'internal' ? 'var(--color-internal)' : 'var(--color-external)'
-                  : 'var(--color-text-muted)',
-              }}
-            >
-              {p}
-            </button>
-          )
-        })}
+    <div className="mt-auto px-6 py-4" style={{ borderTop: '1px solid var(--color-border)' }}>
+      <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-disabled)' }}>
+        Knowledge plane
+      </h3>
+      <div className="flex items-center text-sm">
+        <button
+          onClick={() => setPlane('internal')}
+          style={{ color: plane === 'internal' ? 'var(--color-brand)' : 'var(--color-text-disabled)', fontWeight: plane === 'internal' ? 500 : 400 }}
+        >
+          internal
+        </button>
+        <span className="mx-1" style={{ color: 'var(--color-border-strong)' }}>/</span>
+        <button
+          onClick={() => setPlane('external')}
+          style={{ color: plane === 'external' ? 'var(--color-brand)' : 'var(--color-text-disabled)', fontWeight: plane === 'external' ? 500 : 400 }}
+        >
+          external
+        </button>
       </div>
     </div>
   )
 }
 
-// ─── Nav content (shared between fixed sidebar and Sheet) ────────────────────
+// ─── Sidebar content ──────────────────────────────────────────────────────────
 
 function SidebarContent({ mode, onClose }: { mode: Mode; onClose?: () => void }) {
   const pathname = usePathname()
@@ -108,83 +94,81 @@ function SidebarContent({ mode, onClose }: { mode: Mode; onClose?: () => void })
   const isAdmin = user?.role === 'super_admin' || user?.role === 'org_admin'
 
   return (
-    <div className="flex flex-col h-full" style={{ background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)' }}>
-      {/* Logo row */}
-      <div
-        className="flex items-center shrink-0 border-b"
-        style={{ height: 'var(--header-h)', borderColor: 'var(--color-border)', padding: isIconOnly ? '0' : '0 var(--space-4)', justifyContent: isIconOnly ? 'center' : 'space-between' }}
-      >
-        {!isIconOnly && (
-          <span className="text-sm font-semibold truncate" style={{ color: 'var(--color-text)' }}>
-            Company&apos;s Brain
-          </span>
-        )}
-        {mode === 'sheet' && onClose && (
-          <button onClick={onClose} aria-label="Close navigation" className="flex items-center p-1 rounded" style={{ color: 'var(--color-text-muted)' }}>
+    <div className="flex flex-col h-full" style={{ background: 'var(--color-bg)', borderRight: '1px solid var(--color-border)' }}>
+      {/* Sheet header — mobile only */}
+      {mode === 'sheet' && (
+        <div className="flex items-center justify-between px-4 pt-4 pb-2">
+          <span className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>Company&apos;s Brain</span>
+          <button onClick={onClose} aria-label="Close" className="p-1 rounded" style={{ color: 'var(--color-text-muted)' }}>
             <X size={18} />
           </button>
+        </div>
+      )}
+
+      {/* Scrollable: nav + recents */}
+      <div className="flex-grow flex flex-col pt-4 overflow-y-auto custom-scrollbar">
+        <nav aria-label="Main navigation" className="space-y-0.5" style={{ padding: isIconOnly ? '0 8px' : '0 12px' }}>
+          {visible.map((item) => {
+            const active = pathname === item.href || pathname.startsWith(item.href + '/')
+            const linkEl = (
+              <Link
+                href={item.href as Route}
+                {...(mode === 'sheet' && onClose ? { onClick: onClose } : {})}
+                className="flex items-center gap-3 rounded-lg text-sm transition-colors"
+                style={{
+                  padding: '8px 12px',
+                  justifyContent: isIconOnly ? 'center' : 'flex-start',
+                  fontWeight: active ? 500 : 400,
+                  color: active ? 'var(--color-text)' : 'var(--color-text-muted)',
+                  background: active ? 'var(--color-surface)' : 'transparent',
+                  textDecoration: 'none',
+                }}
+                onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = 'var(--color-surface)' }}
+                onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+              >
+                <item.icon size={20} aria-hidden />
+                {!isIconOnly && item.label}
+              </Link>
+            )
+            if (isIconOnly) {
+              return (
+                <Tooltip key={item.href}>
+                  <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
+                  <TooltipContent side="right">{item.label}</TooltipContent>
+                </Tooltip>
+              )
+            }
+            return <div key={item.href}>{linkEl}</div>
+          })}
+        </nav>
+
+        {/* Recents — expanded only */}
+        {!isIconOnly && (
+          <div className="mt-8">
+            <h3 className="px-6 mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-disabled)' }}>
+              Recents
+            </h3>
+            <div className="space-y-0.5 px-3">
+              <p className="px-3 py-2 text-sm italic" style={{ color: 'var(--color-text-disabled)' }}>No recent queries</p>
+            </div>
+          </div>
         )}
+
+        {/* Plane switcher — admins only, pinned to bottom of scroll area */}
+        {isAdmin && <PlaneSwitcher iconOnly={isIconOnly} />}
       </div>
 
-      {/* Nav items */}
-      <nav aria-label="Main navigation" className="flex-1 overflow-y-auto py-3">
-        {visible.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + '/')
-          const linkEl = (
-            <Link
-              href={item.href}
-              {...(mode === 'sheet' && onClose ? { onClick: onClose } : {})}
-              className="flex items-center gap-3 transition-colors duration-200"
-              style={{
-                height: 'var(--sidebar-item-h)',
-                padding: isIconOnly ? '0' : '0 var(--space-4)',
-                justifyContent: isIconOnly ? 'center' : 'flex-start',
-                color: active ? 'var(--color-brand)' : 'var(--color-text-muted)',
-                background: active ? 'var(--color-brand-subtle)' : 'transparent',
-                borderLeft: active && !isIconOnly ? '2px solid var(--color-brand)' : '2px solid transparent',
-                textDecoration: 'none',
-                fontSize: 'var(--text-sm)',
-                fontWeight: active ? 'var(--font-medium)' : 'var(--font-normal)',
-              }}
-              onMouseEnter={(e) => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'var(--color-brand-subtle)' } }}
-              onMouseLeave={(e) => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent' } }}
-            >
-              <item.icon size={16} aria-hidden />
-              {!isIconOnly && <span>{item.label}</span>}
-            </Link>
-          )
-          if (isIconOnly) {
-            return (
-              <Tooltip key={item.href}>
-                <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
-                <TooltipContent side="right">{item.label}</TooltipContent>
-              </Tooltip>
-            )
-          }
-          return <div key={item.href}>{linkEl}</div>
-        })}
-      </nav>
-
-      {/* Plane switcher */}
-      {isAdmin && <PlaneSwitcher iconOnly={isIconOnly} />}
-
       {/* User footer */}
-      <div
-        className="flex items-center shrink-0 gap-3 border-t"
-        style={{
-          padding: isIconOnly ? 'var(--space-3) 0' : 'var(--space-3) var(--space-4)',
-          borderColor: 'var(--color-border)',
-          justifyContent: isIconOnly ? 'center' : 'flex-start',
-        }}
-      >
+      <div className="p-3" style={{ borderTop: '1px solid var(--color-border)' }}>
         {isIconOnly ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Avatar className="size-8 cursor-default" style={{ background: 'var(--color-brand-subtle)' }}>
-                <AvatarFallback className="text-xs font-medium" style={{ color: 'var(--color-brand)', background: 'var(--color-brand-subtle)' }}>
-                  {initials(user?.email ?? '')}
-                </AvatarFallback>
-              </Avatar>
+              <div
+                className="w-8 h-8 mx-auto rounded flex items-center justify-center text-white text-xs font-bold cursor-default"
+                style={{ background: 'var(--color-brand)' }}
+              >
+                {(user?.email?.[0] ?? '?').toUpperCase()}
+              </div>
             </TooltipTrigger>
             <TooltipContent side="right">
               <p>{user?.email}</p>
@@ -193,14 +177,12 @@ function SidebarContent({ mode, onClose }: { mode: Mode; onClose?: () => void })
           </Tooltip>
         ) : (
           <>
-            <Avatar className="size-8 shrink-0" style={{ background: 'var(--color-brand-subtle)' }}>
-              <AvatarFallback className="text-xs font-medium" style={{ color: 'var(--color-brand)', background: 'var(--color-brand-subtle)' }}>
-                {initials(user?.email ?? '')}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text)' }}>{user?.email}</p>
-              <p className="text-xs capitalize" style={{ color: 'var(--color-text-muted)' }}>{user?.role?.replace(/_/g, ' ')}</p>
+            <div className="w-full py-1 px-3 mb-2 rounded text-xs font-bold text-white" style={{ background: 'var(--color-brand)' }}>
+              {(user?.email?.[0] ?? '?').toUpperCase()}
+            </div>
+            <div className="px-1">
+              <p className="text-xs font-semibold truncate" style={{ color: 'var(--color-text)' }}>{user?.email}</p>
+              <p className="text-[11px] capitalize" style={{ color: 'var(--color-text-muted)' }}>{user?.role?.replace(/_/g, ' ')}</p>
             </div>
           </>
         )}
@@ -218,10 +200,7 @@ export function Sidebar() {
   const width = mode === 'expanded' ? 'var(--sidebar-w)' : 'var(--sidebar-w-icon)'
   return (
     <TooltipProvider delayDuration={300}>
-      <aside
-        className="fixed left-0 top-0 h-screen overflow-hidden z-20"
-        style={{ width, transition: 'width 200ms ease' }}
-      >
+      <aside className="h-screen shrink-0 overflow-hidden" style={{ width, transition: 'width 200ms ease' }}>
         <SidebarContent mode={mode} />
       </aside>
     </TooltipProvider>
@@ -238,23 +217,16 @@ export function MobileMenuButton() {
         <button
           onClick={() => setOpen(true)}
           aria-label="Open navigation"
-          className="flex items-center p-0"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)' }}
         >
           <Menu size={20} />
         </button>
         <Sheet open={open} onOpenChange={setOpen}>
-          <SheetContent side="left" className="p-0 w-[260px]" style={{ background: 'var(--color-surface)' }}>
+          <SheetContent side="left" className="p-0 w-[240px]" style={{ background: 'var(--color-bg)' }}>
             <SidebarContent mode="sheet" onClose={() => setOpen(false)} />
           </SheetContent>
         </Sheet>
       </>
     </TooltipProvider>
   )
-}
-
-export function useSidebarWidth() {
-  const w = useWindowWidth()
-  const mode = getMode(w)
-  return mode === 'expanded' ? 'var(--sidebar-w)' : mode === 'icon-only' ? 'var(--sidebar-w-icon)' : '0px'
 }

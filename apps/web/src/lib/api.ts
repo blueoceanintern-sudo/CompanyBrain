@@ -1,3 +1,12 @@
+import type {
+  QueryResponse,
+  DocumentSummary,
+  CompartmentSummary,
+  UserSummary,
+  QueryHistoryItem,
+  UserRole,
+} from '@company-brain/shared'
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002'
 
 async function apiFetch<T>(
@@ -48,7 +57,7 @@ export async function login(email: string, password: string) {
 // ─── Documents ────────────────────────────────────────────────────────────────
 
 export async function getDocuments(orgId: string) {
-  return apiFetch<unknown[]>(`/api/v1/orgs/${orgId}/documents`)
+  return apiFetch<DocumentSummary[]>(`/api/v1/orgs/${orgId}/documents`)
 }
 
 export async function uploadDocument(orgId: string, formData: FormData) {
@@ -65,40 +74,35 @@ export async function deleteDocument(orgId: string, docId: string) {
 // ─── Query ────────────────────────────────────────────────────────────────────
 
 export async function submitQuery(orgId: string, query: string, accessTier: 'internal' | 'external' = 'internal') {
-  return apiFetch<{
-    answer: string
-    citations: Array<{ index: number; chunkId: string; filename: string; compartment: string; excerpt: string }>
-    confidence: number
-    missing: string[]
-  }>(`/api/v1/orgs/${orgId}/query`, {
+  return apiFetch<QueryResponse>(`/api/v1/orgs/${orgId}/query`, {
     method: 'POST',
     body: JSON.stringify({ query, accessTier }),
   })
 }
 
 export async function getQueryHistory(orgId: string) {
-  return apiFetch<unknown[]>(`/api/v1/orgs/${orgId}/queries`)
+  return apiFetch<QueryHistoryItem[]>(`/api/v1/orgs/${orgId}/queries`)
 }
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
 export async function getCompartments(orgId: string) {
-  return apiFetch<unknown[]>(`/api/v1/orgs/${orgId}/compartments`)
+  return apiFetch<CompartmentSummary[]>(`/api/v1/orgs/${orgId}/compartments`)
 }
 
 export async function createCompartment(orgId: string, data: { name: string; description?: string; mode?: string }) {
-  return apiFetch<unknown>(`/api/v1/orgs/${orgId}/compartments`, {
+  return apiFetch<CompartmentSummary>(`/api/v1/orgs/${orgId}/compartments`, {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
 export async function getUsers(orgId: string) {
-  return apiFetch<unknown[]>(`/api/v1/orgs/${orgId}/users`)
+  return apiFetch<UserSummary[]>(`/api/v1/orgs/${orgId}/users`)
 }
 
 export async function inviteUser(orgId: string, data: { email: string; role: string; temporaryPassword: string }) {
-  return apiFetch<unknown>(`/api/v1/orgs/${orgId}/users`, {
+  return apiFetch<{ id: string; email: string; role: UserRole }>(`/api/v1/orgs/${orgId}/users`, {
     method: 'POST',
     body: JSON.stringify(data),
   })

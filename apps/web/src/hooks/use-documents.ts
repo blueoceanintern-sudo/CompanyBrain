@@ -10,12 +10,7 @@ export function useDocuments(orgId: string) {
     queryFn: async () => {
       const result = await getDocuments(orgId)
       if (!result.success) throw new Error(result.error.message)
-      return result.data as Array<{
-        id: string; orgId: string; compartmentId: string; filename: string
-        accessTier: string; sourceType: string; status: string
-        uploadedBy: string; version: number; previousVersionId: string | null
-        createdAt: string; updatedAt: string
-      }>
+      return result.data
     },
     enabled: !!orgId,
   })

@@ -80,6 +80,55 @@ export interface QueryResponse {
   missing: string[]
 }
 
+// ─── API view types (JSON-serialised rows returned to the web client) ─────────
+// Timestamps arrive as ISO strings over JSON, not Date objects.
+
+export interface DocumentSummary {
+  id: string
+  orgId: string
+  compartmentId: string
+  filename: string
+  accessTier: AccessTier
+  sourceType: SourceType
+  contentHash: string
+  status: IngestionStatus
+  uploadedBy: string
+  version: number
+  previousVersionId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CompartmentSummary {
+  id: string
+  orgId: string
+  name: string
+  description: string | null
+  mode: CompartmentMode
+  createdAt: string
+  updatedAt: string
+}
+
+export interface UserSummary {
+  id: string
+  email: string
+  role: UserRole
+  createdAt: string
+}
+
+export interface QueryHistoryItem {
+  id: string
+  orgId: string
+  userId: string
+  queryText: string
+  answer: string | null
+  citations: Citation[] | null
+  confidence: number | null
+  missing: string[] | null
+  accessTier: AccessTier
+  createdAt: string
+}
+
 // ─── Ingestion types ──────────────────────────────────────────────────────────
 
 export interface IngestParams {

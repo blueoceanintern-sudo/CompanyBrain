@@ -124,9 +124,6 @@
   --sidebar-w-closed: 0px;
 }
 
-@media (min-width: 1280px) {
-  :root { --sidebar-w: var(--sidebar-w-xl); }
-}
 @media (max-width: 1023px) and (min-width: 768px) {
   :root { --sidebar-w: var(--sidebar-w-icon); }
 }
@@ -177,6 +174,10 @@
   --color-input:                  var(--input);
   --color-ring:                   var(--ring);
 }
+
+/* ─── Custom scrollbar ──────────────────────────────────────────────────────── */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 10px; }
 
 /* ─── Base resets ───────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }

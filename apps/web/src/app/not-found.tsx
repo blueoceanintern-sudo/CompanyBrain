@@ -16,7 +16,7 @@ export default function NotFound() {
       <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-semibold)' }}>404</h1>
       <p style={{ fontSize: 'var(--text-base)', color: 'var(--color-text-muted)' }}>Page not found</p>
       <Link
-        href="/dashboard/chat"
+        href="/chat"
         style={{
           height: 'var(--input-h)',
           padding: '0 var(--space-5)',

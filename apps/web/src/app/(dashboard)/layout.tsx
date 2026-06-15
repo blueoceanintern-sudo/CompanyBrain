@@ -2,13 +2,12 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sidebar, MobileMenuButton, useSidebarWidth } from '@/components/sidebar'
+import { Sidebar, MobileMenuButton } from '@/components/sidebar'
 import { Providers } from '@/app/providers'
 import { isAuthenticated } from '@/lib/auth'
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const sidebarWidth = useSidebarWidth()
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -22,15 +21,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       <main
         style={{
           flex: 1,
-          marginLeft: sidebarWidth,
+          minWidth: 0,
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          minWidth: 0,
-          transition: 'margin-left 200ms ease',
         }}
       >
-        {/* Mobile top bar — only renders when sidebar is hidden */}
         <MobileTopBar />
         {children}
       </main>

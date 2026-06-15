@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -19,7 +18,7 @@ interface HistoryEntry {
 
 function ThreeDotPulse() {
   return (
-    <div className="flex items-center gap-1.5 px-6 py-5">
+    <div className="flex items-center gap-1.5 px-4 py-5">
       {[0, 1, 2].map((i) => (
         <span
           key={i}
@@ -61,7 +60,7 @@ function AnswerBubble({ response }: { response: QueryResponse }) {
       {confidence !== undefined && confidence < 0.7 && (
         <Badge style={{ background: 'var(--color-warning-subtle)', color: 'var(--color-warning)', border: 'none' }}>Low confidence</Badge>
       )}
-      <div className="rounded-lg" style={{ background: 'var(--color-surface)', padding: 'var(--space-6)', color: 'var(--color-text)', lineHeight: 'var(--leading-relaxed)', fontSize: 'var(--text-base)', boxShadow: 'var(--shadow-sm)' }}>
+      <div className="rounded-lg" style={{ background: 'var(--color-surface)', padding: 'var(--space-5)', color: 'var(--color-text)', lineHeight: 'var(--leading-relaxed)', fontSize: 'var(--text-base)', boxShadow: 'var(--shadow-sm)' }}>
         <TooltipProvider>
           {answer}
           {citations.map((c, i) => <CitationLink key={c.chunkId} index={i + 1} citation={c} />)}
@@ -85,18 +84,74 @@ function HistoryItem({ entry, onToggle }: { entry: HistoryEntry; onToggle: () =>
     <div className="border-b last:border-b-0" style={{ borderColor: 'var(--color-border)' }}>
       <button
         onClick={onToggle}
-        className="w-full text-left px-6 py-4 transition-colors hover:bg-[var(--color-surface)]"
+        className="w-full text-left px-4 py-4 transition-colors hover:bg-[var(--color-surface)]"
         style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: 'var(--color-text)' }}
       >
         <span className="mr-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>{entry.expanded ? '▾' : '▸'}</span>
         {entry.question}
       </button>
       {entry.expanded && (
-        <div className="px-6 pb-6"><AnswerBubble response={entry.response} /></div>
+        <div className="px-4 pb-5"><AnswerBubble response={entry.response} /></div>
       )}
     </div>
   )
 }
+
+// ─── Pill input (shared between empty and chat states) ────────────────────────
+
+function QueryInput({
+  value,
+  onChange,
+  onSubmit,
+  disabled,
+  textareaRef,
+}: {
+  value: string
+  onChange: (v: string) => void
+  onSubmit: () => void
+  disabled: boolean
+  textareaRef: React.RefObject<HTMLTextAreaElement>
+}) {
+  const autoResize = () => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+  }
+
+  return (
+    <div
+      className="flex items-end gap-3 rounded-full shadow-sm transition-shadow hover:shadow-md"
+      style={{
+        background: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        padding: '10px 16px 10px 20px',
+      }}
+    >
+      <Textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(e) => { onChange(e.target.value); autoResize() }}
+        onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onSubmit() } }}
+        placeholder="Ask anything"
+        rows={1}
+        className="flex-1 resize-none overflow-hidden border-0 bg-transparent shadow-none focus-visible:ring-0 p-0"
+        style={{ minHeight: 24, fontSize: 'var(--text-sm)', color: 'var(--color-text)', lineHeight: '1.5' }}
+      />
+      <button
+        onClick={onSubmit}
+        disabled={!value.trim() || disabled}
+        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-opacity disabled:opacity-30"
+        style={{ background: 'var(--color-text)', color: 'var(--color-bg)' }}
+        aria-label="Send"
+      >
+        <SendHorizontal size={14} aria-hidden />
+      </button>
+    </div>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ChatPage() {
   const user = getAuthUser()
@@ -111,13 +166,6 @@ export default function ChatPage() {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [history, submit.isPending])
-
-  const autoResize = () => {
-    const el = textareaRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
-  }
 
   const handleSubmit = () => {
     const q = input.trim()
@@ -134,48 +182,58 @@ export default function ChatPage() {
     })
   }
 
+  const isEmpty = history.length === 0 && !submit.isPending
+
+  // Empty state: vertically centered with input below the heading
+  if (isEmpty) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6 gap-8">
+        <div className="text-center">
+          <h1 className="font-medium" style={{ fontSize: 'var(--text-2xl)', color: 'var(--color-text)' }}>
+            Ready when you are.
+          </h1>
+          <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+            Query the knowledge base with a plain-language question.
+          </p>
+        </div>
+        <div className="w-full" style={{ maxWidth: 640 }}>
+          <QueryInput
+            value={input}
+            onChange={setInput}
+            onSubmit={handleSubmit}
+            disabled={submit.isPending}
+            textareaRef={textareaRef}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  // Chat state: scrollable history + input pinned to bottom
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center shrink-0 border-b sticky top-0 z-10" style={{ height: 'var(--header-h)', padding: '0 var(--space-8)', background: 'var(--color-bg)', borderColor: 'var(--color-border)' }}>
-        <h1 className="font-semibold" style={{ fontSize: 'var(--text-lg)' }}>Chat</h1>
-      </div>
-
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="mx-auto" style={{ maxWidth: 'min(800px, 100%)' }}>
-          {history.length === 0 && !submit.isPending && (
-            <div className="flex flex-col items-center justify-center py-24 gap-2 text-center">
-              <p className="font-medium" style={{ fontSize: 'var(--text-lg)', color: 'var(--color-text)' }}>Ask anything</p>
-              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Query the knowledge base with a plain-language question.</p>
-            </div>
-          )}
+        <div className="mx-auto" style={{ maxWidth: 640 }}>
           {history.map((entry) => (
-            <HistoryItem key={entry.id} entry={entry} onToggle={() => setHistory((prev) => prev.map((h) => h.id === entry.id ? { ...h, expanded: !h.expanded } : h))} />
+            <HistoryItem
+              key={entry.id}
+              entry={entry}
+              onToggle={() => setHistory((prev) => prev.map((h) => h.id === entry.id ? { ...h, expanded: !h.expanded } : h))}
+            />
           ))}
           {submit.isPending && <ThreeDotPulse />}
         </div>
       </div>
 
-      <div className="shrink-0 border-t sticky bottom-0" style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', padding: 'var(--space-4) var(--space-8)' }}>
-        <div className="mx-auto flex gap-3 items-end" style={{ maxWidth: 'min(800px, 100%)' }}>
-          <Textarea
-            ref={textareaRef}
+      <div className="shrink-0 sticky bottom-0 p-4" style={{ background: 'var(--color-bg)' }}>
+        <div className="mx-auto" style={{ maxWidth: 640 }}>
+          <QueryInput
             value={input}
-            onChange={(e) => { setInput(e.target.value); autoResize() }}
-            onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); handleSubmit() } }}
-            placeholder="Ask a question… (⌘ Enter to send)"
-            rows={1}
-            className="flex-1 resize-none overflow-hidden"
-            style={{ minHeight: 'var(--input-h)', borderRadius: 'var(--radius-lg)', fontSize: 'var(--text-sm)' }}
+            onChange={setInput}
+            onSubmit={handleSubmit}
+            disabled={submit.isPending}
+            textareaRef={textareaRef}
           />
-          <Button
-            onClick={handleSubmit}
-            disabled={!input.trim() || submit.isPending}
-            size="icon"
-            style={{ height: 'var(--input-h)', width: 'var(--input-h)', borderRadius: 'var(--radius-lg)', flexShrink: 0 }}
-          >
-            <SendHorizontal size={16} aria-hidden />
-            <span className="sr-only">Send</span>
-          </Button>
         </div>
       </div>
     </div>
