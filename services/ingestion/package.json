@@ -6,6 +6,7 @@
   "dependencies": {
     "@company-brain/db": "workspace:*",
     "@company-brain/shared": "workspace:*",
+    "drizzle-orm": "^0.31.4",
     "openai": "^4.52.0",
     "pdf-parse": "^1.1.1",
     "mammoth": "^1.7.2",

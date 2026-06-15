@@ -6,6 +6,7 @@
   "dependencies": {
     "@company-brain/db": "workspace:*",
     "@company-brain/shared": "workspace:*",
+    "drizzle-orm": "^0.31.4",
     "stripe": "^16.2.0"
   }
 }

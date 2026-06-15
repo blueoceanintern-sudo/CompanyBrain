@@ -9,6 +9,13 @@
       "Bash(bunx tsc *)",
       "Bash(bun dev *)",
       "Bash(npx shadcn@latest add button input textarea select dialog sheet tooltip table tabs badge skeleton avatar card sonner toggle-group separator label scroll-area --overwrite --yes)"
+    ],
+    "deny": [
+      "Read(*/.env)",
+      "Read(*/.env.local)",
+      "Bash(cat .env*)",
+      "Bash(grep .env*)",
+      "Bash(less .env*)"
     ]
   }
 }
