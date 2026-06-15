@@ -8,6 +8,37 @@ import { useUsers, useInviteUser, useUpdateUserRole } from '@/hooks/use-users'
 import { getAuthUser } from '@/lib/auth'
 import { formatDate } from '@/lib/utils'
 
+interface PendingRoleChange {
+  userId: string
+  email: string
+  currentRole: string
+  pendingRole: string
+}
+
+function RoleConfirmDialog({ pending, onConfirm, onCancel }: { pending: PendingRoleChange; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div
+      role="dialog"
+      aria-labelledby="role-confirm-title"
+      onClick={(e) => e.target === e.currentTarget && onCancel()}
+      style={{ position: 'fixed', inset: 0, background: 'oklch(0% 0 0 / 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+    >
+      <div style={{ background: 'var(--color-surface-raised)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-8)', width: 'min(400px, 90vw)', boxShadow: 'var(--shadow-lg)' }}>
+        <h2 id="role-confirm-title" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', margin: '0 0 var(--space-3)' }}>Change role?</h2>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', margin: '0 0 var(--space-6)', lineHeight: 'var(--leading-relaxed)' }}>
+          Set <strong style={{ color: 'var(--color-text)' }}>{pending.email}</strong> from{' '}
+          <strong style={{ color: 'var(--color-text)' }}>{pending.currentRole.replace(/_/g, ' ')}</strong> to{' '}
+          <strong style={{ color: 'var(--color-text)' }}>{pending.pendingRole.replace(/_/g, ' ')}</strong>?
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
+          <button type="button" onClick={onCancel} style={{ height: 'var(--input-h)', padding: '0 var(--space-5)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'transparent', fontSize: 'var(--text-sm)', cursor: 'pointer', color: 'var(--color-text)' }}>Cancel</button>
+          <button type="button" onClick={onConfirm} style={{ height: 'var(--input-h)', padding: '0 var(--space-5)', border: 'none', borderRadius: 'var(--radius-md)', background: 'var(--color-brand)', color: 'var(--color-brand-fg)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', cursor: 'pointer' }}>Confirm</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const ROLE_STYLE: Record<string, { bg: string; color: string }> = {
   super_admin:     { bg: 'var(--color-danger-subtle)',   color: 'var(--color-danger)'   },
   org_admin:       { bg: 'var(--color-brand-subtle)',    color: 'var(--color-brand)'    },
@@ -93,6 +124,8 @@ export default function UsersPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
   const [showInvite, setShowInvite] = useState(false)
+  const [pendingRole, setPendingRole] = useState<PendingRoleChange | null>(null)
+  const [cancelKey, setCancelKey] = useState(0)
 
   const { data: users = [], isLoading } = useUsers(orgId)
   const updateRole = useUpdateUserRole(orgId)
@@ -144,9 +177,15 @@ export default function UsersPage() {
                       <td style={{ padding: '0 var(--space-4)', height: 'var(--row-height-default)', color: 'var(--color-text-muted)', width: 120 }}>{formatDate(u.createdAt)}</td>
                       <td style={{ padding: '0 var(--space-4)', height: 'var(--row-height-default)', width: 120 }}>
                         <select
+                          key={u.id + '-' + cancelKey}
                           defaultValue={u.role}
                           aria-label={`Change role for ${u.email}`}
-                          onChange={(e) => updateRole.mutate({ userId: u.id, role: e.target.value })}
+                          onChange={(e) => {
+                            const newRole = e.target.value
+                            if (newRole !== u.role) {
+                              setPendingRole({ userId: u.id, email: u.email, currentRole: u.role, pendingRole: newRole })
+                            }
+                          }}
                           style={{ height: 28, padding: '0 var(--space-2)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', background: 'var(--color-surface-raised)', fontSize: 'var(--text-xs)', color: 'var(--color-text)', cursor: 'pointer' }}
                         >
                           <option value="staff">Staff</option>
@@ -165,6 +204,19 @@ export default function UsersPage() {
       </div>
 
       {showInvite && <InviteDialog orgId={orgId} onClose={() => setShowInvite(false)} />}
+      {pendingRole && (
+        <RoleConfirmDialog
+          pending={pendingRole}
+          onConfirm={() => {
+            updateRole.mutate({ userId: pendingRole.userId, role: pendingRole.pendingRole })
+            setPendingRole(null)
+          }}
+          onCancel={() => {
+            setCancelKey((k) => k + 1)
+            setPendingRole(null)
+          }}
+        />
+      )}
     </div>
   )
 }

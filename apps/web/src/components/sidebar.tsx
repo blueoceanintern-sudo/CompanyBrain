@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import type { Route } from 'next'
-import { usePathname } from 'next/navigation'
-import { MessageSquare, FileText, BarChart2, Shield, Users, Settings, Menu, X, type LucideIcon } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { MessageSquare, FileText, BarChart2, Shield, Users, Settings, Menu, X, LogOut, type LucideIcon } from 'lucide-react'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, clearAuth } from '@/lib/auth'
 
 // Navy sidebar palette — all inline, intentionally NOT using --color-surface tokens
 const NAVY        = 'oklch(35% 0.22 258)'
@@ -35,7 +35,7 @@ const NAV: NavItem[] = [
 ]
 
 function useWindowWidth() {
-  const [w, setW] = useState(1280)
+  const [w, setW] = useState<number | null>(null)
   useEffect(() => {
     setW(window.innerWidth)
     const h = () => setW(window.innerWidth)
@@ -98,42 +98,49 @@ function PlaneSwitcher({ iconOnly }: { iconOnly?: boolean }) {
 
 function SidebarContent({ mode, onClose }: { mode: Mode; onClose?: () => void }) {
   const pathname = usePathname()
-  const user = getAuthUser()
+  const router = useRouter()
+  const [user, setUser] = useState<ReturnType<typeof getAuthUser>>(null)
   const isIconOnly = mode === 'icon-only'
+
+  useEffect(() => {
+    setUser(getAuthUser())
+  }, [])
+
   const visible = NAV.filter((n) => n.roles.includes(user?.role ?? ''))
   const isAdmin = user?.role === 'super_admin' || user?.role === 'org_admin'
+  const initial = (user?.email?.[0] ?? '?').toUpperCase()
+
+  const handleLogout = () => {
+    clearAuth()
+    router.replace('/login')
+  }
 
   return (
     <div className="flex flex-col h-full" style={{ background: NAVY, borderRight: NAVY_BORDER }}>
 
       {/* Logo / brand header */}
-      {mode !== 'sheet' && (
-        <div
-          className="flex items-center shrink-0"
-          style={{
-            height: 'var(--header-h)',
-            padding: isIconOnly ? '0' : '0 var(--space-5)',
-            justifyContent: isIconOnly ? 'center' : 'flex-start',
-            borderBottom: NAVY_BORDER,
-          }}
-        >
-          {isIconOnly ? (
-            <span className="text-sm font-bold" style={{ color: WHITE, letterSpacing: '-0.01em' }}>CB</span>
-          ) : (
+      <div
+        className="flex items-center shrink-0"
+        style={{
+          height: 'var(--header-h)',
+          padding: isIconOnly ? '0' : '0 var(--space-5)',
+          justifyContent: isIconOnly ? 'center' : 'flex-start',
+          borderBottom: NAVY_BORDER,
+        }}
+      >
+        {isIconOnly ? (
+          <span className="text-sm font-bold" style={{ color: WHITE, letterSpacing: '-0.01em' }}>CB</span>
+        ) : (
+          <div className="flex items-center justify-between w-full">
             <span className="text-sm font-semibold" style={{ color: WHITE, letterSpacing: '-0.01em' }}>Company&apos;s Brain</span>
-          )}
-        </div>
-      )}
-
-      {/* Sheet header — mobile only */}
-      {mode === 'sheet' && (
-        <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <span className="text-sm font-semibold" style={{ color: WHITE }}>Company&apos;s Brain</span>
-          <button onClick={onClose} aria-label="Close" className="p-1 rounded" style={{ color: WHITE_70 }}>
-            <X size={18} />
-          </button>
-        </div>
-      )}
+            {mode === 'sheet' && (
+              <button onClick={onClose} aria-label="Close" className="p-1 rounded" style={{ color: WHITE_70 }}>
+                <X size={18} />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Scrollable: nav + recents */}
       <div className="flex-grow flex flex-col pt-3 overflow-y-auto custom-scrollbar">
@@ -180,18 +187,6 @@ function SidebarContent({ mode, onClose }: { mode: Mode; onClose?: () => void })
           })}
         </nav>
 
-        {/* Recents — expanded only */}
-        {!isIconOnly && (
-          <div className="mt-8">
-            <h3 className="px-6 mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: WHITE_40 }}>
-              Recents
-            </h3>
-            <div className="space-y-0.5 px-3">
-              <p className="px-3 py-2 text-sm italic" style={{ color: WHITE_40 }}>No recent queries</p>
-            </div>
-          </div>
-        )}
-
         {/* Plane switcher — admins only */}
         {isAdmin && <PlaneSwitcher iconOnly={isIconOnly} />}
       </div>
@@ -199,20 +194,37 @@ function SidebarContent({ mode, onClose }: { mode: Mode; onClose?: () => void })
       {/* User footer */}
       <div className="p-3" style={{ borderTop: NAVY_BORDER }}>
         {isIconOnly ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div
-                className="w-8 h-8 mx-auto rounded flex items-center justify-center text-xs font-bold cursor-default"
-                style={{ background: WHITE_15, color: WHITE }}
-              >
-                {(user?.email?.[0] ?? '?').toUpperCase()}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>{user?.email}</p>
-              <p className="opacity-60 text-xs">{user?.role?.replace(/_/g, ' ')}</p>
-            </TooltipContent>
-          </Tooltip>
+          <>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className="w-8 h-8 mx-auto rounded flex items-center justify-center text-xs font-bold cursor-default"
+                  style={{ background: WHITE_15, color: WHITE }}
+                >
+                  {initial}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>{user?.email}</p>
+                <p className="opacity-60 text-xs">{user?.role?.replace(/_/g, ' ')}</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleLogout}
+                  aria-label="Log out"
+                  className="w-8 h-8 mx-auto mt-1 rounded flex items-center justify-center transition-colors"
+                  style={{ color: 'var(--color-text-muted)', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--color-surface)' }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                >
+                  <LogOut size={16} aria-hidden />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Log out</TooltipContent>
+            </Tooltip>
+          </>
         ) : (
           <div className="flex items-center gap-3 px-1">
             <div
@@ -225,6 +237,16 @@ function SidebarContent({ mode, onClose }: { mode: Mode; onClose?: () => void })
               <p className="text-xs font-semibold truncate" style={{ color: WHITE }}>{user?.email}</p>
               <p className="text-[11px] capitalize" style={{ color: WHITE_70 }}>{user?.role?.replace(/_/g, ' ')}</p>
             </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 w-full rounded-lg text-sm transition-colors"
+              style={{ padding: '6px 12px', color: 'var(--color-text-muted)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--color-surface)' }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+            >
+              <LogOut size={16} aria-hidden />
+              Log out
+            </button>
           </div>
         )}
       </div>
@@ -236,6 +258,7 @@ function SidebarContent({ mode, onClose }: { mode: Mode; onClose?: () => void })
 
 export function Sidebar() {
   const w = useWindowWidth()
+  if (w === null) return <aside className="h-screen shrink-0" style={{ width: 'var(--sidebar-w)' }} />
   const mode = getMode(w)
   if (mode === 'sheet') return null
   const width = mode === 'expanded' ? 'var(--sidebar-w)' : 'var(--sidebar-w-icon)'
@@ -251,7 +274,7 @@ export function Sidebar() {
 export function MobileMenuButton() {
   const [open, setOpen] = useState(false)
   const w = useWindowWidth()
-  if (w >= 768) return null
+  if (w === null || w >= 768) return null
   return (
     <TooltipProvider>
       <>

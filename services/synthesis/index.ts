@@ -4,6 +4,16 @@ import { SYNTHESIS_MODEL, CITATION_EXCERPT_LENGTH } from '@company-brain/shared'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+function friendlyServiceError(raw: string): string {
+  if (raw.includes('401') || /api.?key|authentication|unauthorized/i.test(raw))
+    return 'The answer service is not configured. Please contact your administrator.'
+  if (raw.includes('429') || /rate.?limit/i.test(raw))
+    return 'Too many requests. Please wait a moment and try again.'
+  if (/timeout|ETIMEDOUT|ECONNREFUSED/i.test(raw))
+    return 'Answer generation timed out. Please try again.'
+  return 'Answer generation is temporarily unavailable. Please try again.'
+}
+
 function buildPrompt(query: string, chunks: SynthesisParams['chunks']): string {
   const context = chunks
     .map(
@@ -86,7 +96,9 @@ export async function synthesizeAnswer(
 
     return { success: true, data: { answer: answerText, citations, missing } }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Synthesis failed'
+    console.error('[synthesis]', err)
+    const raw = err instanceof Error ? err.message : ''
+    const message = friendlyServiceError(raw)
     return { success: false, error: { code: 'SYNTHESIS_ERROR', message } }
   }
 }

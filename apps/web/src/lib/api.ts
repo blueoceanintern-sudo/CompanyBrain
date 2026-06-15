@@ -9,10 +9,28 @@ import type {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002'
 
+type ApiResult<T> = { success: true; data: T } | { success: false; error: { code: string; message: string } }
+
+function networkError(message: string): { success: false; error: { code: string; message: string } } {
+  return { success: false, error: { code: 'NETWORK_ERROR', message } }
+}
+
+async function parseResult<T>(res: Response): Promise<ApiResult<T>> {
+  const contentType = res.headers.get('content-type') ?? ''
+  if (!contentType.includes('application/json')) {
+    return networkError(`Unexpected server response (${res.status})`)
+  }
+  try {
+    return await res.json() as ApiResult<T>
+  } catch {
+    return networkError('Failed to parse server response')
+  }
+}
+
 async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
-): Promise<{ success: true; data: T } | { success: false; error: { code: string; message: string } }> {
+): Promise<ApiResult<T>> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
 
   const headers: Record<string, string> = {
@@ -22,20 +40,28 @@ async function apiFetch<T>(
 
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers })
-  return res.json() as Promise<{ success: true; data: T } | { success: false; error: { code: string; message: string } }>
+  try {
+    const res = await fetch(`${API_URL}${path}`, { ...options, headers })
+    return parseResult<T>(res)
+  } catch {
+    return networkError('Could not reach the server. Check your connection.')
+  }
 }
 
 async function apiUpload<T>(
   path: string,
   formData: FormData
-): Promise<{ success: true; data: T } | { success: false; error: { code: string; message: string } }> {
+): Promise<ApiResult<T>> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
   const headers: Record<string, string> = {}
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(`${API_URL}${path}`, { method: 'POST', headers, body: formData })
-  return res.json() as Promise<{ success: true; data: T } | { success: false; error: { code: string; message: string } }>
+  try {
+    const res = await fetch(`${API_URL}${path}`, { method: 'POST', headers, body: formData })
+    return parseResult<T>(res)
+  } catch {
+    return networkError('Could not reach the server. Check your connection.')
+  }
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -146,9 +172,13 @@ export async function cancelSubscription(orgId: string) {
 
 export async function exportAuditLog(orgId: string): Promise<Blob> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
-  const res = await fetch(`${API_URL}/api/v1/orgs/${orgId}/analytics/export`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
-  if (!res.ok) throw new Error('Failed to export audit log')
-  return res.blob()
+  try {
+    const res = await fetch(`${API_URL}/api/v1/orgs/${orgId}/analytics/export`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (!res.ok) throw new Error(`Server error: ${res.status}`)
+    return res.blob()
+  } catch (err) {
+    throw err instanceof Error ? err : new Error('Failed to export audit log')
+  }
 }

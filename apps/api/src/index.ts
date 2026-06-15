@@ -40,6 +40,18 @@ orgApp.route('/analytics', analyticsRoute)
 
 app.route('/api/v1/orgs/:id', orgApp)
 
+app.onError((err, c) => {
+  console.error('[unhandled]', err)
+  return c.json(
+    { success: false, error: { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' } },
+    500
+  )
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason)
+})
+
 const port = Number(process.env.PORT ?? 3002)
 console.log(`API listening on port ${port}`)
 

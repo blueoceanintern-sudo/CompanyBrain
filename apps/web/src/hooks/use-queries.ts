@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery, useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { submitQuery, getQueryHistory } from '@/lib/api'
 
 export function useQueryHistory(orgId: string) {
@@ -21,6 +22,9 @@ export function useSubmitQuery(orgId: string, accessTier: 'internal' | 'external
       const result = await submitQuery(orgId, query, accessTier)
       if (!result.success) throw new Error(result.error.message)
       return result.data
+    },
+    onError: (err: Error) => {
+      toast.error(err.message)
     },
   })
 }

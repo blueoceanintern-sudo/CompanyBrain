@@ -15,6 +15,16 @@ import { canAccessChunk } from '@company-brain/access-control'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
+function friendlyServiceError(raw: string): string {
+  if (raw.includes('401') || /api.?key|authentication|unauthorized/i.test(raw))
+    return 'The knowledge base search is not configured. Please contact your administrator.'
+  if (raw.includes('429') || /rate.?limit/i.test(raw))
+    return 'Too many requests. Please wait a moment and try again.'
+  if (/timeout|ETIMEDOUT|ECONNREFUSED/i.test(raw))
+    return 'Search timed out. Please try again.'
+  return 'Search is temporarily unavailable. Please try again.'
+}
+
 // ─── Embed a single query ─────────────────────────────────────────────────────
 
 async function embedQuery(text: string): Promise<number[]> {
@@ -253,7 +263,9 @@ export async function retrieveChunks(
 
     return { success: true, data: { chunks: enriched, confidence } }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Retrieval failed'
+    console.error('[retrieval]', err)
+    const raw = err instanceof Error ? err.message : ''
+    const message = friendlyServiceError(raw)
     return { success: false, error: { code: 'RETRIEVAL_ERROR', message } }
   }
 }

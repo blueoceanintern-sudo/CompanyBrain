@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Upload, Trash2 } from 'lucide-react'
+import { Upload, Trash2, Paperclip } from 'lucide-react'
 import { useDocuments, useUploadDocument, useDeleteDocument } from '@/hooks/use-documents'
 import { useCompartments } from '@/hooks/use-compartments'
 import { getAuthUser } from '@/lib/auth'
@@ -46,8 +46,10 @@ type UploadFormValues = z.infer<typeof uploadSchema>
 
 function UploadDialog({ orgId, onClose }: { orgId: string; onClose: () => void }) {
   const [file, setFile] = useState<File | null>(null)
-  const { data: compartments = [] } = useCompartments(orgId)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { data: compartments = [], isLoading: compartmentsLoading } = useCompartments(orgId)
   const upload = useUploadDocument(orgId)
+  const noCompartments = !compartmentsLoading && compartments.length === 0
 
   const { register, handleSubmit, formState: { errors } } = useForm<UploadFormValues>({
     resolver: zodResolver(uploadSchema),
@@ -80,15 +82,44 @@ function UploadDialog({ orgId, onClose }: { orgId: string; onClose: () => void }
       <div style={{ background: 'var(--color-surface-raised)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-8)', width: 'min(480px, 90vw)', boxShadow: 'var(--shadow-lg)' }}>
         <h2 id="upload-title" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', margin: '0 0 var(--space-6)' }}>Upload document</h2>
 
+        {noCompartments ? (
+          <div style={{ padding: 'var(--space-4)', background: 'var(--color-warning-subtle)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-4)' }}>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-warning)', margin: 0 }}>
+              No compartments yet — create one in Settings before uploading.
+            </p>
+          </div>
+        ) : null}
+
         <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <div>
             <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>File (PDF, Word, or plain text)</label>
-            <input type="file" accept=".pdf,.doc,.docx,.txt" onChange={(e) => setFile(e.target.files?.[0] ?? null)} style={{ fontSize: 'var(--text-sm)' }} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx,.txt"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              style={{ display: 'none' }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                width: '100%', height: 'var(--input-h)', padding: '0 var(--space-3)',
+                border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface-raised)',
+                color: file ? 'var(--color-text)' : 'var(--color-text-muted)',
+                fontSize: 'var(--text-sm)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 'var(--space-2)', textAlign: 'left',
+              }}
+            >
+              <Paperclip size={13} aria-hidden />
+              {file ? file.name : 'Choose file…'}
+            </button>
           </div>
 
           <div>
             <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>Compartment</label>
-            <select {...register('compartmentId')} style={inputStyle}>
+            <select {...register('compartmentId')} disabled={noCompartments} style={{ ...inputStyle, opacity: noCompartments ? 0.5 : 1 }}>
               {compartments.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             {errors.compartmentId && <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)', marginTop: 2 }}>{errors.compartmentId.message}</p>}
@@ -114,7 +145,7 @@ function UploadDialog({ orgId, onClose }: { orgId: string; onClose: () => void }
             <button type="button" onClick={onClose} style={{ height: 'var(--input-h)', padding: '0 var(--space-5)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'transparent', fontSize: 'var(--text-sm)', cursor: 'pointer', color: 'var(--color-text)' }}>
               Cancel
             </button>
-            <button type="submit" disabled={!file || upload.isPending} style={{ height: 'var(--input-h)', padding: '0 var(--space-5)', border: 'none', borderRadius: 'var(--radius-md)', background: 'var(--color-brand)', color: 'var(--color-brand-fg)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', cursor: upload.isPending ? 'not-allowed' : 'pointer' }}>
+            <button type="submit" disabled={!file || upload.isPending || noCompartments} style={{ height: 'var(--input-h)', padding: '0 var(--space-5)', border: 'none', borderRadius: 'var(--radius-md)', background: 'var(--color-brand)', color: 'var(--color-brand-fg)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', opacity: (!file || noCompartments) ? 0.5 : 1, cursor: (upload.isPending || noCompartments) ? 'not-allowed' : 'pointer' }}>
               {upload.isPending ? 'Uploading…' : 'Upload'}
             </button>
           </div>
