@@ -17,6 +17,8 @@ Company's Brain is a **B2B enterprise knowledge operating system** — not a con
 
 Reference tone: **Linear, Raycast, Retool**. Not: Canva, Loom, ChatGPT, or consumer AI apps.
 
+Built for **BlueOcean (EQuest Education Group)**. Brand palette: royal blue primary (#1565e8), deep navy for elevated surfaces (#1a2fa8), light sky blue for subtle tints (#dce8ff).
+
 ---
 
 ## Colour Tokens
@@ -28,14 +30,14 @@ Defined in `apps/web/src/app/globals.css` as CSS custom properties using `oklch`
 ```css
 :root {
   /* Brand */
-  --color-brand:           oklch(52% 0.18 250);   /* deep blue — primary actions, active states */
-  --color-brand-subtle:    oklch(95% 0.04 250);   /* brand tint — hover backgrounds, selected rows */
+  --color-brand:           oklch(48% 0.24 255);   /* royal blue — buttons, active states */
+  --color-brand-subtle:    oklch(93% 0.06 248);   /* sky blue tint — hover backgrounds, selected rows */
   --color-brand-fg:        oklch(100% 0 0);       /* white — text on brand backgrounds */
 
   /* Neutral surface */
-  --color-bg:              oklch(99% 0 0);        /* page background */
-  --color-surface:         oklch(97% 0 0);        /* cards, panels, sidebar */
-  --color-surface-raised:  oklch(100% 0 0);       /* modals, popovers, inputs */
+  --color-bg:              oklch(93% 0.06 248);   /* sky blue — page background (BlueOcean brand) */
+  --color-surface:         oklch(100% 0 0);       /* white — cards, panels pop off the blue bg */
+  --color-surface-raised:  oklch(100% 0 0);       /* white — modals, popovers, inputs */
   --color-border:          oklch(90% 0 0);        /* dividers, input borders */
   --color-border-strong:   oklch(80% 0 0);        /* focused input borders */
 
@@ -53,8 +55,8 @@ Defined in `apps/web/src/app/globals.css` as CSS custom properties using `oklch`
   --color-danger-subtle:   oklch(97% 0.04 25);
 
   /* Access tier — reinforce architecture in the UI */
-  --color-internal:        oklch(55% 0.16 270);   /* purple — internal plane */
-  --color-internal-subtle: oklch(96% 0.04 270);
+  --color-internal:        oklch(35% 0.22 258);   /* deep navy — admin/elevated UI elements */
+  --color-internal-subtle: oklch(93% 0.06 248);   /* sky blue tint */
   --color-external:        oklch(55% 0.16 155);   /* green — external plane */
   --color-external-subtle: oklch(96% 0.04 155);
 }
@@ -65,8 +67,8 @@ Defined in `apps/web/src/app/globals.css` as CSS custom properties using `oklch`
 ```css
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-brand:           oklch(65% 0.18 250);
-    --color-brand-subtle:    oklch(25% 0.06 250);
+    --color-brand:           oklch(62% 0.22 255);
+    --color-brand-subtle:    oklch(22% 0.10 255);
     --color-brand-fg:        oklch(100% 0 0);
 
     --color-bg:              oklch(10% 0 0);
@@ -86,8 +88,8 @@ Defined in `apps/web/src/app/globals.css` as CSS custom properties using `oklch`
     --color-danger:          oklch(65% 0.20 25);
     --color-danger-subtle:   oklch(20% 0.06 25);
 
-    --color-internal:        oklch(65% 0.16 270);
-    --color-internal-subtle: oklch(20% 0.05 270);
+    --color-internal:        oklch(50% 0.20 258);
+    --color-internal-subtle: oklch(20% 0.08 258);
     --color-external:        oklch(65% 0.16 155);
     --color-external-subtle: oklch(20% 0.05 155);
   }
@@ -98,11 +100,11 @@ Defined in `apps/web/src/app/globals.css` as CSS custom properties using `oklch`
 
 ## Typography
 
-Font: **Inter** via `next/font/google`. Monospace: **JetBrains Mono** for IDs, hashes, timestamps, audit log actions.
+Font: **Be Vietnam Pro** via `next/font/google`. Monospace: **JetBrains Mono** for IDs, hashes, timestamps, audit log actions.
 
 ```css
 :root {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Be Vietnam Pro', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
   /* Fluid scale — clamp(min, preferred, max) so text adapts between breakpoints */
@@ -292,15 +294,19 @@ Different screens have different optimal reading/data widths. Always `width: 100
 
 ## Sidebar
 
+### Sidebar background
+
+The sidebar uses `--color-internal` (deep navy `oklch(35% 0.22 258)`) as its background — **not** `--color-surface`. This is hardcoded in `sidebar.tsx` via an inline constant. All sidebar colours are white at varying opacity levels on the navy background.
+
 ### Nav items
 
 ```
-[Icon]  Label text               ← default: text-muted, transparent bg
-[Icon]  Label text               ← hover: brand-subtle bg (200ms ease)
-[Icon]  Label text    ▌          ← active: brand-subtle bg, brand text, 2px left border brand
+[Icon]  Label text               ← default: white 70% opacity, transparent bg
+[Icon]  Label text               ← hover:   white 100%, white/10% bg
+[Icon]  Label text    ▌          ← active:  white 100%, white/15% bg, 2px solid white left border
 ```
 
-In icon-only mode (md breakpoint), labels are hidden and icons are centred. Active state shows the left border only — no background label.
+In icon-only mode (md breakpoint), labels are hidden and icons are centred. Active state keeps the white left border; background stays white/15%.
 
 Nav items by role:
 
@@ -326,15 +332,16 @@ Segmented toggle — not a dropdown. Selected segment uses the corresponding `--
 ### User footer
 
 ```
-[Avatar]  John Smith          ← full sidebar
-          Org Admin · Equest
+[Avatar]  john@example.com    ← full sidebar (white text on navy)
+          org admin
 ```
 
 In icon-only mode: avatar only, with name + role in a `Tooltip`.
 
-- Avatar: 32px circle, `--color-brand-subtle` bg, `--color-brand` initials, `--font-medium`
-- Name: `--text-sm --font-medium`
-- Role · Org: `--text-xs --color-text-muted`
+- Avatar: 32px square, `white/15%` bg, white initials, `--font-medium`
+- Name: `--text-xs --font-semibold` white
+- Role: `--text-[11px] capitalize` white/70%
+- Section border: white/10%
 
 ---
 
