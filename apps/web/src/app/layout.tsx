@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
-import { Inter, JetBrains_Mono } from 'next/font/google'
+import { Be_Vietnam_Pro, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 
-const inter = Inter({
+const beVietnamPro = Be_Vietnam_Pro({
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-sans',
   display: 'swap',
 })
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetBrainsMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${beVietnamPro.variable} ${jetBrainsMono.variable}`} suppressHydrationWarning>
       <body>{children}</body>
     </html>
   )

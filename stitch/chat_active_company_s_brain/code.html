@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Company's Brain - Chat Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface": "#f8f9ff",
+                        "on-secondary": "#ffffff",
+                        "surface-bright": "#f8f9ff",
+                        "on-error": "#ffffff",
+                        "surface-container-low": "#eff4ff",
+                        "on-surface": "#0b1c30",
+                        "on-surface-variant": "#434655",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed": "#360f00",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-secondary-fixed-variant": "#40484f",
+                        "on-secondary-fixed": "#151c23",
+                        "primary-fixed": "#dbe1ff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "tertiary": "#943700",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-container": "#ffede6",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "secondary-fixed-dim": "#c0c7d0",
+                        "surface-container": "#e5eeff",
+                        "on-primary-container": "#eeefff",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "secondary": "#585f67",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed": "#ffdbcd",
+                        "background": "#f8f9ff",
+                        "surface-variant": "#d3e4fe",
+                        "surface-container-highest": "#d3e4fe",
+                        "on-primary-fixed": "#00174b",
+                        "inverse-primary": "#b4c5ff",
+                        "inverse-surface": "#213145",
+                        "on-error-container": "#93000a",
+                        "primary-container": "#2563eb",
+                        "outline-variant": "#c3c6d7",
+                        "secondary-fixed": "#dce3ec",
+                        "surface-container-high": "#dce9ff",
+                        "surface-dim": "#cbdbf5",
+                        "error-container": "#ffdad6",
+                        "on-secondary-container": "#5e656d",
+                        "primary": "#004ac6",
+                        "outline": "#737686",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#dce3ec",
+                        "surface-tint": "#0053db",
+                        "tertiary-container": "#bc4800",
+                        "on-background": "#0b1c30"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-desktop": "32px",
+                        "margin-mobile": "16px",
+                        "unit": "4px",
+                        "sidebar-width": "280px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Be Vietnam Pro"],
+                        "headline-lg-mobile": ["Be Vietnam Pro"],
+                        "body-lg": ["Be Vietnam Pro"],
+                        "label-md": ["Be Vietnam Pro"],
+                        "body-md": ["Be Vietnam Pro"],
+                        "headline-md": ["Be Vietnam Pro"],
+                        "headline-sm": ["Be Vietnam Pro"],
+                        "headline-lg": ["Be Vietnam Pro"],
+                        "display": ["Be Vietnam Pro"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "display": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Be Vietnam Pro', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #cbd5e1;
+        }
+    </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface">
+<div class="flex min-h-screen">
+<!-- SideNav (Collapsed via prompt requirement, showing as narrow bar) -->
+<aside class="w-20 h-screen sticky left-0 top-0 bg-surface-container-low border-r border-outline-variant flex flex-col py-6 transition-all duration-300 items-center">
+<div class="mb-8">
+<span class="material-symbols-outlined text-primary text-3xl">psychology</span>
+</div>
+<nav class="flex flex-col gap-4 flex-1">
+<!-- Chat is Active -->
+<div class="flex items-center justify-center bg-primary-container text-on-primary-container rounded-xl w-12 h-12 border-l-2 border-primary transition-all duration-200" title="Chat">
+<span class="material-symbols-outlined">chat</span>
+</div>
+<div class="flex items-center justify-center text-secondary hover:bg-surface-container-high rounded-xl w-12 h-12 transition-all duration-200" title="Documents">
+<span class="material-symbols-outlined">description</span>
+</div>
+<div class="flex items-center justify-center text-secondary hover:bg-surface-container-high rounded-xl w-12 h-12 transition-all duration-200" title="Analytics">
+<span class="material-symbols-outlined">analytics</span>
+</div>
+<div class="flex items-center justify-center text-secondary hover:bg-surface-container-high rounded-xl w-12 h-12 transition-all duration-200" title="Audit Log">
+<span class="material-symbols-outlined">assignment_turned_in</span>
+</div>
+<div class="flex items-center justify-center text-secondary hover:bg-surface-container-high rounded-xl w-12 h-12 transition-all duration-200" title="Users">
+<span class="material-symbols-outlined">group</span>
+</div>
+<div class="flex items-center justify-center text-secondary hover:bg-surface-container-high rounded-xl w-12 h-12 transition-all duration-200" title="Settings">
+<span class="material-symbols-outlined">settings</span>
+</div>
+</nav>
+<div class="mt-auto flex flex-col gap-4 items-center">
+<div class="flex items-center justify-center text-secondary hover:bg-surface-container-high rounded-xl w-12 h-12 transition-all duration-200" title="Profile">
+<span class="material-symbols-outlined">account_circle</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="flex flex-col flex-1 min-w-0 h-screen">
+<!-- TopNavBar -->
+<header class="h-[50px] w-full sticky top-0 z-40 bg-surface border-b border-outline-variant flex justify-between items-center px-margin-desktop">
+<div class="flex items-center gap-4">
+<h1 class="text-headline-sm font-headline-sm font-bold text-primary">Chat</h1>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 px-3 py-1 bg-surface-container rounded-full">
+<div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+<span class="text-label-md font-label-md text-on-surface-variant">Status: Internal</span>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant">
+<span class="material-symbols-outlined cursor-pointer hover:text-primary transition-all">notifications</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary transition-all">help_outline</span>
+<div class="w-8 h-8 rounded-full overflow-hidden bg-outline-variant">
+<img alt="User Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB6NXjKu2zmlJ2x2ZPbS9W5Cam9yI7EGNj991FteUNfMvWAOFLWz2cT6L8AE9Q72V8XxhNLBhVXUwc9Xp7RT38LpsZpnj4WX_cIbUTahPofs22j_U6fHyxcqll3XYfY6adsMJieyuUn3CsloMYZpIxGIgspswdURDvn9wC2eOrbYz0Co737BkEYqbQ4dR6FJjvjCnK3_y7ZHyqszYatbABjCPxLDFEe6vQLIB4jZlMkiCRIc0P4q_ez0pFsl6feGMaFpxajlApeIxuU"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Chat Area Container -->
+<main class="flex-1 flex flex-col relative overflow-hidden bg-white">
+<!-- Scrollable Conversation -->
+<div class="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center">
+<div class="w-full max-w-[800px] px-margin-desktop py-12 flex flex-col gap-10">
+<!-- Greeting (Optional Context) -->
+<div class="text-center mb-4">
+<p class="text-label-sm font-label-sm text-outline tracking-widest uppercase">Yesterday</p>
+</div>
+<!-- User Question -->
+<div class="flex flex-col items-end">
+<div class="bg-secondary-container text-on-secondary-fixed-variant px-5 py-3 rounded-2xl rounded-tr-sm max-w-[85%] shadow-sm">
+<p class="text-body-md font-body-md">Can you summarize the performance impact of the new EdTech curriculum introduced in the Q3 pilot program?</p>
+</div>
+</div>
+<!-- AI Answer Card -->
+<div class="flex flex-col items-start w-full">
+<div class="w-full bg-white border border-outline-variant rounded-2xl p-8 shadow-[0_10px_15px_-3px_rgba(0,0,0,0.05)] flex flex-col gap-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+</div>
+<span class="text-label-md font-label-md text-primary font-bold">Brain AI</span>
+</div>
+<div class="space-y-4 text-on-surface leading-relaxed">
+<p class="text-body-lg font-body-lg">Based on the Audit Logs and Performance Analytics from the Q3 Pilot Program, the new EdTech curriculum has demonstrated a significant positive trend in student engagement and retention metrics.</p>
+<ul class="space-y-3 pl-5 border-l-2 border-primary-fixed">
+<li class="text-body-md font-body-md">
+<strong class="text-on-surface font-semibold">Engagement:</strong> Average session duration increased by <span class="text-primary font-bold">24%</span> compared to the traditional curriculum.
+                                        </li>
+<li class="text-body-md font-body-md">
+<strong class="text-on-surface font-semibold">Completion Rates:</strong> Module completion reached an all-time high of <span class="text-primary font-bold">88.2%</span>, with the fastest progression noted in the "Logic &amp; Critical Thinking" segment.
+                                        </li>
+<li class="text-body-md font-body-md">
+<strong class="text-on-surface font-semibold">Feedback Sentiment:</strong> Qualitative analysis from user comments shows a <span class="text-primary font-bold">+42 NPS</span> shift among participating instructors.
+                                        </li>
+</ul>
+<p class="text-body-md font-body-md">However, the "Advanced Mathematics" component showed a slight dip in initial onboarding speed, suggesting a need for additional scaffolding in the first week of implementation.</p>
+</div>
+<!-- Sources Section -->
+<div class="pt-6 border-t border-outline-variant">
+<h3 class="text-label-sm font-label-sm text-outline uppercase tracking-wider mb-3">Sources</h3>
+<div class="flex flex-wrap gap-2">
+<div class="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-full border border-surface-variant hover:border-primary transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-[14px] text-primary">description</span>
+<span class="text-label-sm font-label-sm text-on-surface-variant group-hover:text-primary">Q3_Pilot_Summary_v2.pdf</span>
+<span class="w-[1px] h-3 bg-outline-variant"></span>
+<span class="text-label-sm font-label-sm text-outline">Internal-A1</span>
+</div>
+<div class="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-full border border-surface-variant hover:border-primary transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-[14px] text-primary">analytics</span>
+<span class="text-label-sm font-label-sm text-on-surface-variant group-hover:text-primary">Analytics_Dashboard_Export</span>
+<span class="w-[1px] h-3 bg-outline-variant"></span>
+<span class="text-label-sm font-label-sm text-outline">Data-Warehouse</span>
+</div>
+<div class="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-full border border-surface-variant hover:border-primary transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-[14px] text-primary">assignment_turned_in</span>
+<span class="text-label-sm font-label-sm text-on-surface-variant group-hover:text-primary">Curriculum_Audit_Log</span>
+<span class="w-[1px] h-3 bg-outline-variant"></span>
+<span class="text-label-sm font-label-sm text-outline">Compliance-S4</span>
+</div>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex gap-4 pt-2">
+<button class="flex items-center gap-2 text-label-sm font-label-sm text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[18px]">thumb_up</span>
+                                        Helpful
+                                    </button>
+<button class="flex items-center gap-2 text-label-sm font-label-sm text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+                                        Copy
+                                    </button>
+<button class="flex items-center gap-2 text-label-sm font-label-sm text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[18px]">refresh</span>
+                                        Regenerate
+                                    </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Sticky Input Area -->
+<div class="w-full bg-white border-t border-outline-variant pb-8 pt-4 px-margin-desktop flex justify-center">
+<div class="w-full max-w-[800px] relative">
+<div class="flex flex-col border border-outline-variant focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 rounded-2xl bg-white transition-all shadow-sm">
+<textarea class="w-full p-4 bg-transparent border-none focus:ring-0 text-body-md font-body-md resize-none min-h-[56px] max-h-[200px] custom-scrollbar" oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'" placeholder="Ask your data anything..." rows="1"></textarea>
+<div class="flex items-center justify-between px-4 pb-3">
+<div class="flex items-center gap-2">
+<button class="p-2 text-secondary hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" title="Attach Files">
+<span class="material-symbols-outlined">attach_file</span>
+</button>
+<button class="p-2 text-secondary hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" title="Search Web">
+<span class="material-symbols-outlined">language</span>
+</button>
+<button class="p-2 text-secondary hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors" title="AI Model">
+<span class="material-symbols-outlined">smart_toy</span>
+</button>
+</div>
+<button class="bg-primary hover:bg-primary-container text-white px-5 py-2 rounded-xl text-label-md font-label-md flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-primary/20">
+                                    Send
+                                    <span class="material-symbols-outlined text-[18px]">send</span>
+</button>
+</div>
+</div>
+<p class="text-[10px] text-center text-outline mt-3">Brain AI can make mistakes. Please verify important information.</p>
+</div>
+</div>
+</main>
+</div>
+</div>
+<!-- Micro-interactions Script -->
+<script>
+        // Simple textarea auto-resize
+        const tx = document.getElementsByTagName("textarea");
+        for (let i = 0; i < tx.length; i++) {
+            tx[i].setAttribute("style", "height:" + (tx[i].scrollHeight) + "px;overflow-y:hidden;");
+            tx[i].addEventListener("input", OnInput, false);
+        }
+
+        function OnInput() {
+            this.style.height = "auto";
+            this.style.height = (this.scrollHeight) + "px";
+            if(this.scrollHeight > 200) {
+                this.style.overflowY = "auto";
+            } else {
+                this.style.overflowY = "hidden";
+            }
+        }
+
+        // Active state click effects
+        document.querySelectorAll('button').forEach(button => {
+            button.addEventListener('mousedown', () => {
+                button.classList.add('scale-98');
+            });
+            button.addEventListener('mouseup', () => {
+                button.classList.remove('scale-98');
+            });
+        });
+    </script>
+</body></html>

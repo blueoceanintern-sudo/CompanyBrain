@@ -1,0 +1,29 @@
+# PRODUCT: Company's Brain
+## Brand: BlueOcean (EQuest Education Group, Vietnam)
+## Type: B2B Enterprise AI Knowledge Agent
+
+### Core Functionality
+- Staff ask plain-language questions.
+- System searches uploaded company documents.
+- Returns grounded cited answers.
+- No hallucination: "I don't know" if confidence is low.
+
+### Visual Identity
+- Font: Be Vietnam Pro
+- Colors: #eff6ff (sidebar), #ffffff (content), #2563eb (royal blue accent).
+- Feel: Minimal, airy, whitespace-heavy (Vercel-style).
+- Constraints: No gradients, no navy backgrounds, no decorative illustrations.
+
+### Layout Shell
+- Sidebar: Collapsed by default (56px), expands to 220px. Background #eff6ff.
+- Top bar: 50px tall, white, title on left, status/avatar on right.
+- Content: Desktop-first, generous padding.
+
+### Pages to Design
+1. Login (/login)
+2. Chat (/dashboard/chat) - Empty and Active states
+3. Documents (/dashboard/documents) - Table + Slide-over
+4. Analytics (/dashboard/analytics) - Stats + Charts + Table
+5. Audit Log (/dashboard/audit) - Dense table + Slide-over
+6. Users (/dashboard/users) - Table + Invite Modal
+7. Settings (/dashboard/settings) - Narrow tabs layout

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Company's Brain - Chat Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        body {
+            font-family: 'Be Vietnam Pro', sans-serif;
+            background-color: #ffffff;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface": "#f8f9ff",
+                        "on-secondary": "#ffffff",
+                        "surface-bright": "#f8f9ff",
+                        "on-error": "#ffffff",
+                        "surface-container-low": "#eff4ff",
+                        "on-surface": "#0b1c30",
+                        "on-surface-variant": "#434655",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed": "#360f00",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-secondary-fixed-variant": "#40484f",
+                        "on-secondary-fixed": "#151c23",
+                        "primary-fixed": "#dbe1ff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "tertiary": "#943700",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-container": "#ffede6",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "secondary-fixed-dim": "#c0c7d0",
+                        "surface-container": "#e5eeff",
+                        "on-primary-container": "#eeefff",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "secondary": "#585f67",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed": "#ffdbcd",
+                        "background": "#f8f9ff",
+                        "surface-variant": "#d3e4fe",
+                        "surface-container-highest": "#d3e4fe",
+                        "on-primary-fixed": "#00174b",
+                        "inverse-primary": "#b4c5ff",
+                        "inverse-surface": "#213145",
+                        "on-error-container": "#93000a",
+                        "primary-container": "#2563eb",
+                        "outline-variant": "#c3c6d7",
+                        "secondary-fixed": "#dce3ec",
+                        "surface-container-high": "#dce9ff",
+                        "surface-dim": "#cbdbf5",
+                        "error-container": "#ffdad6",
+                        "on-secondary-container": "#5e656d",
+                        "primary": "#004ac6",
+                        "outline": "#737686",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#dce3ec",
+                        "surface-tint": "#0053db",
+                        "tertiary-container": "#bc4800",
+                        "on-background": "#0b1c30"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-desktop": "32px",
+                        "margin-mobile": "16px",
+                        "unit": "4px",
+                        "sidebar-width": "280px",
+                        "gutter": "24px"
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-surface-container-lowest text-on-surface">
+<div class="flex min-h-screen">
+<!-- SideNav (Collapsed Style as requested, using JSON structure but narrower) -->
+<aside class="w-20 lg:w-[80px] h-screen sticky left-0 top-0 bg-surface-container-low border-r border-outline-variant flex flex-col items-center py-6 gap-8 z-50">
+<div class="mb-4">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="neurology">neurology</span>
+</div>
+<nav class="flex flex-col gap-4">
+<div class="group relative flex items-center justify-center bg-primary-container text-on-primary-container rounded-xl w-12 h-12 border-l-2 border-primary">
+<span class="material-symbols-outlined" data-icon="chat" style="font-variation-settings: 'FILL' 1;">chat</span>
+</div>
+<div class="group relative flex items-center justify-center text-secondary hover:bg-surface-container-high rounded-xl w-12 h-12 transition-colors">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+</div>
+<div class="group relative flex items-center justify-center text-secondary hover:bg-surface-container-high rounded-xl w-12 h-12 transition-colors">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+</div>
+<div class="group relative flex items-center justify-center text-secondary hover:bg-surface-container-high rounded-xl w-12 h-12 transition-colors">
+<span class="material-symbols-outlined" data-icon="assignment_turned_in">assignment_turned_in</span>
+</div>
+</nav>
+<div class="mt-auto flex flex-col gap-4">
+<div class="flex items-center justify-center text-secondary hover:bg-surface-container-high rounded-xl w-12 h-12 transition-colors">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</div>
+<div class="flex items-center justify-center overflow-hidden rounded-full w-10 h-10 border border-outline-variant">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A professional headshot of a modern corporate executive in a bright, clean office environment. The lighting is soft and natural, emphasizing a professional yet approachable demeanor. The background is a minimalist tech workspace with soft out-of-focus highlights, maintaining a light-mode aesthetic with clean lines and a palette of whites and soft blues." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD5BHPRkGj0MpJgL-M610leXPt4EZAtL2IkEDSgTWMyBmhmpAOFcg07SVppW5D6mjo56Vo-kYDleW3YsTzk5K6ylxtLl_Pag6Jj7y47qU4M-fG3ajjBFY3Fg4R-9qLcf0kGVBmsZ-jgssNmgggsQBKJ_csQW_UPQXx0ST7h8AW4SEbnfVVNch3lUc4nM00JAiOMOk5UEIPGAFDvZm8nhDjfEto9hij_oKHd-Yws7UmC3s8YetVuDsZyVydsYZAx7yNfnZNbZqSPT9EK"/>
+</div>
+</div>
+</aside>
+<div class="flex-1 flex flex-col">
+<!-- TopNavBar -->
+<header class="h-[64px] w-full sticky top-0 z-40 bg-surface border-b border-outline-variant flex items-center justify-between px-8">
+<div class="flex items-center gap-4">
+<h1 class="text-headline-sm font-headline-sm font-bold text-primary">Chat</h1>
+<span class="px-2 py-0.5 rounded bg-secondary-container text-on-secondary-container text-label-sm font-label-sm uppercase tracking-wider">Internal</span>
+</div>
+<div class="flex items-center gap-6">
+<button class="text-on-surface-variant hover:text-primary transition-all">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-all">
+<span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
+</button>
+</div>
+</header>
+<!-- Content Area: Empty State Chat -->
+<main class="flex-1 flex flex-col items-center justify-center bg-white p-8 overflow-hidden relative">
+<div class="w-full max-w-2xl flex flex-col items-center animate-fade-in">
+<!-- Hero Section -->
+<div class="text-center mb-12">
+<h2 class="text-[32px] leading-tight font-bold text-on-surface mb-2">Good morning, Alex</h2>
+<p class="text-body-lg text-on-surface-variant">Ask anything from BlueOcean's knowledge base</p>
+</div>
+<!-- Search Input Card -->
+<div class="w-full bg-white rounded-[24px] border border-outline-variant p-2 flex items-center gap-3 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.08)] focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+<div class="pl-4 flex items-center justify-center text-outline">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+</div>
+<input class="flex-1 bg-transparent border-none focus:ring-0 text-body-lg placeholder:text-outline py-4" placeholder="Ask about policies, processes, documents…" type="text"/>
+<button class="bg-primary-container text-on-primary text-body-md font-semibold px-6 py-3 rounded-[16px] hover:opacity-90 transition-all flex items-center gap-2">
+<span>Send</span>
+<span class="material-symbols-outlined text-[18px]" data-icon="send">send</span>
+</button>
+</div>
+<!-- Suggested Chips -->
+<div class="mt-8 flex flex-wrap justify-center gap-3">
+<button class="flex items-center gap-2 px-4 py-2.5 rounded-full border border-outline-variant bg-white text-secondary hover:bg-surface-container-low transition-colors duration-200">
+<span class="material-symbols-outlined text-[18px]" data-icon="history_edu">history_edu</span>
+<span class="text-label-md">Company remote policy</span>
+</button>
+<button class="flex items-center gap-2 px-4 py-2.5 rounded-full border border-outline-variant bg-white text-secondary hover:bg-surface-container-low transition-colors duration-200">
+<span class="material-symbols-outlined text-[18px]" data-icon="description">description</span>
+<span class="text-label-md">Project Phoenix summary</span>
+</button>
+<button class="flex items-center gap-2 px-4 py-2.5 rounded-full border border-outline-variant bg-white text-secondary hover:bg-surface-container-low transition-colors duration-200">
+<span class="material-symbols-outlined text-[18px]" data-icon="event_note">event_note</span>
+<span class="text-label-md">Holiday calendar 2024</span>
+</button>
+</div>
+</div>
+<!-- Recent Queries Strip at bottom -->
+<div class="absolute bottom-8 left-0 right-0 px-8">
+<div class="max-w-[1440px] mx-auto border-t border-outline-variant/30 pt-6 flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<h3 class="text-label-sm font-bold uppercase tracking-widest text-outline">Recent Activity</h3>
+<button class="text-label-sm text-primary hover:underline">Clear all</button>
+</div>
+<div class="flex items-center gap-8 overflow-x-auto no-scrollbar pb-2">
+<div class="flex items-center gap-3 whitespace-nowrap group cursor-pointer">
+<span class="material-symbols-outlined text-outline text-[20px] group-hover:text-primary transition-colors" data-icon="history">history</span>
+<span class="text-body-md text-on-surface-variant group-hover:text-on-surface transition-colors">Q3 Performance Metrics...</span>
+</div>
+<div class="flex items-center gap-3 whitespace-nowrap group cursor-pointer">
+<span class="material-symbols-outlined text-outline text-[20px] group-hover:text-primary transition-colors" data-icon="history">history</span>
+<span class="text-body-md text-on-surface-variant group-hover:text-on-surface transition-colors">Health insurance providers...</span>
+</div>
+<div class="flex items-center gap-3 whitespace-nowrap group cursor-pointer">
+<span class="material-symbols-outlined text-outline text-[20px] group-hover:text-primary transition-colors" data-icon="history">history</span>
+<span class="text-body-md text-on-surface-variant group-hover:text-on-surface transition-colors">Technical debt roadmap...</span>
+</div>
+<div class="flex items-center gap-3 whitespace-nowrap group cursor-pointer">
+<span class="material-symbols-outlined text-outline text-[20px] group-hover:text-primary transition-colors" data-icon="history">history</span>
+<span class="text-body-md text-on-surface-variant group-hover:text-on-surface transition-colors">Onboarding documentation...</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+<style>
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
+<script>
+        // Micro-interactions
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('mousedown', () => {
+                btn.style.transform = 'scale(0.98)';
+            });
+            btn.addEventListener('mouseup', () => {
+                btn.style.transform = 'scale(1)';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.transform = 'scale(1)';
+            });
+        });
+
+        // Search Focus Interaction
+        const searchInput = document.querySelector('input[type="text"]');
+        const searchContainer = searchInput?.closest('div');
+        
+        if (searchInput && searchContainer) {
+            searchInput.addEventListener('focus', () => {
+                searchContainer.classList.add('border-primary');
+                searchContainer.style.boxShadow = '0 15px 40px -15px rgba(37, 99, 235, 0.15)';
+            });
+            searchInput.addEventListener('blur', () => {
+                searchContainer.classList.remove('border-primary');
+                searchContainer.style.boxShadow = '0 10px 30px -10px rgba(0, 0, 0, 0.08)';
+            });
+        }
+    </script>
+</body></html>

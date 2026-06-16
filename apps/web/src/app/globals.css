@@ -6,6 +6,24 @@
 
 /* ─── Brand & neutral tokens ────────────────────────────────────────────────── */
 :root {
+  /* Stitch design tokens */
+  --cb-bg:                  #f8f9ff;
+  --cb-primary:             #004ac6;
+  --cb-primary-container:   #2563eb;
+  --cb-on-primary:          #ffffff;
+  --cb-on-primary-container: #eeefff;
+  --cb-surface:             #f8f9ff;
+  --cb-surface-low:         #eff4ff;
+  --cb-surface-container:   #e5eeff;
+  --cb-surface-high:        #dce9ff;
+  --cb-surface-lowest:      #ffffff;
+  --cb-on-surface:          #0b1c30;
+  --cb-on-surface-variant:  #434655;
+  --cb-secondary:           #585f67;
+  --cb-outline:             #737686;
+  --cb-outline-variant:     #c3c6d7;
+  --cb-error:               #ba1a1a;
+
   --color-brand:           oklch(48% 0.24 255);   /* royal blue — buttons, active states */
   --color-brand-subtle:    oklch(93% 0.06 248);   /* sky blue tint — hover bg, selected rows */
   --color-brand-fg:        oklch(100% 0 0);       /* white */
@@ -243,7 +261,7 @@
 
 html, body {
   height: 100%;
-  background: var(--color-bg);
+  background: #f8f9ff;
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: var(--text-base);

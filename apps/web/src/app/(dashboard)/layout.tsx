@@ -16,8 +16,16 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   }, [router])
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#f8f9ff' }}>
       <Sidebar />
+      {/* Mobile top bar */}
+      <div
+        className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center gap-3 px-4"
+        style={{ height: 56, background: '#f8f9ff', borderBottom: '1px solid #c3c6d7' }}
+      >
+        <MobileMenuButton />
+        <span style={{ fontSize: 14, fontWeight: 600, color: '#004ac6' }}>Company&apos;s Brain</span>
+      </div>
       <main
         style={{
           flex: 1,
@@ -25,36 +33,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
+          background: '#ffffff',
         }}
       >
-        <MobileTopBar />
+        {/* Spacer for mobile top bar */}
+        <div className="md:hidden" style={{ height: 56, flexShrink: 0 }} />
         {children}
       </main>
-    </div>
-  )
-}
-
-function MobileTopBar() {
-  return (
-    <div
-      className="mobile-topbar"
-      style={{
-        display: 'none',
-        height: 'var(--header-h)',
-        alignItems: 'center',
-        padding: '0 var(--space-4)',
-        gap: 'var(--space-3)',
-        borderBottom: '1px solid var(--color-border)',
-        background: 'var(--color-bg)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-        flexShrink: 0,
-      }}
-    >
-      <MobileMenuButton />
-      <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-semibold)' }}>Company&apos;s Brain</span>
-      <style>{`@media (max-width: 767px) { .mobile-topbar { display: flex !important; } }`}</style>
     </div>
   )
 }

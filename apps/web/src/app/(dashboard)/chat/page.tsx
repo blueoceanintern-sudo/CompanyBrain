@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { SendHorizontal, SquarePen } from 'lucide-react'
+import {
+  Search, Send, BookOpen, FileText, Calendar,
+  Paperclip, Globe, Bot, ThumbsUp, Copy, RefreshCw,
+  Sparkles, Clock,
+} from 'lucide-react'
 import { useSubmitQuery } from '@/hooks/use-queries'
 import { getAuthUser } from '@/lib/auth'
 import type { QueryResponse } from '@company-brain/shared'
@@ -18,162 +19,310 @@ interface HistoryEntry {
   error?: string
 }
 
-function ThreeDotPulse() {
-  return (
-    <div className="flex items-center gap-1.5 px-4 py-5">
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          className="size-2 rounded-full"
-          style={{ background: 'var(--color-text-muted)', animation: `cb-pulse 1.2s ease-in-out ${i * 0.2}s infinite` }}
-        />
-      ))}
-      <style>{`@keyframes cb-pulse{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}`}</style>
-    </div>
-  )
-}
+const SUGGESTIONS = [
+  { icon: BookOpen,  label: 'Company remote policy' },
+  { icon: FileText,  label: 'Project Phoenix summary' },
+  { icon: Calendar,  label: 'Holiday calendar 2024' },
+]
 
-function ErrorBubble({ message, onRetry }: { message: string; onRetry: () => void }) {
+const RECENT = [
+  'Q3 Performance Metrics...',
+  'Health insurance providers...',
+  'Technical debt roadmap...',
+  'Onboarding documentation...',
+]
+
+// ─── Header bar ───────────────────────────────────────────────────────────────
+
+function PageHeader() {
   return (
-    <div className="px-4 pb-5 flex items-start gap-3">
-      <div className="flex-1 rounded-lg px-4 py-3 text-sm" style={{ background: 'var(--color-danger-subtle)', color: 'var(--color-danger)' }}>
-        {message}
+    <header style={{ height: 50, borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={{ fontSize: 20, fontWeight: 700, color: '#004ac6' }}>Chat</span>
+        <span style={{ padding: '2px 8px', background: '#dce3ec', color: '#40484f', fontSize: 10, borderRadius: 4, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Internal</span>
       </div>
-      <button
-        onClick={onRetry}
-        className="shrink-0 rounded-lg px-3 text-sm transition-colors"
-        style={{ height: 36, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', cursor: 'pointer' }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--color-text)' }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--color-text-muted)' }}
-      >
-        Retry
-      </button>
-    </div>
-  )
-}
-
-function CitationLink({ index, citation }: { index: number; citation: { chunkId: string; excerpt?: string } }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <sup>
-          <a href="#" onClick={(e) => e.preventDefault()} className="font-medium" style={{ color: 'var(--color-brand)', textDecoration: 'none', fontSize: '0.7em', padding: '0 1px' }}>
-            [{index}]
-          </a>
-        </sup>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-xs">
-        <p className="text-xs font-medium mb-1">Source {index}</p>
-        {citation.excerpt && <p className="text-xs opacity-80 line-clamp-3">{citation.excerpt.slice(0, 120)}{citation.excerpt.length > 120 ? '…' : ''}</p>}
-        <p className="text-xs opacity-50 mt-1 font-mono">{citation.chunkId}</p>
-      </TooltipContent>
-    </Tooltip>
-  )
-}
-
-function AnswerBubble({ response }: { response: QueryResponse }) {
-  const { answer, confidence, citations = [] } = response
-  if ((confidence ?? 0) < 0.5) {
-    return <p className="italic text-sm" style={{ color: 'var(--color-text-muted)' }}>No answer found in the knowledge base.</p>
-  }
-  return (
-    <div className="space-y-3">
-      {confidence !== undefined && confidence < 0.7 && (
-        <Badge style={{ background: 'var(--color-warning-subtle)', color: 'var(--color-warning)', border: 'none' }}>Low confidence</Badge>
-      )}
-      <div className="rounded-lg" style={{ background: 'var(--color-surface)', padding: 'var(--space-5)', color: 'var(--color-text)', lineHeight: 'var(--leading-relaxed)', fontSize: 'var(--text-base)', boxShadow: 'var(--shadow-sm)' }}>
-        <TooltipProvider>
-          {answer}
-          {citations.map((c, i) => <CitationLink key={c.chunkId} index={i + 1} citation={c} />)}
-        </TooltipProvider>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex', alignItems: 'center' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </button>
+        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex', alignItems: 'center' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </button>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e5eeff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#004ac6' }}>A</div>
       </div>
-      {citations.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {citations.map((c, i) => (
-            <span key={c.chunkId} className="text-xs rounded" style={{ color: 'var(--color-text-muted)', background: 'var(--color-surface)', padding: '2px var(--space-2)', fontFamily: 'var(--font-mono)' }}>
-              [{i + 1}] {c.filename}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
+    </header>
   )
 }
 
-function HistoryItem({ entry, onToggle, onRetry }: { entry: HistoryEntry; onToggle: () => void; onRetry: () => void }) {
-  const isInteractive = !entry.pending && !entry.error
-  return (
-    <div className="border-b last:border-b-0" style={{ borderColor: 'var(--color-border)' }}>
-      <button
-        onClick={onToggle}
-        disabled={!isInteractive}
-        className="w-full text-left px-4 py-4 transition-colors hover:bg-[var(--color-surface)] disabled:cursor-default disabled:hover:bg-transparent"
-        style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', color: 'var(--color-text)' }}
-      >
-        {isInteractive && (
-          <span className="mr-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>{entry.expanded ? '▾' : '▸'}</span>
-        )}
-        {entry.question}
-      </button>
-      {entry.pending && <ThreeDotPulse />}
-      {entry.error && <ErrorBubble message={entry.error} onRetry={onRetry} />}
-      {isInteractive && entry.expanded && entry.response && (
-        <div className="px-4 pb-5"><AnswerBubble response={entry.response} /></div>
-      )}
-    </div>
-  )
-}
+// ─── Empty state ──────────────────────────────────────────────────────────────
 
-// ─── Pill input (shared between empty and chat states) ────────────────────────
-
-function QueryInput({
-  value,
-  onChange,
-  onSubmit,
-  disabled,
+function EmptyState({
+  input, onChange, onSubmit, disabled,
   textareaRef,
 }: {
-  value: string
+  input: string
   onChange: (v: string) => void
   onSubmit: () => void
   disabled: boolean
   textareaRef: React.RefObject<HTMLTextAreaElement>
 }) {
+  const user = getAuthUser()
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const name = user?.email?.split('@')[0] ?? 'Alex'
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#ffffff', overflow: 'hidden', position: 'relative' }}>
+      {/* Centered content */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px 80px' }}>
+        <div style={{ width: '100%', maxWidth: 640, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32 }}>
+          {/* Heading */}
+          <div style={{ textAlign: 'center' }}>
+            <h1 style={{ fontSize: 32, fontWeight: 700, color: '#0b1c30', margin: '0 0 8px' }}>{greeting}, {name.charAt(0).toUpperCase() + name.slice(1)}</h1>
+            <p style={{ fontSize: 16, color: '#434655', margin: 0 }}>Ask anything from BlueOcean&apos;s knowledge base</p>
+          </div>
+
+          {/* Search bar */}
+          <div
+            style={{ width: '100%', background: '#ffffff', borderRadius: 24, border: '1px solid #c3c6d7', padding: 8, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 10px 30px -10px rgba(0,0,0,0.08)' }}
+          >
+            <div style={{ paddingLeft: 12, color: '#737686', display: 'flex', alignItems: 'center' }}>
+              <Search size={20} />
+            </div>
+            <input
+              ref={textareaRef as unknown as React.RefObject<HTMLInputElement>}
+              value={input}
+              onChange={(e) => onChange(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit() } }}
+              placeholder="Ask about policies, processes, documents…"
+              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 16, color: '#0b1c30', padding: '12px 0', fontFamily: 'inherit' }}
+            />
+            <button
+              onClick={onSubmit}
+              disabled={!input.trim() || disabled}
+              style={{ background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 16, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: (!input.trim() || disabled) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, opacity: (!input.trim() || disabled) ? 0.5 : 1, fontFamily: 'inherit', flexShrink: 0 }}
+            >
+              Send <Send size={14} />
+            </button>
+          </div>
+
+          {/* Suggestion chips */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10 }}>
+            {SUGGESTIONS.map(({ icon: Icon, label }) => (
+              <button
+                key={label}
+                onClick={() => onChange(label)}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 9999, border: '1px solid #c3c6d7', background: '#ffffff', color: '#585f67', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#eff4ff' }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#ffffff' }}
+              >
+                <Icon size={16} />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Recent activity strip */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 32px 32px', background: 'linear-gradient(to top, #ffffff 60%, transparent)' }}>
+        <div style={{ borderTop: '1px solid rgba(195,198,215,0.3)', paddingTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#737686' }}>Recent Activity</span>
+            <button style={{ fontSize: 12, color: '#004ac6', background: 'none', border: 'none', cursor: 'pointer' }}>Clear all</button>
+          </div>
+          <div style={{ display: 'flex', gap: 32, overflowX: 'auto' }}>
+            {RECENT.map((item) => (
+              <button
+                key={item}
+                onClick={() => onChange(item.replace('...', ''))}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer', color: '#434655', fontSize: 14, fontFamily: 'inherit', padding: 0 }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#0b1c30' }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#434655' }}
+              >
+                <Clock size={16} color="#737686" />
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Source pill ──────────────────────────────────────────────────────────────
+
+function SourcePill({ filename, tier }: { filename: string; tier: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#eff4ff', padding: '6px 12px', borderRadius: 9999, border: '1px solid #d3e4fe', cursor: 'pointer' }}>
+      <FileText size={12} color="#004ac6" />
+      <span style={{ fontSize: 12, color: '#434655' }}>{filename}</span>
+      <span style={{ width: 1, height: 12, background: '#c3c6d7' }} />
+      <span style={{ fontSize: 12, color: '#737686' }}>{tier}</span>
+    </div>
+  )
+}
+
+// ─── Active chat ──────────────────────────────────────────────────────────────
+
+function ActiveChat({
+  history, input, onChange, onSubmit, disabled, textareaRef,
+  onToggle, onRetry, onNew,
+}: {
+  history: HistoryEntry[]
+  input: string
+  onChange: (v: string) => void
+  onSubmit: () => void
+  disabled: boolean
+  textareaRef: React.RefObject<HTMLTextAreaElement>
+  onToggle: (id: string) => void
+  onRetry: (id: string, q: string) => void
+  onNew: () => void
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+  }, [history])
+
   const autoResize = () => {
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px'
   }
 
   return (
-    <div
-      className="flex items-end gap-3 rounded-full shadow-sm transition-shadow hover:shadow-md"
-      style={{
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        padding: '10px 16px 10px 20px',
-      }}
-    >
-      <Textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(e) => { onChange(e.target.value); autoResize() }}
-        onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onSubmit() } }}
-        placeholder="Ask anything"
-        rows={1}
-        className="flex-1 resize-none overflow-hidden border-0 bg-transparent shadow-none focus-visible:ring-0 p-0"
-        style={{ minHeight: 24, fontSize: 'var(--text-sm)', color: 'var(--color-text)', lineHeight: '1.5' }}
-      />
-      <button
-        onClick={onSubmit}
-        disabled={!value.trim() || disabled}
-        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-opacity disabled:opacity-30"
-        style={{ background: 'var(--color-text)', color: 'var(--color-bg)' }}
-        aria-label="Send"
-      >
-        <SendHorizontal size={14} aria-hidden />
-      </button>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#ffffff', overflow: 'hidden' }}>
+      {/* Scrollable messages */}
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 800, padding: '48px 32px', display: 'flex', flexDirection: 'column', gap: 40 }}>
+          {/* Date divider */}
+          <div style={{ textAlign: 'center' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#737686' }}>Yesterday</span>
+          </div>
+
+          {history.map((entry) => (
+            <div key={entry.id} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* User message */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ background: '#dce3ec', color: '#40484f', padding: '12px 20px', borderRadius: '16px 16px 4px 16px', maxWidth: '85%', fontSize: 14, lineHeight: 1.6 }}>
+                  {entry.question}
+                </div>
+              </div>
+
+              {/* Pending */}
+              {entry.pending && (
+                <div style={{ display: 'flex', gap: 8, padding: '16px 0' }}>
+                  {[0, 1, 2].map((i) => (
+                    <span key={i} className="inline-block w-2 h-2 rounded-full" style={{ background: '#c3c6d7', animation: `cb-pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />
+                  ))}
+                  <style>{`@keyframes cb-pulse{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}`}</style>
+                </div>
+              )}
+
+              {/* Error */}
+              {entry.error && (
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1, background: '#ffdad6', color: '#ba1a1a', padding: '12px 16px', borderRadius: 8, fontSize: 14 }}>{entry.error}</div>
+                  <button onClick={() => onRetry(entry.id, entry.question)} style={{ height: 36, padding: '0 12px', background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 8, fontSize: 14, cursor: 'pointer', color: '#585f67', fontFamily: 'inherit' }}>Retry</button>
+                </div>
+              )}
+
+              {/* AI response */}
+              {!entry.pending && !entry.error && entry.response && (
+                <div style={{ background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 16, padding: 32, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: 24 }}>
+                  {/* Header */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Sparkles size={16} color="#ffffff" />
+                    </div>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#004ac6' }}>Brain AI</span>
+                  </div>
+
+                  {/* Answer */}
+                  <div style={{ fontSize: 16, color: '#0b1c30', lineHeight: 1.7 }}>
+                    {(entry.response.confidence ?? 1) < 0.5 ? (
+                      <p style={{ color: '#585f67', fontStyle: 'italic' }}>No answer found in the knowledge base.</p>
+                    ) : (
+                      entry.response.answer
+                    )}
+                  </div>
+
+                  {/* Sources */}
+                  {entry.response.citations && entry.response.citations.length > 0 && (
+                    <div style={{ borderTop: '1px solid #c3c6d7', paddingTop: 24 }}>
+                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#737686', marginBottom: 12 }}>Sources</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {entry.response.citations.map((c) => (
+                          <SourcePill key={c.chunkId} filename={c.filename ?? c.chunkId} tier="Internal" />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', gap: 16 }}>
+                    {[
+                      { icon: ThumbsUp, label: 'Helpful' },
+                      { icon: Copy,     label: 'Copy' },
+                      { icon: RefreshCw, label: 'Regenerate', onClick: () => onRetry(entry.id, entry.question) },
+                    ].map(({ icon: Icon, label, onClick }) => (
+                      <button
+                        key={label}
+                        onClick={onClick}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#737686', fontSize: 12, fontFamily: 'inherit', padding: 0 }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#004ac6' }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#737686' }}
+                      >
+                        <Icon size={16} /> {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Sticky input */}
+      <div style={{ background: '#ffffff', borderTop: '1px solid #c3c6d7', padding: '16px 32px 32px', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 800 }}>
+          <div style={{ border: '1px solid #c3c6d7', borderRadius: 16, background: '#ffffff', display: 'flex', flexDirection: 'column', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', transition: 'border-color 0.2s' }}>
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => { onChange(e.target.value); autoResize() }}
+              onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onSubmit() } }}
+              placeholder="Ask your data anything…"
+              rows={1}
+              style={{ width: '100%', padding: '16px', background: 'transparent', border: 'none', outline: 'none', fontSize: 14, color: '#0b1c30', resize: 'none', minHeight: 56, maxHeight: 160, fontFamily: 'inherit', lineHeight: 1.5 }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px 12px' }}>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {[Paperclip, Globe, Bot].map((Icon, i) => (
+                  <button key={i} style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 8 }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#eff4ff'; (e.currentTarget as HTMLElement).style.color = '#004ac6' }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none'; (e.currentTarget as HTMLElement).style.color = '#585f67' }}
+                  >
+                    <Icon size={18} />
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={onSubmit}
+                disabled={!input.trim() || disabled}
+                style={{ background: '#004ac6', color: '#ffffff', border: 'none', borderRadius: 10, padding: '8px 20px', fontSize: 14, fontWeight: 500, cursor: (!input.trim() || disabled) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, opacity: (!input.trim() || disabled) ? 0.5 : 1, fontFamily: 'inherit' }}
+              >
+                Send <Send size={14} />
+              </button>
+            </div>
+          </div>
+          <p style={{ fontSize: 10, textAlign: 'center', color: '#737686', marginTop: 10 }}>Brain AI can make mistakes. Please verify important information.</p>
+        </div>
+      </div>
     </div>
   )
 }
@@ -188,11 +337,6 @@ export default function ChatPage() {
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const submit = useSubmitQuery(orgId)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-  }, [history, submit.isPending])
 
   const submitQuery = (q: string, entryId?: string) => {
     const id = entryId ?? crypto.randomUUID()
@@ -232,75 +376,30 @@ export default function ChatPage() {
 
   const isEmpty = history.length === 0
 
-  // Empty state: vertically centered with input below the heading
-  if (isEmpty) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6 gap-8">
-        <div className="text-center">
-          <h1 className="font-medium" style={{ fontSize: 'var(--text-2xl)', color: 'var(--color-text)' }}>
-            Ready when you are.
-          </h1>
-          <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            Query the knowledge base with a plain-language question.
-          </p>
-        </div>
-        <div className="w-full" style={{ maxWidth: 640 }}>
-          <QueryInput
-            value={input}
-            onChange={setInput}
-            onSubmit={handleSubmit}
-            disabled={submit.isPending}
-            textareaRef={textareaRef}
-          />
-        </div>
-      </div>
-    )
-  }
-
-  // Chat state: scrollable history + input pinned to bottom
   return (
-    <div className="flex flex-col h-full">
-      <div className="shrink-0 flex justify-end px-4 py-2" style={{ borderBottom: '1px solid var(--color-border)' }}>
-        <button
-          onClick={() => setHistory([])}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-            height: 32, padding: '0 var(--space-3)',
-            background: 'transparent', border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)',
-            color: 'var(--color-text-muted)', cursor: 'pointer',
-          }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--color-text)' }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--color-text-muted)' }}
-        >
-          <SquarePen size={13} aria-hidden />
-          New chat
-        </button>
-      </div>
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="mx-auto" style={{ maxWidth: 640 }}>
-          {history.map((entry) => (
-            <HistoryItem
-              key={entry.id}
-              entry={entry}
-              onToggle={() => setHistory((prev) => prev.map((h) => h.id === entry.id ? { ...h, expanded: !h.expanded } : h))}
-              onRetry={() => submitQuery(entry.question, entry.id)}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="shrink-0 sticky bottom-0 p-4" style={{ background: 'var(--color-bg)' }}>
-        <div className="mx-auto" style={{ maxWidth: 640 }}>
-          <QueryInput
-            value={input}
-            onChange={setInput}
-            onSubmit={handleSubmit}
-            disabled={submit.isPending}
-            textareaRef={textareaRef}
-          />
-        </div>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <PageHeader />
+      {isEmpty ? (
+        <EmptyState
+          input={input}
+          onChange={setInput}
+          onSubmit={handleSubmit}
+          disabled={submit.isPending}
+          textareaRef={textareaRef as React.RefObject<HTMLTextAreaElement>}
+        />
+      ) : (
+        <ActiveChat
+          history={history}
+          input={input}
+          onChange={setInput}
+          onSubmit={handleSubmit}
+          disabled={submit.isPending}
+          textareaRef={textareaRef}
+          onToggle={(id) => setHistory((prev) => prev.map((h) => h.id === id ? { ...h, expanded: !h.expanded } : h))}
+          onRetry={(id, q) => submitQuery(q, id)}
+          onNew={() => setHistory([])}
+        />
+      )}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Upload, Trash2, Paperclip } from 'lucide-react'
+import { Search, Upload, Paperclip, X, FileText, Table2, Link, File } from 'lucide-react'
 import { useDocuments, useUploadDocument, useDeleteDocument } from '@/hooks/use-documents'
 import { useCompartments } from '@/hooks/use-compartments'
 import { getAuthUser } from '@/lib/auth'
@@ -16,32 +16,169 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
   product_doc: 'Product Doc', other: 'Other',
 }
 
-const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
-  complete:   { bg: 'var(--color-success-subtle)',  color: 'var(--color-success)'  },
-  running:    { bg: 'var(--color-warning-subtle)',  color: 'var(--color-warning)'  },
-  failed:     { bg: 'var(--color-danger-subtle)',   color: 'var(--color-danger)'   },
-  queued:     { bg: 'var(--color-surface)',          color: 'var(--color-text-muted)' },
-}
+// ─── Header ───────────────────────────────────────────────────────────────────
 
-const TIER_STYLE: Record<string, { bg: string; color: string }> = {
-  internal: { bg: 'var(--color-internal-subtle)', color: 'var(--color-internal)' },
-  external: { bg: 'var(--color-external-subtle)', color: 'var(--color-external)' },
-}
-
-function Badge({ label, bg, color }: { label: string; bg: string; color: string }) {
+function PageHeader() {
   return (
-    <span style={{ display: 'inline-block', padding: '1px var(--space-2)', background: bg, color, borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-medium)', whiteSpace: 'nowrap' }}>
+    <header style={{ height: 64, borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
+      <span style={{ fontSize: 20, fontWeight: 700, color: '#004ac6' }}>Documents</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <span style={{ fontSize: 14, color: '#585f67' }}>Status: <strong style={{ color: '#004ac6' }}>Internal</strong></span>
+        <div style={{ width: 1, height: 24, background: '#c3c6d7' }} />
+        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </button>
+        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </button>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e5eeff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#004ac6' }}>A</div>
+      </div>
+    </header>
+  )
+}
+
+// ─── Access tier badge ────────────────────────────────────────────────────────
+
+function TierBadge({ tier }: { tier: string }) {
+  const styles: Record<string, { bg: string; color: string; label: string }> = {
+    internal:     { bg: '#dbeafe', color: '#1e40af', label: 'Internal' },
+    confidential: { bg: '#ffedd5', color: '#9a3412', label: 'Confidential' },
+    public:       { bg: '#f1f5f9', color: '#475569', label: 'Public' },
+    restricted:   { bg: '#fee2e2', color: '#991b1b', label: 'Restricted' },
+    external:     { bg: '#dbeafe', color: '#1e40af', label: 'External' },
+  }
+  const s = styles[tier] ?? styles['internal']!
+  return (
+    <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 700, background: s.bg, color: s.color, display: 'inline-block' }}>{s.label}</span>
+  )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const styles: Record<string, { bg: string; color: string; dot: string }> = {
+    complete:   { bg: '#dcfce7', color: '#166534', dot: '#16a34a' },
+    running:    { bg: '#dbeafe', color: '#1e40af', dot: '#2563eb' },
+    queued:     { bg: '#f1f5f9', color: '#475569', dot: '#94a3b8' },
+    failed:     { bg: '#fee2e2', color: '#991b1b', dot: '#dc2626' },
+  }
+  const s = styles[status] ?? styles['queued']!
+  const label = status === 'complete' ? 'Ingested' : status === 'running' ? 'Processing' : status.charAt(0).toUpperCase() + status.slice(1)
+  return (
+    <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 700, background: s.bg, color: s.color, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot, display: 'inline-block' }} />
       {label}
     </span>
   )
 }
+
+// ─── Detail panel ─────────────────────────────────────────────────────────────
+
+function DetailPanel({ doc, onClose }: { doc: { id: string; filename: string; accessTier: string; status: string; sourceType: string; createdAt: string } | null; onClose: () => void }) {
+  return (
+    <div style={{ position: 'absolute', right: 0, top: 0, height: '100%', width: 420, background: '#ffffff', borderLeft: '1px solid #c3c6d7', boxShadow: '-10px 0 30px -5px rgba(0,0,0,0.05)', transform: doc ? 'translateX(0)' : 'translateX(100%)', transition: 'transform 0.3s ease', display: 'flex', flexDirection: 'column', zIndex: 50 }}>
+      {/* Header */}
+      <div style={{ padding: '20px 24px', borderBottom: '1px solid #c3c6d7', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ffffff' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <FileText size={18} color="#004ac6" />
+          <span style={{ fontSize: 18, fontWeight: 700, color: '#0b1c30' }}>Document Detail</span>
+        </div>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: '50%', padding: 6, display: 'flex', alignItems: 'center' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#eff4ff' }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none' }}
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      {doc && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 32 }}>
+          {/* Preview */}
+          <div style={{ aspectRatio: '4/3', width: '100%', background: '#eff4ff', borderRadius: 12, border: '1px solid #c3c6d7', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+            <FileText size={48} color="#c3c6d7" />
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid #c3c6d7', borderRadius: 8, padding: '8px 16px', fontSize: 14, fontWeight: 700, color: '#004ac6', cursor: 'pointer' }}>Full Preview</button>
+            </div>
+          </div>
+
+          {/* Primary Info */}
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#585f67', marginBottom: 8 }}>Primary Info</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {[
+                { label: 'Filename', value: doc.filename },
+                { label: 'Size', value: '2.4 MB' },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ background: '#e5eeff', padding: 12, borderRadius: 8, border: '1px solid #c3c6d7' }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#585f67', margin: '0 0 4px' }}>{label}</p>
+                  <p style={{ fontSize: 14, fontWeight: 500, color: '#0b1c30', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Classification */}
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#585f67', marginBottom: 8 }}>Classification</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {[
+                { label: 'Access Tier', value: <TierBadge tier={doc.accessTier} /> },
+                { label: 'Compartment', value: 'Finance' },
+                { label: 'Encryption', value: 'AES-256' },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #c3c6d7' }}>
+                  <span style={{ fontSize: 14, color: '#434655' }}>{label}</span>
+                  {typeof value === 'string' ? <span style={{ fontSize: 14, fontWeight: 700, color: '#0b1c30' }}>{value}</span> : value}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Ingestion history */}
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#585f67', marginBottom: 12 }}>Ingestion History</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {[
+                { dot: '#22c55e', label: 'Successfully Ingested', time: formatDate(doc.createdAt) + ' · 09:45 AM' },
+                { dot: '#3b82f6', label: 'Vectorized & Indexed', time: formatDate(doc.createdAt) + ' · 09:46 AM' },
+              ].map(({ dot, label, time }) => (
+                <div key={label} style={{ display: 'flex', gap: 16 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: dot, marginTop: 4 }} />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: '#0b1c30', margin: '0 0 2px' }}>{label}</p>
+                    <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>{time}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      {doc && (
+        <div style={{ padding: 24, borderTop: '1px solid #c3c6d7', display: 'flex', gap: 12 }}>
+          <button style={{ flex: 1, padding: '10px 0', border: '1px solid #c3c6d7', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', background: 'transparent', color: '#0b1c30', fontFamily: 'inherit' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#eff4ff' }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+          >Audit Trail</button>
+          <button style={{ flex: 1, padding: '10px 0', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', background: '#fef2f2', color: '#dc2626', border: 'none', fontFamily: 'inherit' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#fee2e2' }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#fef2f2' }}
+          >Delete</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Upload dialog ────────────────────────────────────────────────────────────
 
 const uploadSchema = z.object({
   compartmentId: z.string().min(1, 'Select a compartment'),
   accessTier: z.enum(['internal', 'external']),
   sourceType: z.enum(['hr_policy', 'sop', 'faq', 'case_note', 'compliance', 'product_doc', 'other']),
 })
-
 type UploadFormValues = z.infer<typeof uploadSchema>
 
 function UploadDialog({ orgId, onClose }: { orgId: string; onClose: () => void }) {
@@ -67,85 +204,52 @@ function UploadDialog({ orgId, onClose }: { orgId: string; onClose: () => void }
   }
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', height: 'var(--input-h)', padding: '0 var(--space-3)',
-    border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
-    background: 'var(--color-surface-raised)', color: 'var(--color-text)', fontSize: 'var(--text-sm)',
+    width: '100%', height: 44, padding: '0 12px',
+    border: '1px solid #c3c6d7', borderRadius: 8,
+    background: '#ffffff', color: '#0b1c30', fontSize: 14, fontFamily: 'inherit',
   }
 
   return (
-    <div
-      role="dialog"
-      aria-labelledby="upload-title"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{ position: 'fixed', inset: 0, background: 'oklch(0% 0 0 / 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
-    >
-      <div style={{ background: 'var(--color-surface-raised)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-8)', width: 'min(480px, 90vw)', boxShadow: 'var(--shadow-lg)' }}>
-        <h2 id="upload-title" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', margin: '0 0 var(--space-6)' }}>Upload document</h2>
-
-        {noCompartments ? (
-          <div style={{ padding: 'var(--space-4)', background: 'var(--color-warning-subtle)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-4)' }}>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-warning)', margin: 0 }}>
-              No compartments yet — create one in Settings before uploading.
-            </p>
+    <div role="dialog" onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+      <div style={{ background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 16, padding: 32, width: 'min(480px, 90vw)', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 24px', color: '#0b1c30' }}>Upload Document</h2>
+        {noCompartments && (
+          <div style={{ padding: 12, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, marginBottom: 16 }}>
+            <p style={{ fontSize: 13, color: '#92400e', margin: 0 }}>No compartments yet — create one in Settings first.</p>
           </div>
-        ) : null}
-
-        <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        )}
+        <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>File (PDF, Word, or plain text)</label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.doc,.docx,.txt"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              style={{ display: 'none' }}
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                width: '100%', height: 'var(--input-h)', padding: '0 var(--space-3)',
-                border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-md)',
-                background: 'var(--color-surface-raised)',
-                color: file ? 'var(--color-text)' : 'var(--color-text-muted)',
-                fontSize: 'var(--text-sm)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 'var(--space-2)', textAlign: 'left',
-              }}
-            >
-              <Paperclip size={13} aria-hidden />
-              {file ? file.name : 'Choose file…'}
+            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>File (PDF, Word, or plain text)</label>
+            <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.txt" onChange={(e) => setFile(e.target.files?.[0] ?? null)} style={{ display: 'none' }} />
+            <button type="button" onClick={() => fileInputRef.current?.click()}
+              style={{ ...inputStyle, border: '1px dashed #c3c6d7', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, color: file ? '#0b1c30' : '#737686' }}>
+              <Paperclip size={14} />{file ? file.name : 'Choose file…'}
             </button>
           </div>
-
           <div>
-            <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>Compartment</label>
+            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Compartment</label>
             <select {...register('compartmentId')} disabled={noCompartments} style={{ ...inputStyle, opacity: noCompartments ? 0.5 : 1 }}>
               {compartments.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            {errors.compartmentId && <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)', marginTop: 2 }}>{errors.compartmentId.message}</p>}
           </div>
-
-          <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+          <div style={{ display: 'flex', gap: 12 }}>
             <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>Access tier</label>
-              <select {...register('accessTier')} style={inputStyle}>
-                <option value="internal">Internal</option>
-                <option value="external">External</option>
-              </select>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Access tier</label>
+              <select {...register('accessTier')} style={inputStyle}><option value="internal">Internal</option><option value="external">External</option></select>
             </div>
             <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', marginBottom: 'var(--space-2)' }}>Source type</label>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Source type</label>
               <select {...register('sourceType')} style={inputStyle}>
                 {Object.entries(SOURCE_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
           </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
-            <button type="button" onClick={onClose} style={{ height: 'var(--input-h)', padding: '0 var(--space-5)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'transparent', fontSize: 'var(--text-sm)', cursor: 'pointer', color: 'var(--color-text)' }}>
-              Cancel
-            </button>
-            <button type="submit" disabled={!file || upload.isPending || noCompartments} style={{ height: 'var(--input-h)', padding: '0 var(--space-5)', border: 'none', borderRadius: 'var(--radius-md)', background: 'var(--color-brand)', color: 'var(--color-brand-fg)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', opacity: (!file || noCompartments) ? 0.5 : 1, cursor: (upload.isPending || noCompartments) ? 'not-allowed' : 'pointer' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
+            <button type="button" onClick={onClose} style={{ height: 44, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>Cancel</button>
+            <button type="submit" disabled={!file || upload.isPending || noCompartments}
+              style={{ height: 44, padding: '0 20px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: (!file || noCompartments) ? 'not-allowed' : 'pointer', opacity: (!file || noCompartments) ? 0.5 : 1, fontFamily: 'inherit' }}>
               {upload.isPending ? 'Uploading…' : 'Upload'}
             </button>
           </div>
@@ -155,92 +259,143 @@ function UploadDialog({ orgId, onClose }: { orgId: string; onClose: () => void }
   )
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+type DocItem = Awaited<ReturnType<typeof useDocuments>>['data'] extends Array<infer T> | undefined ? T : never
+
 export default function DocumentsPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
   const [showUpload, setShowUpload] = useState(false)
+  const [selectedDoc, setSelectedDoc] = useState<DocItem | null>(null)
+  const [search, setSearch] = useState('')
 
   const { data: docs = [], isLoading } = useDocuments(orgId)
   const deleteDoc = useDeleteDocument(orgId)
 
+  const filtered = docs.filter((d) =>
+    !search || d.filename.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const docIcon = (sourceType: string) => {
+    if (sourceType === 'hr_policy' || sourceType === 'compliance') return <FileText size={18} color="#585f67" />
+    if (sourceType === 'sop' || sourceType === 'product_doc') return <Table2 size={18} color="#585f67" />
+    if (sourceType === 'faq') return <Link size={18} color="#585f67" />
+    return <File size={18} color="#585f67" />
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
-      <div style={{ height: 'var(--header-h)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 var(--space-8)', position: 'sticky', top: 0, background: 'var(--color-bg)', zIndex: 10, flexShrink: 0 }}>
-        <h1 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', margin: 0 }}>Documents</h1>
-        <button
-          onClick={() => setShowUpload(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', height: 'var(--input-h)', padding: '0 var(--space-4)', background: 'var(--color-brand)', color: 'var(--color-brand-fg)', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-medium)', cursor: 'pointer' }}
-        >
-          <Upload size={14} aria-hidden />
-          Upload
-        </button>
-      </div>
+      <PageHeader />
 
-      {/* Table */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        <table aria-label="Documents" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)' }}>
-          <thead>
-            <tr style={{ position: 'sticky', top: 0, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}>
-              {['Filename', 'Source type', 'Access tier', 'Status', 'Uploaded', 'Actions'].map((h) => (
-                <th key={h} style={{ padding: '0 var(--space-4)', height: 'var(--row-height-default)', textAlign: 'left', fontWeight: 'var(--font-medium)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && Array.from({ length: 5 }).map((_, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                {Array.from({ length: 6 }).map((__, j) => (
-                  <td key={j} style={{ padding: '0 var(--space-4)', height: 'var(--row-height-default)' }}>
-                    <Skeleton w={j === 0 ? 200 : 80} h={14} />
-                  </td>
-                ))}
-              </tr>
-            ))}
+      <div style={{ flex: 1, overflow: 'auto', padding: 32, display: 'flex', flexDirection: 'column', gap: 24, position: 'relative' }}>
+        {/* Page heading */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div>
+            <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0b1c30', margin: '0 0 4px' }}>Knowledge Base</h1>
+            <p style={{ fontSize: 14, color: '#585f67', margin: 0 }}>Manage and audit your organization&apos;s ingested documents.</p>
+          </div>
+          <button
+            onClick={() => setShowUpload(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 12, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+          >
+            <Upload size={16} /> Upload Document
+          </button>
+        </div>
 
-            {!isLoading && docs.length === 0 && (
-              <tr><td colSpan={6} style={{ padding: 'var(--space-12)', textAlign: 'center' }}>
-                <p style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-medium)', margin: '0 0 var(--space-2)' }}>No documents yet</p>
-                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', margin: 0 }}>Upload a PDF or Word document to get started.</p>
-              </td></tr>
-            )}
+        {/* Filters */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#ffffff', padding: 16, borderRadius: 12, border: '1px solid #c3c6d7' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 240 }}>
+            <Search size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#737686' }} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by filename or content..."
+              style={{ width: '100%', height: 40, paddingLeft: 36, paddingRight: 12, border: '1px solid #c3c6d7', borderRadius: 8, fontSize: 14, background: '#f8f9ff', outline: 'none', color: '#0b1c30', fontFamily: 'inherit' }}
+            />
+          </div>
+          {(['Source Type', 'Access Tier', 'Status'] as const).map((label) => (
+            <select key={label} style={{ height: 40, padding: '0 12px', border: '1px solid #c3c6d7', borderRadius: 8, fontSize: 14, color: '#434655', background: '#f8f9ff', cursor: 'pointer', fontFamily: 'inherit' }}>
+              <option>{label}</option>
+            </select>
+          ))}
+        </div>
 
-            {docs.map((doc) => {
-              const ss = STATUS_STYLE[doc.status] ?? STATUS_STYLE['queued']!
-              const ts = TIER_STYLE[doc.accessTier] ?? TIER_STYLE['internal']!
-              return (
-                <tr
-                  key={doc.id}
-                  style={{ borderBottom: '1px solid var(--color-border)', cursor: 'default' }}
-                  onMouseEnter={(e) => { ;(e.currentTarget as HTMLElement).style.background = 'var(--color-brand-subtle)' }}
-                  onMouseLeave={(e) => { ;(e.currentTarget as HTMLElement).style.background = '' }}
-                >
-                  <td style={{ padding: '0 var(--space-4)', height: 'var(--row-height-default)', fontWeight: 'var(--font-medium)', minWidth: 200 }}>{doc.filename}</td>
-                  <td style={{ padding: '0 var(--space-4)', height: 'var(--row-height-default)', width: 120 }}>{SOURCE_TYPE_LABELS[doc.sourceType] ?? doc.sourceType}</td>
-                  <td style={{ padding: '0 var(--space-4)', height: 'var(--row-height-default)', width: 100 }}><Badge label={doc.accessTier} {...ts} /></td>
-                  <td style={{ padding: '0 var(--space-4)', height: 'var(--row-height-default)', width: 100 }}><Badge label={doc.status} {...ss} /></td>
-                  <td style={{ padding: '0 var(--space-4)', height: 'var(--row-height-default)', width: 120, color: 'var(--color-text-muted)' }}>{formatDate(doc.createdAt)}</td>
-                  <td style={{ padding: '0 var(--space-4)', height: 'var(--row-height-default)', width: 80 }}>
-                    <button
-                      onClick={() => { if (confirm('Archive this document?')) deleteDoc.mutate(doc.id) }}
-                      aria-label={`Archive ${doc.filename}`}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: 0, display: 'flex', alignItems: 'center' }}
-                    >
-                      <Trash2 size={14} aria-hidden />
-                    </button>
-                  </td>
+        {/* Table */}
+        <div style={{ background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1 }}>
+          <div style={{ overflow: 'auto', flex: 1 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+              <thead>
+                <tr style={{ background: '#f8f9ff', borderBottom: '1px solid #c3c6d7' }}>
+                  {['FILENAME', 'SOURCE TYPE', 'ACCESS TIER', 'STATUS', 'UPLOADED DATE', 'ACTIONS'].map((h) => (
+                    <th key={h} style={{ padding: '14px 24px', textAlign: 'left', fontSize: 11, fontWeight: 500, color: '#585f67', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {isLoading && Array.from({ length: 4 }).map((_, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #c3c6d7' }}>
+                    {Array.from({ length: 6 }).map((__, j) => (
+                      <td key={j} style={{ padding: '16px 24px' }}>
+                        <div style={{ height: 14, background: '#eff4ff', borderRadius: 4, width: j === 0 ? 200 : 80, animation: 'cb-skel 1.5s ease-in-out infinite' }} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                {!isLoading && filtered.length === 0 && (
+                  <tr><td colSpan={6} style={{ padding: 48, textAlign: 'center', color: '#737686' }}>No documents found.</td></tr>
+                )}
+                {filtered.map((doc) => (
+                  <tr
+                    key={doc.id}
+                    onClick={() => setSelectedDoc(doc === selectedDoc ? null : doc)}
+                    style={{ borderBottom: '1px solid #c3c6d7', cursor: 'pointer', background: selectedDoc?.id === doc.id ? '#eff6ff' : 'transparent', transition: 'background 0.15s' }}
+                    onMouseEnter={(e) => { if (selectedDoc?.id !== doc.id) (e.currentTarget as HTMLElement).style.background = '#f8faff' }}
+                    onMouseLeave={(e) => { if (selectedDoc?.id !== doc.id) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                  >
+                    <td style={{ padding: '16px 24px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        {docIcon(doc.sourceType)}
+                        <div>
+                          <p style={{ fontSize: 14, fontWeight: 500, color: '#0b1c30', margin: 0 }}>{doc.filename}</p>
+                          <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>PDF Document</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '16px 24px', color: '#585f67' }}>{SOURCE_TYPE_LABELS[doc.sourceType] ?? doc.sourceType}</td>
+                    <td style={{ padding: '16px 24px' }}><TierBadge tier={doc.accessTier} /></td>
+                    <td style={{ padding: '16px 24px' }}><StatusBadge status={doc.status} /></td>
+                    <td style={{ padding: '16px 24px', color: '#585f67' }}>{formatDate(doc.createdAt)}</td>
+                    <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); if (confirm('Delete?')) deleteDoc.mutate(doc.id) }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', padding: 4, display: 'flex', alignItems: 'center' }}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {/* Pagination */}
+          <div style={{ padding: '14px 24px', background: '#f8f9ff', borderTop: '1px solid #c3c6d7', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>Showing <strong style={{ color: '#0b1c30' }}>1–{filtered.length}</strong> of <strong style={{ color: '#0b1c30' }}>{filtered.length}</strong> documents</p>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {['‹', '1', '2', '3', '›'].map((p, i) => (
+                <button key={i} style={{ width: 32, height: 32, borderRadius: 4, border: '1px solid #c3c6d7', background: p === '1' ? '#2563eb' : 'transparent', color: p === '1' ? '#ffffff' : '#434655', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{p}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Detail panel */}
+        <DetailPanel doc={selectedDoc} onClose={() => setSelectedDoc(null)} />
       </div>
 
+      <style>{`@keyframes cb-skel { 0%,100%{opacity:.5}50%{opacity:1} }`}</style>
       {showUpload && <UploadDialog orgId={orgId} onClose={() => setShowUpload(false)} />}
     </div>
   )
-}
-
-function Skeleton({ w, h }: { w?: number; h?: number }) {
-  return <div style={{ width: w ?? '100%', height: h ?? 14, background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', animation: 'cb-skel 1.5s ease-in-out infinite' }} />
 }

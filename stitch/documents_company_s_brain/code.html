@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Documents | Company's Brain</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface": "#f8f9ff",
+                    "on-secondary": "#ffffff",
+                    "surface-bright": "#f8f9ff",
+                    "on-error": "#ffffff",
+                    "surface-container-low": "#eff4ff",
+                    "on-surface": "#0b1c30",
+                    "on-surface-variant": "#434655",
+                    "error": "#ba1a1a",
+                    "on-tertiary-fixed": "#360f00",
+                    "on-tertiary-fixed-variant": "#7d2d00",
+                    "inverse-on-surface": "#eaf1ff",
+                    "on-secondary-fixed-variant": "#40484f",
+                    "on-secondary-fixed": "#151c23",
+                    "primary-fixed": "#dbe1ff",
+                    "on-primary-fixed-variant": "#003ea8",
+                    "tertiary": "#943700",
+                    "surface-container-lowest": "#ffffff",
+                    "on-tertiary-container": "#ffede6",
+                    "tertiary-fixed-dim": "#ffb596",
+                    "secondary-fixed-dim": "#c0c7d0",
+                    "surface-container": "#e5eeff",
+                    "on-primary-container": "#eeefff",
+                    "primary-fixed-dim": "#b4c5ff",
+                    "secondary": "#585f67",
+                    "on-tertiary": "#ffffff",
+                    "tertiary-fixed": "#ffdbcd",
+                    "background": "#f8f9ff",
+                    "surface-variant": "#d3e4fe",
+                    "surface-container-highest": "#d3e4fe",
+                    "on-primary-fixed": "#00174b",
+                    "inverse-primary": "#b4c5ff",
+                    "inverse-surface": "#213145",
+                    "on-error-container": "#93000a",
+                    "primary-container": "#2563eb",
+                    "outline-variant": "#c3c6d7",
+                    "secondary-fixed": "#dce3ec",
+                    "surface-container-high": "#dce9ff",
+                    "surface-dim": "#cbdbf5",
+                    "error-container": "#ffdad6",
+                    "on-secondary-container": "#5e656d",
+                    "primary": "#004ac6",
+                    "outline": "#737686",
+                    "on-primary": "#ffffff",
+                    "secondary-container": "#dce3ec",
+                    "surface-tint": "#0053db",
+                    "tertiary-container": "#bc4800",
+                    "on-background": "#0b1c30"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "margin-desktop": "32px",
+                    "margin-mobile": "16px",
+                    "unit": "4px",
+                    "sidebar-width": "280px",
+                    "gutter": "24px"
+            },
+            "fontFamily": {
+                    "label-sm": ["Be Vietnam Pro"],
+                    "headline-lg-mobile": ["Be Vietnam Pro"],
+                    "body-lg": ["Be Vietnam Pro"],
+                    "label-md": ["Be Vietnam Pro"],
+                    "body-md": ["Be Vietnam Pro"],
+                    "headline-md": ["Be Vietnam Pro"],
+                    "headline-sm": ["Be Vietnam Pro"],
+                    "headline-lg": ["Be Vietnam Pro"],
+                    "display": ["Be Vietnam Pro"]
+            },
+            "fontSize": {
+                    "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "600"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "display": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Be Vietnam Pro', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-background text-on-surface overflow-hidden">
+<div class="flex h-screen w-full">
+<!-- Sidebar - Collapsed/Standard as per Blueprint -->
+<aside class="w-sidebar-width h-screen sticky left-0 top-0 bg-surface-container-low border-r border-outline-variant flex flex-col py-6">
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined text-[20px]">psychology</span>
+</div>
+<div>
+<h1 class="text-headline-sm font-headline-sm font-bold text-primary">Brain</h1>
+<p class="text-label-sm font-label-sm text-secondary opacity-70">AI Agent</p>
+</div>
+</div>
+<div class="px-4 mb-6">
+<button class="w-full py-3 bg-primary-container text-on-primary-container rounded-xl font-label-md flex items-center justify-center gap-2 hover:opacity-90 transition-all">
+<span class="material-symbols-outlined">add</span>
+                    New Chat
+                </button>
+</div>
+<nav class="flex-1 px-2 space-y-1">
+<a class="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="chat">chat</span>
+<span class="text-label-md font-label-md">Chat</span>
+</a>
+<!-- Active Tab: Documents -->
+<a class="flex items-center gap-3 bg-primary-container text-on-primary-container rounded-xl px-4 py-3 border-l-2 border-primary" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+<span class="text-label-md font-label-md">Documents</span>
+</a>
+<a class="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="text-label-md font-label-md">Analytics</span>
+</a>
+<a class="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="assignment_turned_in">assignment_turned_in</span>
+<span class="text-label-md font-label-md">Audit Log</span>
+</a>
+<a class="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="text-label-md font-label-md">Users</span>
+</a>
+<a class="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="text-label-md font-label-md">Settings</span>
+</a>
+</nav>
+<div class="px-2 mt-auto">
+<a class="flex items-center gap-3 text-secondary px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+<span class="text-label-md font-label-md">Profile</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col h-screen overflow-hidden">
+<!-- Top Bar -->
+<header class="h-[64px] min-h-[64px] w-full border-b border-outline-variant bg-surface flex items-center justify-between px-8 z-40">
+<h2 class="text-headline-sm font-headline-sm font-bold text-primary">Documents</h2>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4 text-on-surface-variant">
+<span class="material-symbols-outlined cursor-pointer hover:text-primary transition-all">notifications</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary transition-all">help_outline</span>
+</div>
+<div class="h-8 w-[1px] bg-outline-variant"></div>
+<div class="flex items-center gap-3">
+<span class="text-label-md font-label-md text-secondary">Status: <span class="text-primary font-bold">Internal</span></span>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center overflow-hidden">
+<img alt="User Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyPLjNfpIWt_iK_imUAyRkjHxOVST4_LIbeA7HhRMUB_smHCc62moFwkgt-h1Co36MaJzcQ-S4S6logRbvXPC8YbOi0mKFM83kf2jNpeYM2xHwo6wMTMMRep7Q8YHpWiffXjRT5PKDiVayzYHC5sh5u0ttZrJinTM93FbrIXqD0yq8Lc4KkKSmKDQIx4w2W-DzKQf0STtwnr8Qqd-yMeictbQD07knTy5sNfZ_GLsgqIIMyx6lMWk8hPVHWZe2pII2bIzmTwoB-5Q5"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Page Content with Data Table -->
+<div class="flex-1 overflow-auto p-8 flex flex-col gap-6 relative">
+<!-- Action Header -->
+<div class="flex items-center justify-between">
+<div>
+<h3 class="text-headline-md font-headline-md text-on-surface">Knowledge Base</h3>
+<p class="text-body-md font-body-md text-secondary">Manage and audit your organization's ingested documents.</p>
+</div>
+<button class="bg-[#2563eb] text-white px-6 py-2.5 rounded-xl font-label-md flex items-center gap-2 hover:opacity-90 transition-all shadow-sm">
+<span class="material-symbols-outlined">upload_file</span>
+                        Upload Document
+                    </button>
+</div>
+<!-- Filter Bar -->
+<div class="flex flex-wrap items-center gap-3 bg-surface-container-lowest p-4 rounded-xl border border-outline-variant">
+<div class="relative flex-1 min-w-[240px]">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full bg-surface border border-outline-variant rounded-lg pl-10 pr-4 py-2 text-body-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" placeholder="Search by filename or content..." type="text"/>
+</div>
+<div class="flex items-center gap-3">
+<select class="bg-surface border border-outline-variant rounded-lg px-3 py-2 text-label-md text-on-surface-variant outline-none focus:border-primary cursor-pointer">
+<option>Source Type</option>
+<option>PDF</option>
+<option>Spreadsheet</option>
+<option>Web URL</option>
+</select>
+<select class="bg-surface border border-outline-variant rounded-lg px-3 py-2 text-label-md text-on-surface-variant outline-none focus:border-primary cursor-pointer">
+<option>Access Tier</option>
+<option>Public</option>
+<option>Confidential</option>
+<option>Restricted</option>
+</select>
+<select class="bg-surface border border-outline-variant rounded-lg px-3 py-2 text-label-md text-on-surface-variant outline-none focus:border-primary cursor-pointer">
+<option>Compartment</option>
+<option>Legal</option>
+<option>HR</option>
+<option>Product</option>
+</select>
+<select class="bg-surface border border-outline-variant rounded-lg px-3 py-2 text-label-md text-on-surface-variant outline-none focus:border-primary cursor-pointer">
+<option>Status</option>
+<option>Ingested</option>
+<option>Processing</option>
+<option>Failed</option>
+</select>
+<button class="flex items-center gap-1 text-label-md text-primary font-bold px-2 py-2 hover:bg-surface-container-high rounded-lg transition-all">
+<span class="material-symbols-outlined text-[18px]">filter_list_off</span>
+                            Clear
+                        </button>
+</div>
+</div>
+<!-- Table Container -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden flex flex-col flex-1">
+<div class="overflow-x-auto flex-1">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface text-secondary border-b border-outline-variant">
+<tr>
+<th class="px-6 py-4 text-label-sm font-label-sm uppercase tracking-wider">Filename</th>
+<th class="px-6 py-4 text-label-sm font-label-sm uppercase tracking-wider">Source Type</th>
+<th class="px-6 py-4 text-label-sm font-label-sm uppercase tracking-wider">Access Tier</th>
+<th class="px-6 py-4 text-label-sm font-label-sm uppercase tracking-wider">Compartment</th>
+<th class="px-6 py-4 text-label-sm font-label-sm uppercase tracking-wider">Status</th>
+<th class="px-6 py-4 text-label-sm font-label-sm uppercase tracking-wider">Uploaded Date</th>
+<th class="px-6 py-4 text-label-sm font-label-sm uppercase tracking-wider text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Row 1 - Selected (Active) -->
+<tr class="hover:bg-[#eff6ff] bg-[#eff6ff] transition-colors cursor-pointer group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">description</span>
+<div>
+<p class="text-body-md font-label-md text-on-surface">Q3_Financial_Projections.pdf</p>
+<p class="text-[12px] text-secondary">2.4 MB</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-body-md text-secondary">PDF Document</td>
+<td class="px-6 py-4">
+<span class="px-2 py-0.5 rounded text-[12px] font-bold bg-orange-100 text-orange-800">Confidential</span>
+</td>
+<td class="px-6 py-4 text-body-md text-secondary">Finance</td>
+<td class="px-6 py-4">
+<span class="px-2 py-0.5 rounded text-[12px] font-bold bg-green-100 text-green-800 flex items-center w-fit gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-green-600"></span>
+                                            Ingested
+                                        </span>
+</td>
+<td class="px-6 py-4 text-body-md text-secondary">Oct 12, 2023</td>
+<td class="px-6 py-4 text-right">
+<button class="text-secondary hover:text-primary transition-all">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-[#eff6ff] transition-colors cursor-pointer group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">table_chart</span>
+<div>
+<p class="text-body-md font-label-md text-on-surface">Employee_Onboarding_V2.xlsx</p>
+<p class="text-[12px] text-secondary">1.1 MB</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-body-md text-secondary">Spreadsheet</td>
+<td class="px-6 py-4">
+<span class="px-2 py-0.5 rounded text-[12px] font-bold bg-blue-100 text-blue-800">Internal</span>
+</td>
+<td class="px-6 py-4 text-body-md text-secondary">HR</td>
+<td class="px-6 py-4">
+<span class="px-2 py-0.5 rounded text-[12px] font-bold bg-green-100 text-green-800 flex items-center w-fit gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-green-600"></span>
+                                            Ingested
+                                        </span>
+</td>
+<td class="px-6 py-4 text-body-md text-secondary">Oct 10, 2023</td>
+<td class="px-6 py-4 text-right">
+<button class="text-secondary hover:text-primary transition-all">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-[#eff6ff] transition-colors cursor-pointer group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">link</span>
+<div>
+<p class="text-body-md font-label-md text-on-surface">Marketing_Wiki_Internal</p>
+<p class="text-[12px] text-secondary">URL Source</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-body-md text-secondary">Web Scraping</td>
+<td class="px-6 py-4">
+<span class="px-2 py-0.5 rounded text-[12px] font-bold bg-slate-100 text-slate-800">Public</span>
+</td>
+<td class="px-6 py-4 text-body-md text-secondary">Marketing</td>
+<td class="px-6 py-4">
+<span class="px-2 py-0.5 rounded text-[12px] font-bold bg-blue-100 text-blue-800 flex items-center w-fit gap-1 animate-pulse">
+<span class="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                                            Processing
+                                        </span>
+</td>
+<td class="px-6 py-4 text-body-md text-secondary">Oct 14, 2023</td>
+<td class="px-6 py-4 text-right">
+<button class="text-secondary hover:text-primary transition-all">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-[#eff6ff] transition-colors cursor-pointer group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">article</span>
+<div>
+<p class="text-body-md font-label-md text-on-surface">Terms_of_Service_Update.pdf</p>
+<p class="text-[12px] text-secondary">450 KB</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-body-md text-secondary">PDF Document</td>
+<td class="px-6 py-4">
+<span class="px-2 py-0.5 rounded text-[12px] font-bold bg-red-100 text-red-800">Restricted</span>
+</td>
+<td class="px-6 py-4 text-body-md text-secondary">Legal</td>
+<td class="px-6 py-4">
+<span class="px-2 py-0.5 rounded text-[12px] font-bold bg-green-100 text-green-800 flex items-center w-fit gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-green-600"></span>
+                                            Ingested
+                                        </span>
+</td>
+<td class="px-6 py-4 text-body-md text-secondary">Oct 09, 2023</td>
+<td class="px-6 py-4 text-right">
+<button class="text-secondary hover:text-primary transition-all">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="px-6 py-4 bg-surface border-t border-outline-variant flex items-center justify-between">
+<p class="text-label-sm text-secondary">Showing <span class="font-bold text-on-surface">1-4</span> of <span class="font-bold text-on-surface">128</span> documents</p>
+<div class="flex items-center gap-2">
+<button class="p-1 rounded hover:bg-surface-container-high transition-all text-secondary disabled:opacity-30" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded bg-primary text-on-primary text-label-sm font-bold">1</button>
+<button class="w-8 h-8 rounded hover:bg-surface-container-high text-on-surface-variant text-label-sm">2</button>
+<button class="w-8 h-8 rounded hover:bg-surface-container-high text-on-surface-variant text-label-sm">3</button>
+<span class="text-secondary px-1">...</span>
+<button class="w-8 h-8 rounded hover:bg-surface-container-high text-on-surface-variant text-label-sm">32</button>
+<button class="p-1 rounded hover:bg-surface-container-high transition-all text-secondary">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Side Panel (Slide-over) -->
+<div class="absolute right-0 top-0 h-full w-[420px] bg-white shadow-[-10px_0_30px_-5px_rgba(0,0,0,0.05)] border-l border-outline-variant z-50 transform transition-transform duration-300 ease-in-out" id="detail-panel">
+<div class="h-full flex flex-col">
+<div class="px-6 py-5 border-b border-outline-variant flex items-center justify-between bg-surface-container-lowest">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">description</span>
+<h3 class="text-headline-sm font-headline-sm font-bold">Document Detail</h3>
+</div>
+<button class="p-2 hover:bg-surface-container-high rounded-full transition-all text-secondary">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-6 space-y-8">
+<!-- Preview Card -->
+<div class="aspect-[4/3] w-full bg-surface-container-high rounded-xl border border-outline-variant overflow-hidden relative group">
+<img alt="Document Preview" class="w-full h-full object-cover opacity-60" data-alt="A clean, minimalist high-angle shot of a white paper document resting on a sleek blue desk. The lighting is soft and diffused, creating an airy and expansive atmosphere. The document features faint charts and professional typography. The overall visual style is modern, clinical, and high-performance, reflecting a sophisticated corporate AI environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA7chxrcqmQSeyO9qfJUmbII_h9feM3LeLVNFYeEOgYthd9w_lDhk9DnY5XP3vN5q38_Ds9vmPOL2tM0i494f1vFj8-BjhAYSR4csYU3y6yQF8dRB6TtzB_nzzwBfXnwhNL96fZujE9tkQFgqVxw7Zr7PmI3iQZE4C1PbTX98-v4lC3adO_H2SGGjB_cCJvEBXAikKxIb0zG2C2VEMkJfxBtcswUWRw2DH3LBuz_34hSJG4Bg1SCEYV-fFWGZHpmNKrl0vxDTfX8oMO"/>
+<div class="absolute inset-0 flex items-center justify-center">
+<button class="bg-white/90 backdrop-blur-md px-4 py-2 rounded-lg border border-outline-variant text-label-md font-bold text-primary shadow-sm hover:scale-105 transition-all">
+                                    Full Preview
+                                </button>
+</div>
+</div>
+<!-- Info Section -->
+<div class="space-y-6">
+<div>
+<h4 class="text-label-sm font-label-sm text-secondary uppercase tracking-wider mb-2">Primary Info</h4>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container p-3 rounded-lg border border-outline-variant">
+<p class="text-[10px] text-secondary font-bold uppercase">Filename</p>
+<p class="text-body-md font-label-md truncate">Q3_Financial_Projections.pdf</p>
+</div>
+<div class="bg-surface-container p-3 rounded-lg border border-outline-variant">
+<p class="text-[10px] text-secondary font-bold uppercase">Size</p>
+<p class="text-body-md font-label-md">2.4 MB</p>
+</div>
+</div>
+</div>
+<div>
+<h4 class="text-label-sm font-label-sm text-secondary uppercase tracking-wider mb-2">Classification</h4>
+<div class="space-y-3">
+<div class="flex justify-between items-center py-2 border-b border-outline-variant">
+<span class="text-body-md text-on-surface-variant">Access Tier</span>
+<span class="px-2 py-0.5 rounded text-[12px] font-bold bg-orange-100 text-orange-800">Confidential</span>
+</div>
+<div class="flex justify-between items-center py-2 border-b border-outline-variant">
+<span class="text-body-md text-on-surface-variant">Compartment</span>
+<span class="text-body-md font-bold text-on-surface">Finance</span>
+</div>
+<div class="flex justify-between items-center py-2 border-b border-outline-variant">
+<span class="text-body-md text-on-surface-variant">Encryption</span>
+<span class="text-body-md font-bold text-on-surface">AES-256</span>
+</div>
+</div>
+</div>
+<div>
+<h4 class="text-label-sm font-label-sm text-secondary uppercase tracking-wider mb-2">Ingestion History</h4>
+<div class="space-y-4">
+<div class="flex gap-4">
+<div class="flex flex-col items-center">
+<div class="w-3 h-3 rounded-full bg-green-500 mt-1"></div>
+<div class="w-[2px] h-10 bg-outline-variant"></div>
+</div>
+<div>
+<p class="text-label-md font-bold text-on-surface">Successfully Ingested</p>
+<p class="text-[12px] text-secondary">Oct 12, 2023 · 09:45 AM</p>
+</div>
+</div>
+<div class="flex gap-4">
+<div class="flex flex-col items-center">
+<div class="w-3 h-3 rounded-full bg-blue-500 mt-1"></div>
+</div>
+<div>
+<p class="text-label-md font-bold text-on-surface">Vectorized &amp; Indexed</p>
+<p class="text-[12px] text-secondary">Oct 12, 2023 · 09:46 AM</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="p-6 border-t border-outline-variant bg-surface gap-3 flex">
+<button class="flex-1 py-2.5 border border-outline-variant rounded-xl text-label-md font-bold hover:bg-surface-container-high transition-all">
+                            Audit Trail
+                        </button>
+<button class="flex-1 py-2.5 bg-red-50 text-red-600 rounded-xl text-label-md font-bold hover:bg-red-100 transition-all">
+                            Delete
+                        </button>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Micro-interaction Script -->
+<script>
+        // Simple script to toggle side panel (mock)
+        const panel = document.getElementById('detail-panel');
+        let isOpen = true;
+
+        function togglePanel() {
+            if (isOpen) {
+                panel.style.transform = 'translateX(100%)';
+            } else {
+                panel.style.transform = 'translateX(0)';
+            }
+            isOpen = !isOpen;
+        }
+
+        // Close panel when clicking the close button
+        const closeBtn = panel.querySelector('button');
+        closeBtn.addEventListener('click', togglePanel);
+
+        // Interaction for rows to "select" them
+        const rows = document.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            row.addEventListener('click', () => {
+                rows.forEach(r => r.classList.remove('bg-[#eff6ff]'));
+                row.classList.add('bg-[#eff6ff]');
+                if(!isOpen) togglePanel();
+            });
+        });
+    </script>
+</body></html>
