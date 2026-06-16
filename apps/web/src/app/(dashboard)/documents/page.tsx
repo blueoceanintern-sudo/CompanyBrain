@@ -72,7 +72,12 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── Detail panel ─────────────────────────────────────────────────────────────
 
-function DetailPanel({ doc, onClose }: { doc: { id: string; filename: string; accessTier: string; status: string; sourceType: string; createdAt: string } | null; onClose: () => void }) {
+function DetailPanel({ doc, compartmentName, onClose, onDelete }: {
+  doc: { id: string; filename: string; accessTier: string; status: string; sourceType: string; createdAt: string } | null
+  compartmentName: string
+  onClose: () => void
+  onDelete: (id: string) => void
+}) {
   return (
     <div style={{ position: 'absolute', right: 0, top: 0, height: '100%', width: 420, background: '#ffffff', borderLeft: '1px solid #c3c6d7', boxShadow: '-10px 0 30px -5px rgba(0,0,0,0.05)', transform: doc ? 'translateX(0)' : 'translateX(100%)', transition: 'transform 0.3s ease', display: 'flex', flexDirection: 'column', zIndex: 50 }}>
       {/* Header */}
@@ -105,7 +110,7 @@ function DetailPanel({ doc, onClose }: { doc: { id: string; filename: string; ac
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               {[
                 { label: 'Filename', value: doc.filename },
-                { label: 'Size', value: '2.4 MB' },
+                { label: 'Size', value: '—' },
               ].map(({ label, value }) => (
                 <div key={label} style={{ background: '#e5eeff', padding: 12, borderRadius: 8, border: '1px solid #c3c6d7' }}>
                   <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#585f67', margin: '0 0 4px' }}>{label}</p>
@@ -121,7 +126,7 @@ function DetailPanel({ doc, onClose }: { doc: { id: string; filename: string; ac
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {[
                 { label: 'Access Tier', value: <TierBadge tier={doc.accessTier} /> },
-                { label: 'Compartment', value: 'Finance' },
+                { label: 'Compartment', value: compartmentName },
                 { label: 'Encryption', value: 'AES-256' },
               ].map(({ label, value }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #c3c6d7' }}>
@@ -162,7 +167,9 @@ function DetailPanel({ doc, onClose }: { doc: { id: string; filename: string; ac
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#eff4ff' }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
           >Audit Trail</button>
-          <button style={{ flex: 1, padding: '10px 0', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', background: '#fef2f2', color: '#dc2626', border: 'none', fontFamily: 'inherit' }}
+          <button
+            onClick={() => { if (confirm('Delete this document?')) onDelete(doc.id) }}
+            style={{ flex: 1, padding: '10px 0', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', background: '#fef2f2', color: '#dc2626', border: 'none', fontFamily: 'inherit' }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#fee2e2' }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#fef2f2' }}
           >Delete</button>
@@ -269,13 +276,24 @@ export default function DocumentsPage() {
   const [showUpload, setShowUpload] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<DocItem | null>(null)
   const [search, setSearch] = useState('')
+  const [sourceTypeFilter, setSourceTypeFilter] = useState('')
+  const [accessTierFilter, setAccessTierFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
 
   const { data: docs = [], isLoading } = useDocuments(orgId)
+  const { data: compartments = [] } = useCompartments(orgId)
   const deleteDoc = useDeleteDocument(orgId)
 
-  const filtered = docs.filter((d) =>
-    !search || d.filename.toLowerCase().includes(search.toLowerCase())
-  )
+  const getCompartmentName = (compartmentId: string) =>
+    compartments.find((c) => c.id === compartmentId)?.name ?? '—'
+
+  const filtered = docs.filter((d) => {
+    if (search && !d.filename.toLowerCase().includes(search.toLowerCase())) return false
+    if (sourceTypeFilter && d.sourceType !== sourceTypeFilter) return false
+    if (accessTierFilter && d.accessTier !== accessTierFilter) return false
+    if (statusFilter && d.status !== statusFilter) return false
+    return true
+  })
 
   const docIcon = (sourceType: string) => {
     if (sourceType === 'hr_policy' || sourceType === 'compliance') return <FileText size={18} color="#585f67" />
@@ -314,11 +332,25 @@ export default function DocumentsPage() {
               style={{ width: '100%', height: 40, paddingLeft: 36, paddingRight: 12, border: '1px solid #c3c6d7', borderRadius: 8, fontSize: 14, background: '#f8f9ff', outline: 'none', color: '#0b1c30', fontFamily: 'inherit' }}
             />
           </div>
-          {(['Source Type', 'Access Tier', 'Status'] as const).map((label) => (
-            <select key={label} style={{ height: 40, padding: '0 12px', border: '1px solid #c3c6d7', borderRadius: 8, fontSize: 14, color: '#434655', background: '#f8f9ff', cursor: 'pointer', fontFamily: 'inherit' }}>
-              <option>{label}</option>
-            </select>
-          ))}
+          <select value={sourceTypeFilter} onChange={(e) => setSourceTypeFilter(e.target.value)} style={{ height: 40, padding: '0 12px', border: '1px solid #c3c6d7', borderRadius: 8, fontSize: 14, color: '#434655', background: '#f8f9ff', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <option value="">Source Type</option>
+            {Object.entries(SOURCE_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+          <select value={accessTierFilter} onChange={(e) => setAccessTierFilter(e.target.value)} style={{ height: 40, padding: '0 12px', border: '1px solid #c3c6d7', borderRadius: 8, fontSize: 14, color: '#434655', background: '#f8f9ff', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <option value="">Access Tier</option>
+            <option value="internal">Internal</option>
+            <option value="external">External</option>
+            <option value="confidential">Confidential</option>
+            <option value="public">Public</option>
+            <option value="restricted">Restricted</option>
+          </select>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ height: 40, padding: '0 12px', border: '1px solid #c3c6d7', borderRadius: 8, fontSize: 14, color: '#434655', background: '#f8f9ff', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <option value="">Status</option>
+            <option value="complete">Ingested</option>
+            <option value="running">Processing</option>
+            <option value="queued">Queued</option>
+            <option value="failed">Failed</option>
+          </select>
         </div>
 
         {/* Table */}
@@ -391,7 +423,12 @@ export default function DocumentsPage() {
         </div>
 
         {/* Detail panel */}
-        <DetailPanel doc={selectedDoc} onClose={() => setSelectedDoc(null)} />
+        <DetailPanel
+          doc={selectedDoc}
+          compartmentName={selectedDoc ? getCompartmentName((selectedDoc as { compartmentId?: string }).compartmentId ?? '') : '—'}
+          onClose={() => setSelectedDoc(null)}
+          onDelete={(id) => { deleteDoc.mutate(id); setSelectedDoc(null) }}
+        />
       </div>
 
       <style>{`@keyframes cb-skel { 0%,100%{opacity:.5}50%{opacity:1} }`}</style>

@@ -4,8 +4,9 @@ import { useState, useRef, useEffect } from 'react'
 import {
   Search, Send, BookOpen, FileText, Calendar,
   Paperclip, Globe, Bot, ThumbsUp, Copy, RefreshCw,
-  Sparkles, Clock,
+  Sparkles, Clock, Plus,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { useSubmitQuery } from '@/hooks/use-queries'
 import { getAuthUser } from '@/lib/auth'
 import type { QueryResponse } from '@company-brain/shared'
@@ -25,16 +26,9 @@ const SUGGESTIONS = [
   { icon: Calendar,  label: 'Holiday calendar 2024' },
 ]
 
-const RECENT = [
-  'Q3 Performance Metrics...',
-  'Health insurance providers...',
-  'Technical debt roadmap...',
-  'Onboarding documentation...',
-]
-
 // ─── Header bar ───────────────────────────────────────────────────────────────
 
-function PageHeader() {
+function PageHeader({ onNew }: { onNew?: () => void }) {
   return (
     <header style={{ height: 50, borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -58,13 +52,15 @@ function PageHeader() {
 
 function EmptyState({
   input, onChange, onSubmit, disabled,
-  textareaRef,
+  textareaRef, recentQueries, onClearRecent,
 }: {
   input: string
   onChange: (v: string) => void
   onSubmit: () => void
   disabled: boolean
   textareaRef: React.RefObject<HTMLTextAreaElement>
+  recentQueries: string[]
+  onClearRecent: () => void
 }) {
   const user = getAuthUser()
   const hour = new Date().getHours()
@@ -125,28 +121,30 @@ function EmptyState({
       </div>
 
       {/* Recent activity strip */}
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 32px 32px', background: 'linear-gradient(to top, #ffffff 60%, transparent)' }}>
-        <div style={{ borderTop: '1px solid rgba(195,198,215,0.3)', paddingTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#737686' }}>Recent Activity</span>
-            <button style={{ fontSize: 12, color: '#004ac6', background: 'none', border: 'none', cursor: 'pointer' }}>Clear all</button>
-          </div>
-          <div style={{ display: 'flex', gap: 32, overflowX: 'auto' }}>
-            {RECENT.map((item) => (
-              <button
-                key={item}
-                onClick={() => onChange(item.replace('...', ''))}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer', color: '#434655', fontSize: 14, fontFamily: 'inherit', padding: 0 }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#0b1c30' }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#434655' }}
-              >
-                <Clock size={16} color="#737686" />
-                {item}
-              </button>
-            ))}
+      {recentQueries.length > 0 && (
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 32px 32px', background: 'linear-gradient(to top, #ffffff 60%, transparent)' }}>
+          <div style={{ borderTop: '1px solid rgba(195,198,215,0.3)', paddingTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#737686' }}>Recent Activity</span>
+              <button onClick={onClearRecent} style={{ fontSize: 12, color: '#004ac6', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Clear all</button>
+            </div>
+            <div style={{ display: 'flex', gap: 32, overflowX: 'auto' }}>
+              {recentQueries.map((item) => (
+                <button
+                  key={item}
+                  onClick={() => onChange(item)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer', color: '#434655', fontSize: 14, fontFamily: 'inherit', padding: 0 }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#0b1c30' }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#434655' }}
+                >
+                  <Clock size={16} color="#737686" />
+                  {item}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -265,8 +263,8 @@ function ActiveChat({
                   {/* Actions */}
                   <div style={{ display: 'flex', gap: 16 }}>
                     {[
-                      { icon: ThumbsUp, label: 'Helpful' },
-                      { icon: Copy,     label: 'Copy' },
+                      { icon: ThumbsUp, label: 'Helpful', onClick: () => toast.success('Marked as helpful') },
+                      { icon: Copy, label: 'Copy', onClick: () => { navigator.clipboard.writeText(entry.response?.answer ?? '').then(() => toast.success('Copied to clipboard')) } },
                       { icon: RefreshCw, label: 'Regenerate', onClick: () => onRetry(entry.id, entry.question) },
                     ].map(({ icon: Icon, label, onClick }) => (
                       <button
@@ -302,8 +300,12 @@ function ActiveChat({
             />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px 12px' }}>
               <div style={{ display: 'flex', gap: 4 }}>
-                {[Paperclip, Globe, Bot].map((Icon, i) => (
-                  <button key={i} style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 8 }}
+                {[
+                  { Icon: Paperclip, title: 'Attach file', handler: () => toast.info('File attachments coming soon') },
+                  { Icon: Globe, title: 'Web search', handler: () => toast.info('Web search coming soon') },
+                  { Icon: Bot, title: 'AI settings', handler: () => toast.info('AI model selection coming soon') },
+                ].map(({ Icon, title, handler }) => (
+                  <button key={title} title={title} onClick={handler} style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 8 }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#eff4ff'; (e.currentTarget as HTMLElement).style.color = '#004ac6' }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none'; (e.currentTarget as HTMLElement).style.color = '#585f67' }}
                   >
@@ -335,6 +337,7 @@ export default function ChatPage() {
 
   const [input, setInput] = useState('')
   const [history, setHistory] = useState<HistoryEntry[]>([])
+  const [recentQueries, setRecentQueries] = useState<string[]>([])
   const submit = useSubmitQuery(orgId)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -376,9 +379,20 @@ export default function ChatPage() {
 
   const isEmpty = history.length === 0
 
+  const handleNewChat = () => {
+    const questions = history.map((h) => h.question).filter(Boolean)
+    setRecentQueries((prev) => {
+      const merged = [...questions.filter((q) => !prev.includes(q)), ...prev]
+      return merged.slice(0, 8)
+    })
+    setHistory([])
+    setInput('')
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <PageHeader />
+      <PageHeader onNew={handleNewChat} />
       {isEmpty ? (
         <EmptyState
           input={input}
@@ -386,6 +400,8 @@ export default function ChatPage() {
           onSubmit={handleSubmit}
           disabled={submit.isPending}
           textareaRef={textareaRef as React.RefObject<HTMLTextAreaElement>}
+          recentQueries={recentQueries}
+          onClearRecent={() => setRecentQueries([])}
         />
       ) : (
         <ActiveChat
@@ -397,7 +413,7 @@ export default function ChatPage() {
           textareaRef={textareaRef}
           onToggle={(id) => setHistory((prev) => prev.map((h) => h.id === id ? { ...h, expanded: !h.expanded } : h))}
           onRetry={(id, q) => submitQuery(q, id)}
-          onNew={() => setHistory([])}
+          onNew={handleNewChat}
         />
       )}
     </div>

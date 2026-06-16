@@ -94,9 +94,9 @@ function DetailPanel({ entry, onClose }: { entry: AuditEntry; onClose: () => voi
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               {[
                 { label: 'Action ID', value: `evt_${entry.id.slice(0, 10)}`, mono: true },
-                { label: 'IP Address', value: '192.168.1.45', mono: true },
-                { label: 'User Agent', value: 'Mozilla/5.0 (Macintosh; Intel...)', mono: false },
-                { label: 'Region', value: 'us-east-1 (Virginia)', mono: false },
+                { label: 'IP Address', value: '—', mono: true },
+                { label: 'User Agent', value: '—', mono: false },
+                { label: 'Region', value: '—', mono: false },
               ].map(({ label, value, mono }) => (
                 <div key={label}>
                   <span style={{ fontSize: 12, fontWeight: 500, color: '#434655', display: 'block', marginBottom: 4 }}>{label}</span>
@@ -151,17 +151,6 @@ function DetailPanel({ entry, onClose }: { entry: AuditEntry; onClose: () => voi
   )
 }
 
-// ─── Static preview rows ───────────────────────────────────────────────────────
-
-const PREVIEW_ROWS: AuditEntry[] = [
-  { id: '1', userId: 'Alex Loomis', action: 'security.access_revoked', resourceType: 'api_key_8812_prod', resourceId: null, createdAt: '2023-10-24 14:22:01.442' },
-  { id: '2', userId: 'System Engine', action: 'cache.flush_complete', resourceType: 'redis_v4_node2', resourceId: null, createdAt: '2023-10-24 14:18:33.001' },
-  { id: '3', userId: 'Maria Kim', action: 'doc.metadata_update', resourceType: 'onboarding_flow.pdf', resourceId: null, createdAt: '2023-10-24 14:15:10.992' },
-  { id: '4', userId: 'John Doe', action: 'iam.user_invite_sent', resourceType: 'invited:sarah@corp.com', resourceId: null, createdAt: '2023-10-24 13:59:22.012' },
-  { id: '5', userId: 'System Firewall', action: 'auth.failed_attempts_spike', resourceType: 'ip_range:192.168.1.*', resourceId: null, createdAt: '2023-10-24 13:45:00.000' },
-  { id: '6', userId: 'Alex Loomis', action: 'settings.global_config_edit', resourceType: 'retention_policy_30d', resourceId: null, createdAt: '2023-10-24 13:30:12.881' },
-]
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AuditPage() {
@@ -173,9 +162,7 @@ export default function AuditPage() {
   const [dateFilter, setDateFilter] = useState('24h')
   const [selected, setSelected] = useState<AuditEntry | null>(null)
 
-  const displayRows = logs.length > 0 ? logs : PREVIEW_ROWS
-
-  const filtered = displayRows.filter((l) => {
+  const filtered = logs.filter((l) => {
     if (search && !l.action.includes(search) && !(l.userId ?? '').toLowerCase().includes(search.toLowerCase())) return false
     if (actionFilter !== 'all' && l.action !== actionFilter) return false
     return true

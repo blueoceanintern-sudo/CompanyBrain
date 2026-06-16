@@ -115,10 +115,10 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <label style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>Workspace URL</label>
+                    <label style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>Workspace Slug</label>
                     <div style={{ display: 'flex' }}>
-                      <span style={{ padding: '0 16px', height: 48, display: 'flex', alignItems: 'center', background: '#e5eeff', border: '1px solid #c3c6d7', borderRight: 'none', borderRadius: '8px 0 0 8px', fontSize: 14, color: '#434655', whiteSpace: 'nowrap' }}>brain.blueocean.ai/</span>
-                      <input type="text" defaultValue="education-hub"
+                      <span style={{ padding: '0 16px', height: 48, display: 'flex', alignItems: 'center', background: '#e5eeff', border: '1px solid #c3c6d7', borderRight: 'none', borderRadius: '8px 0 0 8px', fontSize: 14, color: '#434655', whiteSpace: 'nowrap' }}>app/</span>
+                      <input type="text" defaultValue={user?.orgId ?? ''}
                         style={{ ...inputBase, borderRadius: '0 8px 8px 0', flex: 1 }}
                         onFocus={(e) => { e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)' }}
                         onBlur={(e) => { e.currentTarget.style.borderColor = '#c3c6d7'; e.currentTarget.style.boxShadow = 'none' }}
@@ -183,13 +183,17 @@ export default function SettingsPage() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      <button style={{ padding: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 6, display: 'flex' }}
+                      <button
+                        onClick={() => toast.info('Rename feature coming soon')}
+                        style={{ padding: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 6, display: 'flex' }}
                         onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#004ac6' }}
                         onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#585f67' }}
                       >
                         <Pencil size={18} />
                       </button>
-                      <button style={{ padding: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 6, display: 'flex' }}
+                      <button
+                        onClick={() => toast.error('Contact support to delete a compartment.')}
+                        style={{ padding: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 6, display: 'flex' }}
                         onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ba1a1a' }}
                         onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#585f67' }}
                       >
@@ -199,32 +203,6 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
-
-              {/* Also show static preview rows if no real compartments */}
-              {!compartmentsLoading && compartments.length === 0 && !showCreate && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {[
-                    { name: 'Student Performance Records', desc: '324 Documents • Created 2m ago', icon: FolderOpen },
-                    { name: 'Curriculum Standards 2024', desc: '15 Documents • Created 15d ago', icon: FileText },
-                  ].map(({ name, desc, icon: Icon }) => (
-                    <div key={name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 16, border: '1px solid #c3c6d7', borderRadius: 12, background: '#ffffff' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 8, background: '#e5eeff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon size={18} color="#004ac6" />
-                        </div>
-                        <div>
-                          <p style={{ fontSize: 14, fontWeight: 500, color: '#0b1c30', margin: 0 }}>{name}</p>
-                          <p style={{ fontSize: 12, color: '#585f67', margin: '2px 0 0' }}>{desc}</p>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button style={{ padding: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 6, display: 'flex' }}><Pencil size={18} /></button>
-                        <button style={{ padding: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 6, display: 'flex' }}><Trash2 size={18} /></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
 
               {showCreate && (
                 <div style={{ padding: 16, border: '1px solid #c3c6d7', borderRadius: 12, background: '#f8f9ff', display: 'flex', gap: 12, alignItems: 'flex-end' }}>
@@ -265,21 +243,20 @@ export default function SettingsPage() {
                       {sub?.subscriptionId && <p style={{ fontSize: 12, color: '#585f67', fontFamily: 'JetBrains Mono, monospace', margin: '8px 0 0' }}>{sub.subscriptionId}</p>}
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: 20, fontWeight: 600, color: '#0b1c30', margin: 0 }}>$1,200<span style={{ fontSize: 14, fontWeight: 400, color: '#585f67' }}>/mo</span></p>
-                      <p style={{ fontSize: 12, color: '#585f67', margin: '4px 0 0' }}>Next billing: Oct 24, 2024</p>
+                      <p style={{ fontSize: 14, color: '#585f67', margin: 0 }}>Contact us for pricing</p>
                     </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
                     {[
-                      { label: 'API Requests', value: '84%', detail: 'of 1M', pct: 84 },
-                      { label: 'Storage', value: '12.4 GB', detail: 'of 100 GB', pct: 12.4 },
-                    ].map(({ label, value, detail, pct }) => (
+                      { label: 'API Requests', value: '—' },
+                      { label: 'Storage', value: '—' },
+                    ].map(({ label, value }) => (
                       <div key={label} style={{ padding: 16, border: '1px solid #c3c6d7', borderRadius: 8, background: '#f8f9ff' }}>
                         <p style={{ fontSize: 12, color: '#585f67', margin: '0 0 4px' }}>{label}</p>
-                        <p style={{ fontSize: 16, fontWeight: 700, color: '#0b1c30', margin: '0 0 8px' }}>{value} <span style={{ fontSize: 12, fontWeight: 400, color: '#585f67' }}>{detail}</span></p>
+                        <p style={{ fontSize: 16, fontWeight: 700, color: '#0b1c30', margin: '0 0 8px' }}>{value}</p>
                         <div style={{ width: '100%', background: '#e5eeff', height: 6, borderRadius: 3 }}>
-                          <div style={{ width: `${pct}%`, background: '#004ac6', height: 6, borderRadius: 3 }} />
+                          <div style={{ width: '0%', background: '#004ac6', height: 6, borderRadius: 3 }} />
                         </div>
                       </div>
                     ))}
