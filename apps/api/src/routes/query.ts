@@ -19,6 +19,7 @@ const querySchema = z.object({
 // POST /orgs/:id/query
 queryRoute.post('/', zValidator('json', querySchema), async (c) => {
   const orgId = c.req.param('id')
+  if (!orgId) return c.json({ success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } }, 400)
   const userId = c.get('userId')
   const userRole = c.get('role')
   const { query, accessTier } = c.req.valid('json')
@@ -82,6 +83,7 @@ queryRoute.post('/', zValidator('json', querySchema), async (c) => {
 // GET /orgs/:id/queries
 queryRoute.get('/', async (c) => {
   const orgId = c.req.param('id')
+  if (!orgId) return c.json({ success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } }, 400)
 
   try {
     const rows = await db

@@ -17,67 +17,70 @@ const compartmentCreateSchema = z.object({
   mode: z.enum(['autonomous', 'schema_driven']).default('autonomous'),
 })
 
+const BAD_ORG = { success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } } as const
+
 adminRoute.get('/compartments', async (c) => {
   const orgId = c.req.param('id')
-  const rows = await db
-    .select()
-    .from(compartments)
-    .where(eq(compartments.orgId, orgId))
+  if (!orgId) return c.json(BAD_ORG, 400)
+  const rows = await db.select().from(compartments).where(eq(compartments.orgId, orgId))
   return c.json({ success: true, data: rows })
 })
 
-adminRoute.post(
-  '/compartments',
-  zValidator('json', compartmentCreateSchema),
-  async (c) => {
-    const orgId = c.req.param('id')
-    const userId = c.get('userId')
-    const role = c.get('role')
-    const body = c.req.valid('json')
+adminRoute.post('/compartments', zValidator('json', compartmentCreateSchema), async (c) => {
+  const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
+  const userId = c.get('userId')
+  const role = c.get('role')
+  const body = c.req.valid('json')
 
-    if (!canManageUsers(role)) {
-      return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
-    }
+  if (!canManageUsers(role)) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
 
-    const [compartment] = await db
-      .insert(compartments)
-      .values({ orgId, ...body })
-      .returning()
-
-    await db.insert(auditLogs).values({
+  const [compartment] = await db
+    .insert(compartments)
+    .values({
       orgId,
-      userId,
-      action: 'compartment.create',
-      resourceType: 'compartment',
-      resourceId: compartment?.id,
-      metadata: { name: body.name },
+      name: body.name,
+      mode: body.mode,
+      ...(body.description !== undefined ? { description: body.description } : {}),
     })
+    .returning()
 
-    return c.json({ success: true, data: compartment }, 201)
+  await db.insert(auditLogs).values({
+    orgId, userId,
+    action: 'compartment.create',
+    resourceType: 'compartment',
+    resourceId: compartment?.id ?? null,
+    metadata: { name: body.name },
+  })
+
+  return c.json({ success: true, data: compartment }, 201)
+})
+
+adminRoute.patch('/compartments/:cId', zValidator('json', compartmentCreateSchema.partial()), async (c) => {
+  const orgId = c.req.param('id')
+  const cId = c.req.param('cId')
+  if (!orgId || !cId) return c.json(BAD_ORG, 400)
+  const role = c.get('role')
+  const updates = c.req.valid('json')
+
+  if (!canManageUsers(role)) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
-)
 
-adminRoute.patch(
-  '/compartments/:cId',
-  zValidator('json', compartmentCreateSchema.partial()),
-  async (c) => {
-    const orgId = c.req.param('id')
-    const cId = c.req.param('cId')
-    const role = c.get('role')
-    const updates = c.req.valid('json')
+  await db
+    .update(compartments)
+    .set({
+      updatedAt: new Date(),
+      ...(updates.name !== undefined ? { name: updates.name } : {}),
+      ...(updates.description !== undefined ? { description: updates.description } : {}),
+      ...(updates.mode !== undefined ? { mode: updates.mode } : {}),
+    })
+    .where(and(eq(compartments.id, cId), eq(compartments.orgId, orgId)))
 
-    if (!canManageUsers(role)) {
-      return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
-    }
-
-    await db
-      .update(compartments)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(and(eq(compartments.id, cId), eq(compartments.orgId, orgId)))
-
-    return c.json({ success: true, data: null })
-  }
-)
+  return c.json({ success: true, data: null })
+})
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
@@ -93,13 +96,9 @@ const updateRoleSchema = z.object({
 
 adminRoute.get('/users', async (c) => {
   const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
   const rows = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      role: users.role,
-      createdAt: users.createdAt,
-    })
+    .select({ id: users.id, email: users.email, role: users.role, createdAt: users.createdAt })
     .from(users)
     .where(eq(users.orgId, orgId))
   return c.json({ success: true, data: rows })
@@ -107,6 +106,7 @@ adminRoute.get('/users', async (c) => {
 
 adminRoute.post('/users', zValidator('json', inviteUserSchema), async (c) => {
   const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
   const userId = c.get('userId')
   const role = c.get('role')
   const body = c.req.valid('json')
@@ -119,20 +119,14 @@ adminRoute.post('/users', zValidator('json', inviteUserSchema), async (c) => {
 
   const [newUser] = await db
     .insert(users)
-    .values({
-      orgId,
-      email: body.email,
-      passwordHash,
-      role: body.role,
-    })
+    .values({ orgId, email: body.email, passwordHash, role: body.role })
     .returning({ id: users.id, email: users.email, role: users.role })
 
   await db.insert(auditLogs).values({
-    orgId,
-    userId,
+    orgId, userId,
     action: 'user.invite',
     resourceType: 'user',
-    resourceId: newUser?.id,
+    resourceId: newUser?.id ?? null,
     metadata: { email: body.email, role: body.role },
   })
 
@@ -142,6 +136,7 @@ adminRoute.post('/users', zValidator('json', inviteUserSchema), async (c) => {
 adminRoute.patch('/users/:userId/role', zValidator('json', updateRoleSchema), async (c) => {
   const orgId = c.req.param('id')
   const targetUserId = c.req.param('userId')
+  if (!orgId || !targetUserId) return c.json(BAD_ORG, 400)
   const actorUserId = c.get('userId')
   const role = c.get('role')
   const { role: newRole } = c.req.valid('json')

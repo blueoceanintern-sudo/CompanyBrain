@@ -42,6 +42,13 @@ async function apiFetch<T>(
 
   try {
     const res = await fetch(`${API_URL}${path}`, { ...options, headers })
+    if (res.status === 401 && path !== '/api/v1/auth/login') {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('auth_user')
+        window.location.replace('/login')
+      }
+    }
     return parseResult<T>(res)
   } catch {
     return networkError('Could not reach the server. Check your connection.')

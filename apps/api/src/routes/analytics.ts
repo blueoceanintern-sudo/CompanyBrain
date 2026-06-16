@@ -1,12 +1,14 @@
 import { Hono } from 'hono'
 import { db } from '@company-brain/db'
-import { queries, auditLogs, chunks } from '@company-brain/db'
+import { queries, auditLogs } from '@company-brain/db'
 import { eq, and, gte, sql, count } from 'drizzle-orm'
 import { canViewAnalytics } from '@company-brain/access-control'
 import { CONFIDENCE_GATE_THRESHOLD } from '@company-brain/shared'
 import type { AuthVars } from '../middleware/auth'
 
 const analyticsRoute = new Hono<AuthVars>()
+
+const BAD_ORG = { success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } } as const
 
 function daysAgoDate(days: number): Date {
   const d = new Date()
@@ -17,6 +19,7 @@ function daysAgoDate(days: number): Date {
 // GET /orgs/:id/analytics/overview
 analyticsRoute.get('/overview', async (c) => {
   const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
   const days = Number(c.req.query('days') ?? '30')
 
@@ -71,6 +74,7 @@ analyticsRoute.get('/overview', async (c) => {
 // GET /orgs/:id/analytics/queries (top unanswered)
 analyticsRoute.get('/queries', async (c) => {
   const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
   const days = Number(c.req.query('days') ?? '30')
 
@@ -110,6 +114,7 @@ analyticsRoute.get('/queries', async (c) => {
 // GET /orgs/:id/analytics/export (audit log CSV)
 analyticsRoute.get('/export', async (c) => {
   const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
 
   if (!canViewAnalytics(role)) {

@@ -4,7 +4,10 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import type { Route } from 'next'
 import { usePathname, useRouter } from 'next/navigation'
-import { MessageSquare, FileText, BarChart2, Shield, Users, Settings, Menu, X, LogOut, type LucideIcon } from 'lucide-react'
+import {
+  MessageSquare, FileText, BarChart2, Shield, Users, Settings,
+  Menu, X, LogOut, ChevronLeft, ChevronRight, type LucideIcon,
+} from 'lucide-react'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getAuthUser, clearAuth } from '@/lib/auth'
@@ -45,48 +48,37 @@ function useWindowWidth() {
   return w
 }
 
-type Mode = 'expanded' | 'icon-only' | 'sheet'
-
-function getMode(w: number): Mode {
-  if (w >= 1024) return 'expanded'
-  if (w >= 768) return 'icon-only'
-  return 'sheet'
-}
-
 // ─── Plane switcher ───────────────────────────────────────────────────────────
 
 type Plane = 'internal' | 'external'
 
-function PlaneSwitcher({ iconOnly }: { iconOnly?: boolean }) {
+function PlaneSwitcher({ collapsed }: { collapsed: boolean }) {
   const [plane, setPlane] = useState<Plane>('internal')
-  if (iconOnly) {
+
+  if (collapsed) {
     return (
       <div className="flex justify-center py-3" style={{ borderTop: NAVY_BORDER }}>
-        <div
-          title={`Plane: ${plane}`}
-          className="size-2 rounded-full"
-          style={{ background: plane === 'internal' ? WHITE : 'var(--color-external)' }}
-        />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="size-2 rounded-full" style={{ background: plane === 'internal' ? WHITE : 'var(--color-external)' }} />
+          </TooltipTrigger>
+          <TooltipContent side="right">Plane: {plane}</TooltipContent>
+        </Tooltip>
       </div>
     )
   }
+
   return (
-    <div className="mt-auto px-6 py-4" style={{ borderTop: NAVY_BORDER }}>
+    <div className="px-6 py-4" style={{ borderTop: NAVY_BORDER }}>
       <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: WHITE_40 }}>
         Knowledge plane
       </h3>
       <div className="flex items-center text-sm">
-        <button
-          onClick={() => setPlane('internal')}
-          style={{ color: plane === 'internal' ? WHITE : WHITE_40, fontWeight: plane === 'internal' ? 500 : 400 }}
-        >
+        <button onClick={() => setPlane('internal')} style={{ color: plane === 'internal' ? WHITE : WHITE_40, fontWeight: plane === 'internal' ? 500 : 400 }}>
           internal
         </button>
         <span className="mx-1" style={{ color: WHITE_40 }}>/</span>
-        <button
-          onClick={() => setPlane('external')}
-          style={{ color: plane === 'external' ? WHITE : WHITE_40, fontWeight: plane === 'external' ? 500 : 400 }}
-        >
+        <button onClick={() => setPlane('external')} style={{ color: plane === 'external' ? WHITE : WHITE_40, fontWeight: plane === 'external' ? 500 : 400 }}>
           external
         </button>
       </div>
@@ -96,86 +88,101 @@ function PlaneSwitcher({ iconOnly }: { iconOnly?: boolean }) {
 
 // ─── Sidebar content ──────────────────────────────────────────────────────────
 
-function SidebarContent({ mode, onClose }: { mode: Mode; onClose?: () => void }) {
+function SidebarContent({
+  collapsed,
+  onToggle,
+  isSheet = false,
+  onClose,
+}: {
+  collapsed: boolean
+  onToggle?: () => void
+  isSheet?: boolean
+  onClose?: () => void
+}) {
   const pathname = usePathname()
   const router = useRouter()
   const [user, setUser] = useState<ReturnType<typeof getAuthUser>>(null)
-  const isIconOnly = mode === 'icon-only'
 
-  useEffect(() => {
-    setUser(getAuthUser())
-  }, [])
+  useEffect(() => { setUser(getAuthUser()) }, [])
 
   const visible = NAV.filter((n) => n.roles.includes(user?.role ?? ''))
   const isAdmin = user?.role === 'super_admin' || user?.role === 'org_admin'
   const initial = (user?.email?.[0] ?? '?').toUpperCase()
+  const handleLogout = () => { clearAuth(); router.replace('/login') }
 
-  const handleLogout = () => {
-    clearAuth()
-    router.replace('/login')
+  // Text fades out fast on collapse, delays fade-in on expand so the sidebar opens first
+  const textStyle: React.CSSProperties = {
+    opacity: collapsed ? 0 : 1,
+    transition: collapsed ? 'opacity 100ms ease' : 'opacity 150ms ease 80ms',
+    overflow: 'hidden',
+    whiteSpace: 'nowrap',
+    pointerEvents: collapsed ? 'none' : 'auto',
   }
 
   return (
     <div className="flex flex-col h-full" style={{ background: NAVY, borderRight: NAVY_BORDER }}>
 
-      {/* Logo / brand header */}
+      {/* Header */}
       <div
-        className="flex items-center shrink-0"
-        style={{
-          height: 'var(--header-h)',
-          padding: isIconOnly ? '0' : '0 var(--space-5)',
-          justifyContent: isIconOnly ? 'center' : 'flex-start',
-          borderBottom: NAVY_BORDER,
-        }}
+        className="flex items-center shrink-0 gap-2"
+        style={{ height: 'var(--header-h)', padding: '0 10px', borderBottom: NAVY_BORDER, overflow: 'hidden' }}
       >
-        {isIconOnly ? (
-          <span className="text-sm font-bold" style={{ color: WHITE, letterSpacing: '-0.01em' }}>CB</span>
+        {isSheet ? (
+          <>
+            <span className="flex-1 text-sm font-semibold" style={{ color: WHITE, letterSpacing: '-0.01em' }}>Company&apos;s Brain</span>
+            <button onClick={onClose} aria-label="Close menu" className="p-1 rounded shrink-0" style={{ color: WHITE_70, background: 'none', border: 'none', cursor: 'pointer' }}>
+              <X size={18} />
+            </button>
+          </>
         ) : (
-          <div className="flex items-center justify-between w-full">
-            <span className="text-sm font-semibold" style={{ color: WHITE, letterSpacing: '-0.01em' }}>Company&apos;s Brain</span>
-            {mode === 'sheet' && (
-              <button onClick={onClose} aria-label="Close" className="p-1 rounded" style={{ color: WHITE_70 }}>
-                <X size={18} />
+          <>
+            <span className="flex-1 text-sm font-semibold" style={{ color: WHITE, letterSpacing: '-0.01em', ...textStyle }}>
+              Company&apos;s Brain
+            </span>
+            {onToggle && (
+              <button
+                onClick={onToggle}
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                className="shrink-0 p-1 rounded transition-colors"
+                style={{ color: WHITE_40, background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = WHITE }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = WHITE_40 }}
+              >
+                {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
               </button>
             )}
-          </div>
+          </>
         )}
       </div>
 
-      {/* Scrollable: nav + recents */}
+      {/* Nav */}
       <div className="flex-grow flex flex-col pt-3 overflow-y-auto custom-scrollbar">
-        <nav aria-label="Main navigation" className="space-y-0.5" style={{ padding: isIconOnly ? '0 8px' : '0 12px' }}>
+        <nav aria-label="Main navigation" className="space-y-0.5" style={{ padding: '0 6px' }}>
           {visible.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + '/')
             const linkEl = (
               <Link
                 href={item.href as Route}
-                {...(mode === 'sheet' && onClose ? { onClick: onClose } : {})}
+                {...(isSheet && onClose ? { onClick: onClose } : {})}
                 className="flex items-center gap-3 rounded-lg text-sm transition-colors"
                 style={{
-                  padding: '8px 12px',
-                  paddingLeft: active && !isIconOnly ? '10px' : '12px',
-                  justifyContent: isIconOnly ? 'center' : 'flex-start',
+                  padding: '9px 8px',
                   fontWeight: active ? 500 : 400,
                   color: active ? WHITE : WHITE_70,
                   background: active ? WHITE_15 : 'transparent',
                   textDecoration: 'none',
-                  borderLeft: active && !isIconOnly ? `2px solid ${WHITE}` : '2px solid transparent',
+                  borderLeft: active && !collapsed ? `2px solid ${WHITE}` : '2px solid transparent',
+                  overflow: 'hidden',
                 }}
-                onMouseEnter={(e) => {
-                  const el = e.currentTarget as HTMLElement
-                  if (!active) { el.style.background = WHITE_10; el.style.color = WHITE }
-                }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget as HTMLElement
-                  if (!active) { el.style.background = 'transparent'; el.style.color = WHITE_70 }
-                }}
+                onMouseEnter={(e) => { const el = e.currentTarget as HTMLElement; if (!active) { el.style.background = WHITE_10; el.style.color = WHITE } }}
+                onMouseLeave={(e) => { const el = e.currentTarget as HTMLElement; if (!active) { el.style.background = 'transparent'; el.style.color = WHITE_70 } }}
               >
-                <item.icon size={20} aria-hidden />
-                {!isIconOnly && item.label}
+                <item.icon size={18} aria-hidden className="shrink-0" />
+                <span style={textStyle}>{item.label}</span>
               </Link>
             )
-            if (isIconOnly) {
+
+            if (collapsed && !isSheet) {
               return (
                 <Tooltip key={item.href}>
                   <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
@@ -187,20 +194,16 @@ function SidebarContent({ mode, onClose }: { mode: Mode; onClose?: () => void })
           })}
         </nav>
 
-        {/* Plane switcher — admins only */}
-        {isAdmin && <PlaneSwitcher iconOnly={isIconOnly} />}
+        {isAdmin && <PlaneSwitcher collapsed={collapsed && !isSheet} />}
       </div>
 
-      {/* User footer */}
-      <div className="p-3" style={{ borderTop: NAVY_BORDER }}>
-        {isIconOnly ? (
-          <>
+      {/* Footer */}
+      <div className="shrink-0 p-2" style={{ borderTop: NAVY_BORDER }}>
+        {collapsed && !isSheet ? (
+          <div className="flex flex-col items-center gap-1">
             <Tooltip>
               <TooltipTrigger asChild>
-                <div
-                  className="w-8 h-8 mx-auto rounded flex items-center justify-center text-xs font-bold cursor-default"
-                  style={{ background: WHITE_15, color: WHITE }}
-                >
+                <div className="w-7 h-7 rounded flex items-center justify-center text-xs font-bold cursor-default" style={{ background: WHITE_15, color: WHITE }}>
                   {initial}
                 </div>
               </TooltipTrigger>
@@ -211,41 +214,24 @@ function SidebarContent({ mode, onClose }: { mode: Mode; onClose?: () => void })
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <button
-                  onClick={handleLogout}
-                  aria-label="Log out"
-                  className="w-8 h-8 mx-auto mt-1 rounded flex items-center justify-center transition-colors"
-                  style={{ color: 'var(--color-text-muted)', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--color-surface)' }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
-                >
-                  <LogOut size={16} aria-hidden />
+                <button onClick={handleLogout} aria-label="Log out" className="w-7 h-7 rounded flex items-center justify-center transition-colors" style={{ color: WHITE_40, background: 'none', border: 'none', cursor: 'pointer' }} onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = WHITE }} onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = WHITE_40 }}>
+                  <LogOut size={15} aria-hidden />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right">Log out</TooltipContent>
             </Tooltip>
-          </>
+          </div>
         ) : (
-          <div className="flex items-center gap-3 px-1">
-            <div
-              className="w-8 h-8 shrink-0 rounded flex items-center justify-center text-xs font-bold"
-              style={{ background: WHITE_15, color: WHITE }}
-            >
-              {(user?.email?.[0] ?? '?').toUpperCase()}
+          <div className="flex items-center gap-2 px-1">
+            <div className="w-7 h-7 shrink-0 rounded flex items-center justify-center text-xs font-bold" style={{ background: WHITE_15, color: WHITE }}>
+              {initial}
             </div>
-            <div className="min-w-0">
+            <div className="flex-1 min-w-0" style={textStyle}>
               <p className="text-xs font-semibold truncate" style={{ color: WHITE }}>{user?.email}</p>
               <p className="text-[11px] capitalize" style={{ color: WHITE_70 }}>{user?.role?.replace(/_/g, ' ')}</p>
             </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 w-full rounded-lg text-sm transition-colors"
-              style={{ padding: '6px 12px', color: 'var(--color-text-muted)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--color-surface)' }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
-            >
-              <LogOut size={16} aria-hidden />
-              Log out
+            <button onClick={handleLogout} aria-label="Log out" className="shrink-0 p-1 rounded flex items-center transition-colors" style={{ color: WHITE_40, background: 'none', border: 'none', cursor: 'pointer' }} onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = WHITE }} onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = WHITE_40 }}>
+              <LogOut size={15} aria-hidden />
             </button>
           </div>
         )}
@@ -258,14 +244,16 @@ function SidebarContent({ mode, onClose }: { mode: Mode; onClose?: () => void })
 
 export function Sidebar() {
   const w = useWindowWidth()
+  const [collapsed, setCollapsed] = useState(false)
+
   if (w === null) return <aside className="h-screen shrink-0" style={{ width: 'var(--sidebar-w)' }} />
-  const mode = getMode(w)
-  if (mode === 'sheet') return null
-  const width = mode === 'expanded' ? 'var(--sidebar-w)' : 'var(--sidebar-w-icon)'
+  if (w < 768) return null
+
+  const width = collapsed ? 'var(--sidebar-w-icon)' : 'var(--sidebar-w)'
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider delayDuration={200}>
       <aside className="h-screen shrink-0 overflow-hidden" style={{ width, transition: 'width 200ms ease' }}>
-        <SidebarContent mode={mode} />
+        <SidebarContent collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
       </aside>
     </TooltipProvider>
   )
@@ -278,16 +266,12 @@ export function MobileMenuButton() {
   return (
     <TooltipProvider>
       <>
-        <button
-          onClick={() => setOpen(true)}
-          aria-label="Open navigation"
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)' }}
-        >
+        <button onClick={() => setOpen(true)} aria-label="Open navigation" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)' }}>
           <Menu size={20} />
         </button>
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetContent side="left" className="p-0 w-[240px]" style={{ background: NAVY }}>
-            <SidebarContent mode="sheet" onClose={() => setOpen(false)} />
+            <SidebarContent isSheet collapsed={false} onClose={() => setOpen(false)} />
           </SheetContent>
         </Sheet>
       </>

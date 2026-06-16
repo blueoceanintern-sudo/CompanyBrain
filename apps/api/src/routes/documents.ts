@@ -19,9 +19,12 @@ const updateDocSchema = z.object({
     .optional(),
 })
 
+const BAD_ORG = { success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } } as const
+
 // GET /orgs/:id/documents
 documentsRoute.get('/', async (c) => {
   const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
 
   const rows = await db
     .select()
@@ -35,6 +38,7 @@ documentsRoute.get('/', async (c) => {
 // POST /orgs/:id/documents
 documentsRoute.post('/', async (c) => {
   const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
   const userId = c.get('userId')
   const role = c.get('role')
 
@@ -168,6 +172,7 @@ documentsRoute.post('/', async (c) => {
 documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) => {
   const orgId = c.req.param('id')
   const docId = c.req.param('docId')
+  if (!orgId || !docId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
   const updates = c.req.valid('json')
 
@@ -177,7 +182,12 @@ documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) =
 
   await db
     .update(documents)
-    .set({ ...updates, updatedAt: new Date() })
+    .set({
+      updatedAt: new Date(),
+      ...(updates.compartmentId !== undefined ? { compartmentId: updates.compartmentId } : {}),
+      ...(updates.accessTier !== undefined ? { accessTier: updates.accessTier } : {}),
+      ...(updates.sourceType !== undefined ? { sourceType: updates.sourceType } : {}),
+    })
     .where(and(eq(documents.id, docId), eq(documents.orgId, orgId)))
 
   return c.json({ success: true, data: null })
@@ -187,6 +197,7 @@ documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) =
 documentsRoute.delete('/:docId', async (c) => {
   const orgId = c.req.param('id')
   const docId = c.req.param('docId')
+  if (!orgId || !docId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
 
   if (!canManageDocuments(role)) {

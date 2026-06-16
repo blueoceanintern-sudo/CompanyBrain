@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/pdf-parse": "^1.1.5",
     "drizzle-kit": "^0.22.8",
     "typescript": "^5.4.5"
   }

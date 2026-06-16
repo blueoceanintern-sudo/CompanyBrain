@@ -14,6 +14,8 @@ import type { AuthVars } from '../middleware/auth'
 
 const paymentsRoute = new Hono<AuthVars>()
 
+const BAD_ORG = { success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } } as const
+
 const subscriptionCreateSchema = z.object({
   priceId: z.string(),
   connectedAccountId: z.string(),
@@ -25,6 +27,7 @@ paymentsRoute.post(
   zValidator('json', subscriptionCreateSchema),
   async (c) => {
     const orgId = c.req.param('id')
+    if (!orgId) return c.json(BAD_ORG, 400)
     const userId = c.get('userId')
     const { priceId, connectedAccountId } = c.req.valid('json')
 
@@ -62,6 +65,7 @@ paymentsRoute.post(
 // GET /orgs/:id/subscriptions
 paymentsRoute.get('/subscriptions', async (c) => {
   const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
   const result = await getSubscriptionStatus(orgId)
   if (!result.success) return c.json({ success: false, error: result.error }, 500)
   return c.json({ success: true, data: result.data })
@@ -70,6 +74,7 @@ paymentsRoute.get('/subscriptions', async (c) => {
 // DELETE /orgs/:id/subscriptions
 paymentsRoute.delete('/subscriptions', async (c) => {
   const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
   const result = await cancelOrgSubscription(orgId)
   if (!result.success) return c.json({ success: false, error: result.error }, 500)
   return c.json({ success: true, data: null })

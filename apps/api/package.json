@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "bun --env-file=../../.env run --watch src/index.ts",
-    "start": "bun run src/index.ts"
+    "start": "bun --env-file=../../.env run src/index.ts"
   },
   "dependencies": {
     "@company-brain/db": "workspace:*",
