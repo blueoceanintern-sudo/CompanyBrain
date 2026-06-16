@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, timestamp, integer, boolean } from 'drizzle-orm/pg-core'
 import { orgPlanEnum, compartmentModeEnum } from './enums'
 
 export const orgs = pgTable('orgs', {
@@ -7,6 +7,9 @@ export const orgs = pgTable('orgs', {
   plan: orgPlanEnum('plan').notNull().default('free'),
   stripeCustomerId: text('stripe_customer_id'),
   stripeSubscriptionId: text('stripe_subscription_id'),
+  stripeConnectAccountId: text('stripe_connect_account_id'),
+  stripeConnectChargesEnabled: boolean('stripe_connect_charges_enabled').notNull().default(false),
+  externalPriceCents: integer('external_price_cents'),
   compartmentMode: compartmentModeEnum('compartment_mode').notNull().default('autonomous'),
   cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

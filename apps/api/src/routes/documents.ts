@@ -3,10 +3,11 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { createHash } from 'crypto'
 import { db } from '@company-brain/db'
-import { documents, ingestionJobs, chunks } from '@company-brain/db'
+import { documents, ingestionJobs, chunks, orgs } from '@company-brain/db'
 import { eq, and, desc } from 'drizzle-orm'
 import { ingestDocument } from '@company-brain/ingestion'
 import { hasPermission } from '@company-brain/shared'
+import { canPublishExternal } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
 
 const documentsRoute = new Hono<AuthVars>()
@@ -60,6 +61,16 @@ documentsRoute.post('/', async (c) => {
       { success: false, error: { code: 'MISSING_FIELDS', message: 'file and compartmentId are required' } },
       400
     )
+  }
+
+  if (accessTier === 'external') {
+    const orgRow = await db.select({ plan: orgs.plan }).from(orgs).where(eq(orgs.id, orgId)).limit(1)
+    if (!canPublishExternal(orgRow[0]?.plan ?? 'free')) {
+      return c.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'External publishing requires a paid plan' } },
+        403
+      )
+    }
   }
 
   const buffer = Buffer.from(await file.arrayBuffer())
@@ -178,6 +189,16 @@ documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) =
 
   if (!hasPermission(role, 'documents:manage')) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
+
+  if (updates.accessTier === 'external') {
+    const orgRow = await db.select({ plan: orgs.plan }).from(orgs).where(eq(orgs.id, orgId)).limit(1)
+    if (!canPublishExternal(orgRow[0]?.plan ?? 'free')) {
+      return c.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'External publishing requires a paid plan' } },
+        403
+      )
+    }
   }
 
   await db

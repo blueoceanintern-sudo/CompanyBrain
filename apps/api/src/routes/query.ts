@@ -2,11 +2,12 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { db } from '@company-brain/db'
-import { queries } from '@company-brain/db'
+import { queries, orgs, users } from '@company-brain/db'
 import { eq, desc } from 'drizzle-orm'
 import { retrieveChunks } from '@company-brain/retrieval'
 import { synthesizeAnswer } from '@company-brain/synthesis'
 import { CONFIDENCE_GATE_THRESHOLD } from '@company-brain/shared'
+import { canPublishExternal } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
 
 const queryRoute = new Hono<AuthVars>()
@@ -23,6 +24,27 @@ queryRoute.post('/', zValidator('json', querySchema), async (c) => {
   const userId = c.get('userId')
   const userRole = c.get('role')
   const { query, accessTier } = c.req.valid('json')
+
+  if (accessTier === 'external') {
+    const orgRow = await db.select({ plan: orgs.plan }).from(orgs).where(eq(orgs.id, orgId)).limit(1)
+    if (!canPublishExternal(orgRow[0]?.plan ?? 'free')) {
+      return c.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'External knowledge plane is not available on the free plan' } },
+        403
+      )
+    }
+
+    if (userRole === 'external_client') {
+      const clientRow = await db.select({ subscriptionStatus: users.subscriptionStatus }).from(users).where(eq(users.id, userId)).limit(1)
+      const status = clientRow[0]?.subscriptionStatus
+      if (status !== 'active' && status !== 'trialing') {
+        return c.json(
+          { success: false, error: { code: 'SUBSCRIPTION_REQUIRED', message: 'An active subscription is required to access this knowledge base' } },
+          403
+        )
+      }
+    }
+  }
 
   try {
     // Retrieve
