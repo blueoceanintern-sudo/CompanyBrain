@@ -76,7 +76,7 @@ async function apiUpload<T>(
 export interface AuthUser {
   id: string
   email: string
-  role: string
+  role: UserRole
   orgId: string
 }
 

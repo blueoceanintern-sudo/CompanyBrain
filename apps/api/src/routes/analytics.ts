@@ -2,8 +2,7 @@ import { Hono } from 'hono'
 import { db } from '@company-brain/db'
 import { queries, auditLogs } from '@company-brain/db'
 import { eq, and, gte, sql, count } from 'drizzle-orm'
-import { canViewAnalytics } from '@company-brain/access-control'
-import { CONFIDENCE_GATE_THRESHOLD } from '@company-brain/shared'
+import { hasPermission, CONFIDENCE_GATE_THRESHOLD } from '@company-brain/shared'
 import type { AuthVars } from '../middleware/auth'
 
 const analyticsRoute = new Hono<AuthVars>()
@@ -23,7 +22,7 @@ analyticsRoute.get('/overview', async (c) => {
   const role = c.get('role')
   const days = Number(c.req.query('days') ?? '30')
 
-  if (!canViewAnalytics(role)) {
+  if (!hasPermission(role, 'analytics:view')) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -78,7 +77,7 @@ analyticsRoute.get('/queries', async (c) => {
   const role = c.get('role')
   const days = Number(c.req.query('days') ?? '30')
 
-  if (!canViewAnalytics(role)) {
+  if (!hasPermission(role, 'analytics:view')) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -117,7 +116,7 @@ analyticsRoute.get('/export', async (c) => {
   if (!orgId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
 
-  if (!canViewAnalytics(role)) {
+  if (!hasPermission(role, 'analytics:view')) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 

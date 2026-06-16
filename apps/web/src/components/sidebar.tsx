@@ -11,22 +11,17 @@ import {
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getAuthUser, clearAuth } from '@/lib/auth'
+import { NAV } from '@/lib/nav'
+import { hasPermission } from '@company-brain/shared'
 
-interface NavItem {
-  label: string
-  href: string
-  icon: React.ElementType
-  roles: string[]
+const NAV_ICONS: Record<string, React.ElementType> = {
+  '/chat':      MessageSquare,
+  '/documents': FileText,
+  '/analytics': BarChart2,
+  '/audit':     ClipboardCheck,
+  '/users':     Users,
+  '/settings':  Settings,
 }
-
-const NAV: NavItem[] = [
-  { label: 'Chat',      href: '/chat',      icon: MessageSquare,  roles: ['super_admin','org_admin','dept_admin','staff','external_client'] },
-  { label: 'Documents', href: '/documents', icon: FileText,        roles: ['super_admin','org_admin','dept_admin'] },
-  { label: 'Analytics', href: '/analytics', icon: BarChart2,       roles: ['super_admin','org_admin'] },
-  { label: 'Audit Log', href: '/audit',     icon: ClipboardCheck,  roles: ['super_admin','org_admin'] },
-  { label: 'Users',     href: '/users',     icon: Users,           roles: ['super_admin','org_admin'] },
-  { label: 'Settings',  href: '/settings',  icon: Settings,        roles: ['super_admin','org_admin'] },
-]
 
 // ─── Sidebar content ──────────────────────────────────────────────────────────
 
@@ -43,7 +38,7 @@ function SidebarContent({
 
   useEffect(() => { setUser(getAuthUser()) }, [])
 
-  const visible = NAV.filter((n) => n.roles.includes(user?.role ?? ''))
+  const visible = NAV.filter((n) => user?.role && hasPermission(user.role, n.permission))
   const initial = (user?.email?.[0] ?? '?').toUpperCase()
   const handleLogout = () => { clearAuth(); router.replace('/login') }
 
@@ -82,6 +77,7 @@ function SidebarContent({
       <nav className="flex flex-col items-center gap-1 flex-1 px-2">
         {visible.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + '/')
+          const Icon = NAV_ICONS[item.href]
           const linkEl = (
             <Link
               href={item.href as Route}
@@ -101,7 +97,7 @@ function SidebarContent({
               onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = bgHover }}
               onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
             >
-              <item.icon size={20} aria-hidden className="shrink-0" />
+              {Icon && <Icon size={20} aria-hidden className="shrink-0" />}
               {isSheet && <span className="text-sm font-medium">{item.label}</span>}
             </Link>
           )

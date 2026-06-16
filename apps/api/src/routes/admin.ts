@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { db } from '@company-brain/db'
 import { compartments, users, auditLogs } from '@company-brain/db'
 import { eq, and } from 'drizzle-orm'
-import { canManageUsers } from '@company-brain/access-control'
+import { hasPermission } from '@company-brain/shared'
 import type { AuthVars } from '../middleware/auth'
 
 const adminRoute = new Hono<AuthVars>()
@@ -33,7 +33,7 @@ adminRoute.post('/compartments', zValidator('json', compartmentCreateSchema), as
   const role = c.get('role')
   const body = c.req.valid('json')
 
-  if (!canManageUsers(role)) {
+  if (!hasPermission(role, 'users:manage')) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -65,7 +65,7 @@ adminRoute.patch('/compartments/:cId', zValidator('json', compartmentCreateSchem
   const role = c.get('role')
   const updates = c.req.valid('json')
 
-  if (!canManageUsers(role)) {
+  if (!hasPermission(role, 'users:manage')) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -111,7 +111,7 @@ adminRoute.post('/users', zValidator('json', inviteUserSchema), async (c) => {
   const role = c.get('role')
   const body = c.req.valid('json')
 
-  if (!canManageUsers(role)) {
+  if (!hasPermission(role, 'users:manage')) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -141,7 +141,7 @@ adminRoute.patch('/users/:userId/role', zValidator('json', updateRoleSchema), as
   const role = c.get('role')
   const { role: newRole } = c.req.valid('json')
 
-  if (!canManageUsers(role)) {
+  if (!hasPermission(role, 'users:manage')) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 

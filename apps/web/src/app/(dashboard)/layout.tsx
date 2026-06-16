@@ -1,19 +1,37 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { Sidebar, MobileMenuButton } from '@/components/sidebar'
 import { Providers } from '@/app/providers'
-import { isAuthenticated } from '@/lib/auth'
+import { getAuthUser, isAuthenticated } from '@/lib/auth'
+import { routePermission } from '@/lib/nav'
+import { hasPermission } from '@company-brain/shared'
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
+  const [allowed, setAllowed] = useState(false)
 
   useEffect(() => {
     if (!isAuthenticated()) {
       router.replace('/login')
+      return
     }
-  }, [router])
+
+    const permission = routePermission(pathname)
+    if (permission) {
+      const user = getAuthUser()
+      if (!user || !hasPermission(user.role, permission)) {
+        router.replace('/chat')
+        return
+      }
+    }
+
+    setAllowed(true)
+  }, [pathname, router])
+
+  if (!allowed) return null
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#f8f9ff' }}>

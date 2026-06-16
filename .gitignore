@@ -9,6 +9,7 @@ build/
 .env.*.local
 
 *.log
+*.tsbuildinfo
 .DS_Store
 
 db/migrations/*.sql

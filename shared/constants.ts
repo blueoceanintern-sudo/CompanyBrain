@@ -1,3 +1,17 @@
+import type { UserRole, Permission } from './types'
+
+export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+  super_admin:     ['documents:manage', 'analytics:view', 'users:manage', 'billing:manage', 'queries:submit'],
+  org_admin:       ['documents:manage', 'analytics:view', 'users:manage', 'billing:manage', 'queries:submit'],
+  dept_admin:      ['documents:manage', 'queries:submit'],
+  staff:           ['queries:submit'],
+  external_client: ['queries:submit'],
+}
+
+export function hasPermission(role: UserRole, permission: Permission): boolean {
+  return ROLE_PERMISSIONS[role]?.includes(permission) ?? false
+}
+
 export const CONFIDENCE_GATE_THRESHOLD = 0.5
 export const SEMANTIC_WEIGHT = 0.7
 export const BM25_WEIGHT = 0.3

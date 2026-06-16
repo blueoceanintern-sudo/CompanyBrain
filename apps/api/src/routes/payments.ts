@@ -10,6 +10,7 @@ import {
 import { db } from '@company-brain/db'
 import { orgs, users } from '@company-brain/db'
 import { eq } from 'drizzle-orm'
+import { hasPermission } from '@company-brain/shared'
 import type { AuthVars } from '../middleware/auth'
 
 const paymentsRoute = new Hono<AuthVars>()
@@ -28,6 +29,10 @@ paymentsRoute.post(
   async (c) => {
     const orgId = c.req.param('id')
     if (!orgId) return c.json(BAD_ORG, 400)
+    const role = c.get('role')
+    if (!hasPermission(role, 'billing:manage')) {
+      return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+    }
     const userId = c.get('userId')
     const { priceId, connectedAccountId } = c.req.valid('json')
 
@@ -66,6 +71,10 @@ paymentsRoute.post(
 paymentsRoute.get('/subscriptions', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
+  const role = c.get('role')
+  if (!hasPermission(role, 'billing:manage')) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
   const result = await getSubscriptionStatus(orgId)
   if (!result.success) return c.json({ success: false, error: result.error }, 500)
   return c.json({ success: true, data: result.data })
@@ -75,6 +84,10 @@ paymentsRoute.get('/subscriptions', async (c) => {
 paymentsRoute.delete('/subscriptions', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
+  const role = c.get('role')
+  if (!hasPermission(role, 'billing:manage')) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
   const result = await cancelOrgSubscription(orgId)
   if (!result.success) return c.json({ success: false, error: result.error }, 500)
   return c.json({ success: true, data: null })

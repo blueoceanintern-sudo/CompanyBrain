@@ -6,7 +6,7 @@ import { db } from '@company-brain/db'
 import { documents, ingestionJobs, chunks } from '@company-brain/db'
 import { eq, and, desc } from 'drizzle-orm'
 import { ingestDocument } from '@company-brain/ingestion'
-import { canManageDocuments } from '@company-brain/access-control'
+import { hasPermission } from '@company-brain/shared'
 import type { AuthVars } from '../middleware/auth'
 
 const documentsRoute = new Hono<AuthVars>()
@@ -42,7 +42,7 @@ documentsRoute.post('/', async (c) => {
   const userId = c.get('userId')
   const role = c.get('role')
 
-  if (!canManageDocuments(role)) {
+  if (!hasPermission(role, 'documents:manage')) {
     return c.json(
       { success: false, error: { code: 'FORBIDDEN', message: 'Insufficient role to upload documents' } },
       403
@@ -176,7 +176,7 @@ documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) =
   const role = c.get('role')
   const updates = c.req.valid('json')
 
-  if (!canManageDocuments(role)) {
+  if (!hasPermission(role, 'documents:manage')) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -200,7 +200,7 @@ documentsRoute.delete('/:docId', async (c) => {
   if (!orgId || !docId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
 
-  if (!canManageDocuments(role)) {
+  if (!hasPermission(role, 'documents:manage')) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 

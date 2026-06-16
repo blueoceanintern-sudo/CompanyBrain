@@ -21,6 +21,13 @@ export type UserRole =
   | 'staff'
   | 'external_client'
 
+export type Permission =
+  | 'documents:manage'
+  | 'analytics:view'
+  | 'users:manage'
+  | 'billing:manage'
+  | 'queries:submit'
+
 // ─── Visibility policy (JSONB) ────────────────────────────────────────────────
 
 export interface VisibilityPolicy {
