@@ -1,0 +1,26 @@
+{
+  "name": "company-brain",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "workers",
+    "db",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "bun run --filter '@company-brain/*' dev",
+    "build": "bun run --filter '@company-brain/*' build",
+    "test": "bun test",
+    "workers": "bun run workers/index.ts",
+    "db:generate": "bunx drizzle-kit generate",
+    "db:migrate": "bunx drizzle-kit migrate",
+    "db:studio": "bunx drizzle-kit studio"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/pdf-parse": "^1.1.5",
+    "drizzle-kit": "^0.22.8",
+    "typescript": "^5.4.5"
+  }
+}

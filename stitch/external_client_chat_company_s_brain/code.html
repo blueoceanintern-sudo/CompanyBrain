@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>External Portal | Company's Brain</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@100;200;300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-low": "#eff4ff",
+                    "tertiary": "#943700",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-fixed-variant": "#003ea8",
+                    "inverse-primary": "#b4c5ff",
+                    "primary-fixed": "#dbe1ff",
+                    "primary": "#004ac6",
+                    "on-tertiary-fixed": "#360f00",
+                    "on-background": "#0b1c30",
+                    "surface-container-high": "#dce9ff",
+                    "on-secondary-container": "#5e656d",
+                    "surface-container-highest": "#d3e4fe",
+                    "secondary-fixed": "#dce3ec",
+                    "outline": "#737686",
+                    "inverse-surface": "#213145",
+                    "on-secondary-fixed": "#151c23",
+                    "tertiary-container": "#bc4800",
+                    "inverse-on-surface": "#eaf1ff",
+                    "on-error": "#ffffff",
+                    "on-primary": "#ffffff",
+                    "surface-container": "#e5eeff",
+                    "on-secondary-fixed-variant": "#40484f",
+                    "on-error-container": "#93000a",
+                    "tertiary-fixed-dim": "#ffb596",
+                    "on-primary-fixed": "#00174b",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-fixed-variant": "#7d2d00",
+                    "surface-tint": "#0053db",
+                    "tertiary-fixed": "#ffdbcd",
+                    "outline-variant": "#c3c6d7",
+                    "background": "#f8f9ff",
+                    "error": "#ba1a1a",
+                    "surface": "#f8f9ff",
+                    "on-surface-variant": "#434655",
+                    "on-primary-container": "#eeefff",
+                    "secondary": "#585f67",
+                    "surface-variant": "#d3e4fe",
+                    "surface-dim": "#cbdbf5",
+                    "primary-fixed-dim": "#b4c5ff",
+                    "secondary-fixed-dim": "#c0c7d0",
+                    "primary-container": "#2563eb",
+                    "on-secondary": "#ffffff",
+                    "surface-bright": "#f8f9ff",
+                    "on-tertiary-container": "#ffede6",
+                    "surface-container-lowest": "#ffffff",
+                    "on-surface": "#0b1c30",
+                    "secondary-container": "#dce3ec"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "margin-mobile": "16px",
+                    "margin-desktop": "32px",
+                    "gutter": "24px",
+                    "unit": "4px",
+                    "sidebar-width": "280px"
+            },
+            "fontFamily": {
+                    "label-sm": ["Be Vietnam Pro"],
+                    "label-md": ["Be Vietnam Pro"],
+                    "headline-sm": ["Be Vietnam Pro"],
+                    "headline-lg-mobile": ["Be Vietnam Pro"],
+                    "body-md": ["Be Vietnam Pro"],
+                    "headline-lg": ["Be Vietnam Pro"],
+                    "display": ["Be Vietnam Pro"],
+                    "headline-md": ["Be Vietnam Pro"],
+                    "body-lg": ["Be Vietnam Pro"]
+            },
+            "fontSize": {
+                    "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "600"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "display": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Be Vietnam Pro', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .custom-shadow {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+        }
+        /* Custom scrollbar for minimalist look */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- SideNavBar Anchor -->
+<aside class="fixed left-0 top-0 h-full w-[56px] overflow-hidden bg-surface-container-low dark:bg-surface-dim border-r border-outline-variant dark:border-outline flex flex-col items-center py-4 z-50">
+<div class="mb-8 cursor-pointer active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-primary font-headline-sm">neurology</span>
+</div>
+<nav class="flex flex-col gap-4 w-full items-center">
+<!-- Active Tab: Chat -->
+<div class="w-full flex justify-center py-2 bg-primary-container text-on-primary-container border-l-2 border-primary cursor-pointer active:scale-95 transition-colors group relative" title="Chat">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">chat</span>
+</div>
+<!-- Inactive Tab: Billing -->
+<div class="w-full flex justify-center py-2 text-secondary hover:bg-surface-container-high cursor-pointer active:scale-95 transition-colors group relative" title="Billing">
+<span class="material-symbols-outlined">payments</span>
+</div>
+</nav>
+<div class="mt-auto flex flex-col gap-4 items-center">
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="Client Avatar" class="w-full h-full object-cover" data-alt="A professional, high-resolution headshot of a diverse corporate client with a friendly expression. The lighting is soft and studio-quality, emphasizing a modern professional aesthetic. The background is a clean, out-of-focus office environment with soft blue and white tones, matching a high-end minimalist design system." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxbWxbRZKwQTwBc6S-ecN4dLzzxiHClev5YEQ1uUa19Rd-S_VJV8vndvI-kY6mFb18u5ZwcsuppRSM4zR1O-PhXPeVB0drYlrn1Kx5otFSV9zh85BCYHfl4oNkHQH1vMF7Jixys234QIwk8VD-zCbM-mgudjR7pY9jgYmZASfcfe0mrg_eugjeOkq_XOaR-6pAFS2p23vFvMZcBc7REa8c2XTYtElQaTUbjytUCexkN2qE4QlzYit_nn0jVPLzLFUtvf304UkctdYP"/>
+</div>
+</div>
+</aside>
+<!-- TopNavBar Anchor -->
+<header class="fixed top-0 right-0 h-[50px] w-[calc(100%-56px)] bg-surface dark:bg-background border-b border-outline-variant dark:border-outline flex justify-between items-center px-8 z-40">
+<div class="flex items-center gap-4">
+<h1 class="font-headline-sm text-headline-sm font-bold text-primary tracking-tight">Company's Brain</h1>
+<div class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-green-50 border border-green-200">
+<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+<span class="text-[11px] font-bold text-green-700 uppercase tracking-wider">External</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-primary transition-opacity flex items-center justify-center p-1">
+<span class="material-symbols-outlined">help</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-opacity flex items-center justify-center p-1">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-[56px] mt-[50px] min-h-[calc(100vh-50px)] flex flex-col relative overflow-hidden bg-white">
+<!-- Atmospheric Background Element -->
+<div class="absolute inset-0 pointer-events-none opacity-40">
+<div class="absolute -top-24 -right-24 w-96 h-96 bg-primary/5 rounded-full blur-3xl"></div>
+<div class="absolute top-1/2 -left-24 w-64 h-64 bg-surface-container-low rounded-full blur-3xl"></div>
+</div>
+<!-- Center Search Area -->
+<div class="flex-grow flex flex-col items-center justify-center px-margin-desktop max-w-4xl mx-auto w-full z-10">
+<div class="text-center mb-10 space-y-2">
+<h2 class="font-headline-lg text-headline-lg text-on-background">Hi Alex, what can we help you with today?</h2>
+<p class="font-body-lg text-body-lg text-secondary">Your AI-powered assistant for all BlueOcean documentation and services.</p>
+</div>
+<!-- Search Card -->
+<div class="w-full bg-white border border-outline-variant rounded-xl p-2 custom-shadow hover:border-primary/30 transition-all duration-300">
+<div class="relative flex items-center">
+<div class="pl-4 pr-2 text-secondary">
+<span class="material-symbols-outlined">search</span>
+</div>
+<input class="w-full py-4 bg-transparent border-none focus:ring-0 font-body-lg text-on-surface placeholder:text-outline" placeholder="Ask about product docs, service guides..." type="text"/>
+<button class="ml-2 bg-primary-container text-on-primary-container px-6 py-3 rounded-lg font-label-md text-label-md hover:bg-primary transition-colors flex items-center gap-2 active:scale-95">
+<span>Send</span>
+<span class="material-symbols-outlined text-[18px]">send</span>
+</button>
+</div>
+</div>
+<!-- Suggested Chips -->
+<div class="mt-8 flex flex-wrap justify-center gap-3">
+<button class="px-4 py-2 bg-surface-container-low text-primary border border-primary/10 rounded-full font-label-md text-label-md hover:bg-primary-container hover:text-on-primary-container transition-all active:scale-95">
+                    Product documentation
+                </button>
+<button class="px-4 py-2 bg-surface-container-low text-primary border border-primary/10 rounded-full font-label-md text-label-md hover:bg-primary-container hover:text-on-primary-container transition-all active:scale-95">
+                    Service FAQs
+                </button>
+<button class="px-4 py-2 bg-surface-container-low text-primary border border-primary/10 rounded-full font-label-md text-label-md hover:bg-primary-container hover:text-on-primary-container transition-all active:scale-95">
+                    Integration guide
+                </button>
+</div>
+</div>
+<!-- Recent Activity Strip -->
+<footer class="h-16 border-t border-outline-variant/50 flex items-center px-8 bg-surface-bright/50 backdrop-blur-sm z-20">
+<div class="flex items-center gap-2 text-secondary overflow-hidden whitespace-nowrap w-full">
+<span class="font-label-sm text-label-sm uppercase tracking-widest text-outline mr-4">Recent Activity</span>
+<div class="flex items-center gap-6 overflow-x-auto no-scrollbar">
+<div class="flex items-center gap-2 group cursor-pointer">
+<span class="material-symbols-outlined text-[16px] text-primary">history</span>
+<span class="font-label-md text-label-md group-hover:text-primary transition-colors">API Endpoint Specs v2.4</span>
+<span class="text-[10px] text-outline">2h ago</span>
+</div>
+<div class="w-1 h-1 rounded-full bg-outline-variant"></div>
+<div class="flex items-center gap-2 group cursor-pointer">
+<span class="material-symbols-outlined text-[16px] text-primary">description</span>
+<span class="font-label-md text-label-md group-hover:text-primary transition-colors">Onboarding Checklist</span>
+<span class="text-[10px] text-outline">Yesterday</span>
+</div>
+<div class="w-1 h-1 rounded-full bg-outline-variant"></div>
+<div class="flex items-center gap-2 group cursor-pointer">
+<span class="material-symbols-outlined text-[16px] text-primary">receipt_long</span>
+<span class="font-label-md text-label-md group-hover:text-primary transition-colors">Invoice #88492-B</span>
+<span class="text-[10px] text-outline">Jan 12</span>
+</div>
+</div>
+<button class="ml-auto flex items-center gap-1 text-primary hover:underline font-label-md text-label-md">
+                    View all <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</button>
+</div>
+</footer>
+</main>
+<!-- Floating Action Button - Supressed as per task description for specific screen type focus -->
+<script>
+        // Simple interactive handling for search focus
+        const searchInput = document.querySelector('input[type="text"]');
+        const searchContainer = searchInput?.closest('.custom-shadow');
+
+        searchInput?.addEventListener('focus', () => {
+            searchContainer.classList.add('ring-2', 'ring-primary/20', 'border-primary');
+        });
+
+        searchInput?.addEventListener('blur', () => {
+            searchContainer.classList.remove('ring-2', 'ring-primary/20', 'border-primary');
+        });
+
+        // Micro-interaction for tabs
+        const navItems = document.querySelectorAll('nav > div');
+        navItems.forEach(item => {
+            item.addEventListener('click', () => {
+                navItems.forEach(i => {
+                    i.classList.remove('bg-primary-container', 'text-on-primary-container', 'border-l-2', 'border-primary');
+                    i.classList.add('text-secondary', 'hover:bg-surface-container-high');
+                    const icon = i.querySelector('.material-symbols-outlined');
+                    if(icon) icon.style.fontVariationSettings = "'FILL' 0";
+                });
+                item.classList.add('bg-primary-container', 'text-on-primary-container', 'border-l-2', 'border-primary');
+                item.classList.remove('text-secondary', 'hover:bg-surface-container-high');
+                const icon = item.querySelector('.material-symbols-outlined');
+                if(icon) icon.style.fontVariationSettings = "'FILL' 1";
+            });
+        });
+    </script>
+</body></html>

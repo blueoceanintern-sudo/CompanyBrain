@@ -1,0 +1,14 @@
+{
+  "name": "@company-brain/workers",
+  "private": true,
+  "main": "./index.ts",
+  "scripts": {
+    "start": "bun run index.ts"
+  },
+  "dependencies": {
+    "@company-brain/db": "workspace:*",
+    "@company-brain/shared": "workspace:*",
+    "@company-brain/ingestion": "workspace:*",
+    "node-cron": "^3.0.3"
+  }
+}

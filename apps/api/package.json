@@ -1,0 +1,22 @@
+{
+  "name": "@company-brain/api",
+  "private": true,
+  "scripts": {
+    "dev": "bun --env-file=../../.env run --watch src/index.ts",
+    "start": "bun --env-file=../../.env run src/index.ts"
+  },
+  "dependencies": {
+    "@company-brain/db": "workspace:*",
+    "@company-brain/shared": "workspace:*",
+    "@company-brain/ingestion": "workspace:*",
+    "@company-brain/retrieval": "workspace:*",
+    "@company-brain/synthesis": "workspace:*",
+    "@company-brain/access-control": "workspace:*",
+    "@company-brain/payments": "workspace:*",
+    "drizzle-orm": "^0.31.4",
+    "@hono/zod-validator": "^0.2.2",
+    "hono": "^4.4.6",
+    "jose": "^5.4.0",
+    "zod": "^3.23.8"
+  }
+}

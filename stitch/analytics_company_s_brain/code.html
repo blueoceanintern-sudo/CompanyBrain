@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Analytics | Company's Brain</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface": "#f8f9ff",
+                        "on-secondary": "#ffffff",
+                        "surface-bright": "#f8f9ff",
+                        "on-error": "#ffffff",
+                        "surface-container-low": "#eff4ff",
+                        "on-surface": "#0b1c30",
+                        "on-surface-variant": "#434655",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed": "#360f00",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-secondary-fixed-variant": "#40484f",
+                        "on-secondary-fixed": "#151c23",
+                        "primary-fixed": "#dbe1ff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "tertiary": "#943700",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-container": "#ffede6",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "secondary-fixed-dim": "#c0c7d0",
+                        "surface-container": "#e5eeff",
+                        "on-primary-container": "#eeefff",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "secondary": "#585f67",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed": "#ffdbcd",
+                        "background": "#f8f9ff",
+                        "surface-variant": "#d3e4fe",
+                        "surface-container-highest": "#d3e4fe",
+                        "on-primary-fixed": "#00174b",
+                        "inverse-primary": "#b4c5ff",
+                        "inverse-surface": "#213145",
+                        "on-error-container": "#93000a",
+                        "primary-container": "#2563eb",
+                        "outline-variant": "#c3c6d7",
+                        "secondary-fixed": "#dce3ec",
+                        "surface-container-high": "#dce9ff",
+                        "surface-dim": "#cbdbf5",
+                        "error-container": "#ffdad6",
+                        "on-secondary-container": "#5e656d",
+                        "primary": "#004ac6",
+                        "outline": "#737686",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#dce3ec",
+                        "surface-tint": "#0053db",
+                        "tertiary-container": "#bc4800",
+                        "on-background": "#0b1c30"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-desktop": "32px",
+                        "margin-mobile": "16px",
+                        "unit": "4px",
+                        "sidebar-width": "280px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Be Vietnam Pro"],
+                        "headline-lg-mobile": ["Be Vietnam Pro"],
+                        "body-lg": ["Be Vietnam Pro"],
+                        "label-md": ["Be Vietnam Pro"],
+                        "body-md": ["Be Vietnam Pro"],
+                        "headline-md": ["Be Vietnam Pro"],
+                        "headline-sm": ["Be Vietnam Pro"],
+                        "headline-lg": ["Be Vietnam Pro"],
+                        "display": ["Be Vietnam Pro"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "display": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Be Vietnam Pro', sans-serif; background-color: #ffffff; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; vertical-align: middle; }
+        .sidebar-collapsed { width: 80px; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .stat-card-border { border: 1px solid #e2e8f0; }
+        .stat-card-border:hover { border-color: #2563eb; }
+        .chart-placeholder { background-image: radial-gradient(#e2e8f0 1px, transparent 1px); background-size: 20px 20px; }
+        .segmented-control { background: #f1f5f9; padding: 4px; border-radius: 8px; }
+        .segmented-item { padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .segmented-item.active { background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); color: #2563eb; font-weight: 600; }
+    </style>
+</head>
+<body class="bg-surface-container-lowest min-h-screen flex">
+<!-- Collapsed SideNavBar from JSON Specs (Style mapping applied) -->
+<aside class="sidebar-collapsed h-screen sticky left-0 top-0 bg-surface-container-low border-r border-outline-variant flex flex-col py-6 items-center z-50">
+<div class="mb-8 flex flex-col items-center">
+<div class="w-10 h-10 bg-primary-container rounded-xl flex items-center justify-center text-white mb-2">
+<span class="material-symbols-outlined">psychology</span>
+</div>
+<div class="hidden">Brain</div>
+</div>
+<nav class="flex-1 flex flex-col gap-2 w-full px-3">
+<button class="w-full aspect-square flex items-center justify-center text-secondary hover:bg-surface-container-high transition-colors rounded-xl" title="Chat">
+<span class="material-symbols-outlined">chat</span>
+</button>
+<button class="w-full aspect-square flex items-center justify-center text-secondary hover:bg-surface-container-high transition-colors rounded-xl" title="Documents">
+<span class="material-symbols-outlined">description</span>
+</button>
+<!-- Active State: Analytics -->
+<button class="w-full aspect-square flex items-center justify-center bg-primary-container text-on-primary-container rounded-xl shadow-sm border-l-2 border-primary" title="Analytics">
+<span class="material-symbols-outlined">analytics</span>
+</button>
+<button class="w-full aspect-square flex items-center justify-center text-secondary hover:bg-surface-container-high transition-colors rounded-xl" title="Audit Log">
+<span class="material-symbols-outlined">assignment_turned_in</span>
+</button>
+<button class="w-full aspect-square flex items-center justify-center text-secondary hover:bg-surface-container-high transition-colors rounded-xl" title="Users">
+<span class="material-symbols-outlined">group</span>
+</button>
+<button class="w-full aspect-square flex items-center justify-center text-secondary hover:bg-surface-container-high transition-colors rounded-xl" title="Settings">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</nav>
+<div class="mt-auto w-full px-3">
+<button class="w-full aspect-square flex items-center justify-center text-secondary hover:bg-surface-container-high transition-colors rounded-xl" title="Profile">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</aside>
+<div class="flex-1 flex flex-col min-w-0">
+<!-- TopNavBar from JSON Specs (Style mapping applied) -->
+<header class="h-[50px] w-full sticky top-0 z-40 bg-surface border-b border-outline-variant flex justify-between items-center px-margin-desktop">
+<div class="flex items-center gap-3">
+<span class="font-headline-sm text-headline-sm font-bold text-primary">Analytics</span>
+<span class="h-4 w-[1px] bg-outline-variant mx-2"></span>
+<span class="font-label-md text-label-md text-secondary">Company's Brain</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-label-sm font-label-sm text-on-surface-variant bg-surface-container px-3 py-1 rounded-full">Status: Internal</span>
+<div class="flex items-center gap-2">
+<button class="text-secondary hover:text-primary transition-all p-1">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-secondary hover:text-primary transition-all p-1">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+</div>
+<div class="w-8 h-8 rounded-full overflow-hidden bg-surface-container">
+<img alt="User Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDY-UdfYHG5XSR8iPnEKHFH3VWuzoXxlAN-oukPsUQwXV3xQDxf9afzPPVnuR70jWPhHjT5kBhD-Q0R-7eT6Y5g6q3aQ70BYRI17sFbo3Pi1_kaPgXztQhhKGZ4czcOo77KD1kmWyA80PftCcx4hK22XfkuztuLeNudzqKhW7LK72ZaSj2IHtkmK34AHCbiCty1hfqgcX01_SJG40nap3aQ8OSVF1GeV6lYM9DdOvh0MmLdtywmv7Kz8L1Tq74iq70Or0rsXAM06TV8"/>
+</div>
+</div>
+</header>
+<main class="flex-1 overflow-y-auto p-margin-desktop space-y-gutter bg-white">
+<!-- Header Section -->
+<div class="flex justify-between items-end">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Intelligence Overview</h1>
+<p class="font-body-md text-body-md text-secondary mt-1">Real-time performance metrics for your AI Knowledge Base.</p>
+</div>
+<div class="segmented-control flex font-label-md text-label-md">
+<div class="segmented-item">7d</div>
+<div class="segmented-item active">30d</div>
+<div class="segmented-item">90d</div>
+</div>
+</div>
+<!-- 4 Stat Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
+<div class="stat-card-border p-6 rounded-xl transition-all duration-200">
+<div class="flex justify-between items-start mb-4">
+<span class="text-secondary font-label-md">KB Coverage</span>
+<span class="material-symbols-outlined text-primary">database</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="font-headline-md text-headline-md text-on-surface">94.2%</span>
+<span class="text-label-sm text-green-600 font-medium flex items-center">
+<span class="material-symbols-outlined text-sm">arrow_upward</span> 2.1%
+                        </span>
+</div>
+</div>
+<div class="stat-card-border p-6 rounded-xl transition-all duration-200">
+<div class="flex justify-between items-start mb-4">
+<span class="text-secondary font-label-md">Query Volume</span>
+<span class="material-symbols-outlined text-primary">forum</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="font-headline-md text-headline-md text-on-surface">12.4k</span>
+<span class="text-label-sm text-green-600 font-medium flex items-center">
+<span class="material-symbols-outlined text-sm">arrow_upward</span> 15%
+                        </span>
+</div>
+</div>
+<div class="stat-card-border p-6 rounded-xl transition-all duration-200">
+<div class="flex justify-between items-start mb-4">
+<span class="text-secondary font-label-md">Citation Hit Rate</span>
+<span class="material-symbols-outlined text-primary">link</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="font-headline-md text-headline-md text-on-surface">88.5%</span>
+<span class="text-label-sm text-red-500 font-medium flex items-center">
+<span class="material-symbols-outlined text-sm">arrow_downward</span> 0.4%
+                        </span>
+</div>
+</div>
+<div class="stat-card-border p-6 rounded-xl transition-all duration-200 bg-red-50 border-red-100">
+<div class="flex justify-between items-start mb-4">
+<span class="text-red-700 font-label-md">"I Don't Know" Rate</span>
+<span class="material-symbols-outlined text-red-600" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="font-headline-md text-headline-md text-red-900">4.2%</span>
+<span class="text-label-sm text-red-600 font-medium flex items-center">
+<span class="material-symbols-outlined text-sm">arrow_upward</span> 1.2%
+                        </span>
+</div>
+<div class="mt-2 text-[11px] font-label-sm text-red-600/80">Requires Immediate KB Update</div>
+</div>
+</div>
+<!-- Charts Section -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-gutter">
+<div class="stat-card-border p-6 rounded-xl min-h-[320px] flex flex-col">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Query Volume Over Time</h3>
+<button class="text-secondary hover:text-primary p-1">
+<span class="material-symbols-outlined">more_horiz</span>
+</button>
+</div>
+<div class="flex-1 chart-placeholder relative rounded-lg border border-f1f5f9 overflow-hidden">
+<svg class="absolute inset-0 w-full h-full p-4" preserveaspectratio="none" viewbox="0 0 100 100">
+<path d="M0,80 Q10,75 20,60 T40,65 T60,40 T80,30 T100,10" fill="none" stroke="#2563eb" stroke-width="2" vector-effect="non-scaling-stroke"></path>
+<circle cx="20" cy="60" fill="#2563eb" r="1.5"></circle>
+<circle cx="40" cy="65" fill="#2563eb" r="1.5"></circle>
+<circle cx="60" cy="40" fill="#2563eb" r="1.5"></circle>
+<circle cx="80" cy="30" fill="#2563eb" r="1.5"></circle>
+</svg>
+<div class="absolute bottom-2 left-0 right-0 flex justify-between px-4 text-[10px] text-secondary font-label-sm">
+<span>01 May</span><span>08 May</span><span>15 May</span><span>22 May</span><span>29 May</span>
+</div>
+</div>
+</div>
+<div class="stat-card-border p-6 rounded-xl min-h-[320px] flex flex-col">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Unanswered Queries by Category</h3>
+<div class="flex gap-2">
+<div class="flex items-center gap-1">
+<div class="w-2 h-2 rounded-full bg-primary-container"></div>
+<span class="text-[11px] text-secondary">Missed</span>
+</div>
+</div>
+</div>
+<div class="flex-1 flex items-end justify-around gap-4 px-4 pb-8">
+<div class="flex flex-col items-center gap-2 w-full max-w-[40px]">
+<div class="w-full bg-primary/20 h-[40%] rounded-t-lg relative group">
+<div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-on-surface text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">42 queries</div>
+</div>
+<span class="text-[10px] text-secondary text-center rotate-45 mt-2 origin-left">Billing</span>
+</div>
+<div class="flex flex-col items-center gap-2 w-full max-w-[40px]">
+<div class="w-full bg-primary-container h-[90%] rounded-t-lg relative group">
+<div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-on-surface text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">108 queries</div>
+</div>
+<span class="text-[10px] text-secondary text-center rotate-45 mt-2 origin-left">Technical</span>
+</div>
+<div class="flex flex-col items-center gap-2 w-full max-w-[40px]">
+<div class="w-full bg-primary/20 h-[25%] rounded-t-lg relative group"></div>
+<span class="text-[10px] text-secondary text-center rotate-45 mt-2 origin-left">Product</span>
+</div>
+<div class="flex flex-col items-center gap-2 w-full max-w-[40px]">
+<div class="w-full bg-primary/20 h-[60%] rounded-t-lg relative group"></div>
+<span class="text-[10px] text-secondary text-center rotate-45 mt-2 origin-left">Security</span>
+</div>
+<div class="flex flex-col items-center gap-2 w-full max-w-[40px]">
+<div class="w-full bg-primary/20 h-[15%] rounded-t-lg relative group"></div>
+<span class="text-[10px] text-secondary text-center rotate-45 mt-2 origin-left">Policy</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Table Section -->
+<div class="stat-card-border rounded-xl overflow-hidden">
+<div class="px-6 py-4 border-b border-outline-variant flex justify-between items-center">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Top Unanswered Queries</h3>
+<button class="text-primary font-label-md hover:underline flex items-center gap-1">
+                        View all <span class="material-symbols-outlined text-sm">open_in_new</span>
+</button>
+</div>
+<table class="w-full text-left font-body-md text-body-md">
+<thead class="bg-surface font-label-sm text-label-sm text-secondary border-b border-outline-variant">
+<tr>
+<th class="px-6 py-3 font-medium">Query Content</th>
+<th class="px-6 py-3 font-medium">Frequency</th>
+<th class="px-6 py-3 font-medium">Last Asked</th>
+<th class="px-6 py-3 font-medium">Suggested Fix</th>
+<th class="px-6 py-3 font-medium text-right">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-f1f5f9">
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 text-on-surface font-medium">"How do I reset my SSO token if locked out?"</td>
+<td class="px-6 py-4">42 times</td>
+<td class="px-6 py-4">2 hours ago</td>
+<td class="px-6 py-4">
+<span class="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-[12px]">Add Security Doc</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-primary hover:text-primary/80 font-label-md">Train</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 text-on-surface font-medium">"What is the current policy on API rate limiting?"</td>
+<td class="px-6 py-4">38 times</td>
+<td class="px-6 py-4">5 hours ago</td>
+<td class="px-6 py-4">
+<span class="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-[12px]">Update API Docs</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-primary hover:text-primary/80 font-label-md">Train</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 text-on-surface font-medium">"Integrate with Jira Service Management?"</td>
+<td class="px-6 py-4">29 times</td>
+<td class="px-6 py-4">Yesterday</td>
+<td class="px-6 py-4">
+<span class="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-[12px]">Link External Guide</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-primary hover:text-primary/80 font-label-md">Train</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 text-on-surface font-medium">"Pricing for Enterprise High-Availability tier?"</td>
+<td class="px-6 py-4">12 times</td>
+<td class="px-6 py-4">2 days ago</td>
+<td class="px-6 py-4">
+<span class="bg-secondary/10 text-secondary px-2 py-0.5 rounded-full text-[12px]">Handover Only</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-primary hover:text-primary/80 font-label-md">Train</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</main>
+</div>
+<!-- Micro-interaction for Segmented Control -->
+<script>
+        document.querySelectorAll('.segmented-item').forEach(item => {
+            item.addEventListener('click', () => {
+                item.parentElement.querySelector('.active').classList.remove('active');
+                item.classList.add('active');
+            });
+        });
+
+        // Simple hover effect for table rows handled via Tailwind
+    </script>
+</body></html>

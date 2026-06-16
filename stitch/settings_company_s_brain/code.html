@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Settings | Company's Brain</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface": "#f8f9ff",
+                        "on-secondary": "#ffffff",
+                        "surface-bright": "#f8f9ff",
+                        "on-error": "#ffffff",
+                        "surface-container-low": "#eff4ff",
+                        "on-surface": "#0b1c30",
+                        "on-surface-variant": "#434655",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed": "#360f00",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-secondary-fixed-variant": "#40484f",
+                        "on-secondary-fixed": "#151c23",
+                        "primary-fixed": "#dbe1ff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "tertiary": "#943700",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-container": "#ffede6",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "secondary-fixed-dim": "#c0c7d0",
+                        "surface-container": "#e5eeff",
+                        "on-primary-container": "#eeefff",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "secondary": "#585f67",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed": "#ffdbcd",
+                        "background": "#f8f9ff",
+                        "surface-variant": "#d3e4fe",
+                        "surface-container-highest": "#d3e4fe",
+                        "on-primary-fixed": "#00174b",
+                        "inverse-primary": "#b4c5ff",
+                        "inverse-surface": "#213145",
+                        "on-error-container": "#93000a",
+                        "primary-container": "#2563eb",
+                        "outline-variant": "#c3c6d7",
+                        "secondary-fixed": "#dce3ec",
+                        "surface-container-high": "#dce9ff",
+                        "surface-dim": "#cbdbf5",
+                        "error-container": "#ffdad6",
+                        "on-secondary-container": "#5e656d",
+                        "primary": "#004ac6",
+                        "outline": "#737686",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#dce3ec",
+                        "surface-tint": "#0053db",
+                        "tertiary-container": "#bc4800",
+                        "on-background": "#0b1c30"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-desktop": "32px",
+                        "margin-mobile": "16px",
+                        "unit": "4px",
+                        "sidebar-width": "280px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Be Vietnam Pro"],
+                        "headline-lg-mobile": ["Be Vietnam Pro"],
+                        "body-lg": ["Be Vietnam Pro"],
+                        "label-md": ["Be Vietnam Pro"],
+                        "body-md": ["Be Vietnam Pro"],
+                        "headline-md": ["Be Vietnam Pro"],
+                        "headline-sm": ["Be Vietnam Pro"],
+                        "headline-lg": ["Be Vietnam Pro"],
+                        "display": ["Be Vietnam Pro"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "display": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Be Vietnam Pro', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .settings-tab-active {
+            border-bottom: 2px solid #2563eb;
+            color: #004ac6;
+        }
+        .sidebar-collapsed {
+            width: 80px;
+        }
+        .custom-shadow {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface overflow-x-hidden">
+<div class="flex min-h-screen">
+<!-- Collapsed Sidebar -->
+<aside class="sidebar-collapsed h-screen sticky left-0 top-0 bg-surface-container-low border-r border-outline-variant flex flex-col py-6 items-center transition-all duration-300 z-50">
+<div class="mb-10 text-primary">
+<span class="material-symbols-outlined text-4xl" data-weight="fill" style="font-variation-settings: 'FILL' 1;">psychology</span>
+</div>
+<nav class="flex flex-col gap-6 items-center flex-1 w-full">
+<div class="p-2 rounded-xl text-secondary hover:bg-surface-container-high transition-colors cursor-pointer group relative">
+<span class="material-symbols-outlined">chat</span>
+<span class="absolute left-16 bg-on-surface text-surface text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Chat</span>
+</div>
+<div class="p-2 rounded-xl text-secondary hover:bg-surface-container-high transition-colors cursor-pointer group relative">
+<span class="material-symbols-outlined">description</span>
+</div>
+<div class="p-2 rounded-xl text-secondary hover:bg-surface-container-high transition-colors cursor-pointer group relative">
+<span class="material-symbols-outlined">analytics</span>
+</div>
+<div class="p-2 rounded-xl text-secondary hover:bg-surface-container-high transition-colors cursor-pointer group relative">
+<span class="material-symbols-outlined">assignment_turned_in</span>
+</div>
+<div class="p-2 rounded-xl text-secondary hover:bg-surface-container-high transition-colors cursor-pointer group relative">
+<span class="material-symbols-outlined">group</span>
+</div>
+<div class="p-2 rounded-xl bg-primary-container text-on-primary-container border-l-2 border-primary cursor-pointer group relative">
+<span class="material-symbols-outlined">settings</span>
+</div>
+</nav>
+<div class="mt-auto pt-6 border-t border-outline-variant w-full flex flex-col items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center text-primary font-bold overflow-hidden">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="A professional, minimalist headshot of a user against a neutral soft-blue background, matching the clean and airy visual language of a high-end SaaS platform. The image is crisp, with soft lighting and professional composition." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCtSaEt2q_KtT34O_2suFLHJNqThEE52k5Zcx5RC8mPfL1AfFwSnyapMXHX14m1ZVDfKnhNSHhDN0PSogUDX0nlijxAAtqDSD26kypzBpfFfqqmqQns1tM8du8GxqRV7ubJ9uq77V-FOBUWuBxXIyeU1Wqvr9jI5MiyFOJ1DES6AJTcHB59mJZOAGZ27keuDxTYWLImMICg3qk7jrez7tZWY3_H4_CPsKDTgp4XO3IDb8NyM4SETnpulWUTjAyjPq6FA1IkXTXu_-qR"/>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col">
+<!-- Top App Bar -->
+<header class="h-[50px] w-full sticky top-0 z-40 bg-surface border-b border-outline-variant flex items-center justify-between px-margin-desktop">
+<div class="flex items-center gap-4">
+<h1 class="text-headline-sm font-headline-sm font-bold text-primary">Settings</h1>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-label-md font-label-md text-on-surface-variant px-3 py-1 bg-surface-container rounded-full">Status: Internal</span>
+<button class="text-secondary hover:text-primary transition-all">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-secondary hover:text-primary transition-all">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+</div>
+</header>
+<!-- Scrollable Settings Container -->
+<div class="flex-1 overflow-y-auto px-4 py-12 flex justify-center">
+<div class="w-full max-w-[680px]">
+<!-- Tabs Navigation -->
+<div class="flex gap-8 mb-12 border-b border-outline-variant">
+<button class="pb-3 text-label-md font-label-md settings-tab-active transition-all cursor-pointer" id="tab-general" onclick="switchTab('general')">General</button>
+<button class="pb-3 text-label-md font-label-md text-secondary hover:text-primary transition-all cursor-pointer" id="tab-compartments" onclick="switchTab('compartments')">Compartments</button>
+<button class="pb-3 text-label-md font-label-md text-secondary hover:text-primary transition-all cursor-pointer" id="tab-subscription" onclick="switchTab('subscription')">Subscription</button>
+<button class="pb-3 text-label-md font-label-md text-secondary hover:text-primary transition-all cursor-pointer" id="tab-danger" onclick="switchTab('danger')">Danger Zone</button>
+</div>
+<!-- Content Sections -->
+<div id="content-area">
+<!-- General Section -->
+<section class="space-y-10" id="section-general">
+<div>
+<h2 class="text-headline-sm font-headline-sm mb-2">Organization Profile</h2>
+<p class="text-body-md text-on-surface-variant mb-6">Manage your organization's core identification settings and branding identity within the Brain ecosystem.</p>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-8 space-y-6">
+<div class="space-y-2">
+<label class="text-label-md font-label-md text-secondary">Organization Name</label>
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-body-md focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none" type="text" value="BlueOcean EdTech"/>
+</div>
+<div class="space-y-2">
+<label class="text-label-md font-label-md text-secondary">Workspace URL</label>
+<div class="flex items-center">
+<span class="bg-surface-container px-4 py-3 rounded-l-lg border border-r-0 border-outline-variant text-label-md text-on-surface-variant">brain.blueocean.ai/</span>
+<input class="flex-1 bg-surface-container-lowest border border-outline-variant rounded-r-lg px-4 py-3 text-body-md focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none" type="text" value="education-hub"/>
+</div>
+</div>
+<div class="flex justify-end pt-4">
+<button class="bg-primary-container text-on-primary-container px-6 py-2.5 rounded-lg font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all">Save Changes</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Compartments Section (Hidden by Default) -->
+<section class="hidden space-y-8" id="section-compartments">
+<div class="flex justify-between items-end">
+<div>
+<h2 class="text-headline-sm font-headline-sm mb-2">Data Compartments</h2>
+<p class="text-body-md text-on-surface-variant">Isolate data and AI training contexts into secure logical containers.</p>
+</div>
+<button class="bg-primary text-on-primary px-5 py-2 rounded-lg font-label-md text-label-md flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm">add</span> New Compartment
+                                </button>
+</div>
+<div class="space-y-3">
+<!-- Compartment Item -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex items-center justify-between group hover:border-primary transition-all">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">folder_shared</span>
+</div>
+<div>
+<h4 class="text-label-md font-label-md">Student Performance Records</h4>
+<p class="text-label-sm font-label-sm text-secondary">324 Documents • Created 2m ago</p>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="p-2 text-secondary hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-xl">edit</span>
+</button>
+<button class="p-2 text-secondary hover:text-error transition-colors">
+<span class="material-symbols-outlined text-xl">delete</span>
+</button>
+</div>
+</div>
+<!-- Compartment Item -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex items-center justify-between group hover:border-primary transition-all">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">description</span>
+</div>
+<div>
+<h4 class="text-label-md font-label-md">Curriculum Standards 2024</h4>
+<p class="text-label-sm font-label-sm text-secondary">15 Documents • Created 15d ago</p>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="p-2 text-secondary hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-xl">edit</span>
+</button>
+<button class="p-2 text-secondary hover:text-error transition-colors">
+<span class="material-symbols-outlined text-xl">delete</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Subscription Section (Hidden by Default) -->
+<section class="hidden space-y-8" id="section-subscription">
+<h2 class="text-headline-sm font-headline-sm mb-2">Plan &amp; Billing</h2>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-8">
+<div class="flex justify-between items-start mb-8">
+<div>
+<div class="flex items-center gap-3 mb-2">
+<h3 class="text-headline-sm font-headline-sm">Enterprise AI</h3>
+<span class="px-2 py-0.5 bg-[#dcfce7] text-[#166534] text-[11px] font-bold uppercase rounded tracking-wider">Active</span>
+</div>
+<p class="text-body-md text-on-surface-variant">Professional grade intelligence for large scale educational institutions.</p>
+</div>
+<div class="text-right">
+<p class="text-headline-sm font-headline-sm">$1,200<span class="text-body-md text-secondary">/mo</span></p>
+<p class="text-label-sm font-label-sm text-secondary">Next billing: Oct 24, 2024</p>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4 mb-8">
+<div class="p-4 bg-surface rounded-lg border border-outline-variant">
+<p class="text-label-sm font-label-sm text-secondary mb-1">API Requests</p>
+<p class="text-body-lg font-bold">84% <span class="text-label-sm font-normal text-secondary">of 1M</span></p>
+<div class="w-full bg-surface-container h-1.5 rounded-full mt-2">
+<div class="bg-primary h-1.5 rounded-full" style="width: 84%"></div>
+</div>
+</div>
+<div class="p-4 bg-surface rounded-lg border border-outline-variant">
+<p class="text-label-sm font-label-sm text-secondary mb-1">Storage</p>
+<p class="text-body-lg font-bold">12.4 GB <span class="text-label-sm font-normal text-secondary">of 100 GB</span></p>
+<div class="w-full bg-surface-container h-1.5 rounded-full mt-2">
+<div class="bg-primary h-1.5 rounded-full" style="width: 12.4%"></div>
+</div>
+</div>
+</div>
+<button class="w-full border border-outline-variant hover:bg-surface-container transition-colors py-3 rounded-lg font-label-md text-label-md">
+                                    Manage Billing &amp; Payment Methods
+                                </button>
+</div>
+</section>
+<!-- Danger Zone Section (Hidden by Default) -->
+<section class="hidden space-y-8" id="section-danger">
+<h2 class="text-headline-sm font-headline-sm mb-2 text-error">Danger Zone</h2>
+<div class="bg-surface-container-lowest border border-error-container rounded-xl overflow-hidden">
+<div class="p-6 border-b border-error-container flex items-center justify-between bg-error-container/5">
+<div>
+<h4 class="text-label-md font-headline-sm text-error">Cancel Subscription</h4>
+<p class="text-body-md text-on-surface-variant max-w-sm mt-1">Once you cancel, your organization will lose access to premium AI models at the end of the current billing cycle.</p>
+</div>
+<button class="bg-error text-on-error px-6 py-2.5 rounded-lg font-label-md text-label-md hover:bg-red-700 transition-all active:scale-95">Cancel Subscription</button>
+</div>
+<div class="p-6 flex items-center justify-between">
+<div>
+<h4 class="text-label-md font-headline-sm text-error">Delete Organization</h4>
+<p class="text-body-md text-on-surface-variant max-w-sm mt-1">Permanently remove all data, documents, and AI training history. This action cannot be undone.</p>
+</div>
+<button class="border border-error text-error px-6 py-2.5 rounded-lg font-label-md text-label-md hover:bg-error-container transition-all">Delete Forever</button>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</main>
+</div>
+<script>
+        function switchTab(tabId) {
+            // IDs of all sections
+            const sections = ['general', 'compartments', 'subscription', 'danger'];
+            
+            // Update UI tabs
+            sections.forEach(id => {
+                const tab = document.getElementById(`tab-${id}`);
+                const section = document.getElementById(`section-${id}`);
+                
+                if (id === tabId) {
+                    tab.classList.remove('text-secondary', 'hover:text-primary');
+                    tab.classList.add('settings-tab-active');
+                    section.classList.remove('hidden');
+                } else {
+                    tab.classList.remove('settings-tab-active');
+                    tab.classList.add('text-secondary', 'hover:text-primary');
+                    section.classList.add('hidden');
+                }
+            });
+
+            // Log navigation for simulation
+            console.log(`Navigated to settings tab: ${tabId}`);
+        }
+
+        // Simple animation for the organization input on focus
+        const inputs = document.querySelectorAll('input');
+        inputs.forEach(input => {
+            input.addEventListener('focus', () => {
+                input.parentElement.classList.add('scale-[1.01]');
+                input.parentElement.classList.add('transition-transform');
+            });
+            input.addEventListener('blur', () => {
+                input.parentElement.classList.remove('scale-[1.01]');
+            });
+        });
+    </script>
+</body></html>

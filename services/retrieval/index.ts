@@ -1,0 +1,271 @@
+import OpenAI from 'openai'
+import { db } from '@company-brain/db'
+import { chunks, documents, compartments } from '@company-brain/db'
+import { eq, and, sql } from 'drizzle-orm'
+import type { RetrieveParams, ServiceResult, ChunkContext } from '@company-brain/shared'
+import {
+  EMBEDDING_MODEL,
+  EMBEDDING_DIMENSIONS,
+  SEMANTIC_WEIGHT,
+  BM25_WEIGHT,
+  CONFIDENCE_GATE_THRESHOLD,
+  TOP_K_CHUNKS,
+} from '@company-brain/shared'
+import { canAccessChunk } from '@company-brain/access-control'
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+function friendlyServiceError(raw: string): string {
+  if (raw.includes('401') || /api.?key|authentication|unauthorized/i.test(raw))
+    return 'The knowledge base search is not configured. Please contact your administrator.'
+  if (raw.includes('429') || /rate.?limit/i.test(raw))
+    return 'Too many requests. Please wait a moment and try again.'
+  if (/timeout|ETIMEDOUT|ECONNREFUSED/i.test(raw))
+    return 'Search timed out. Please try again.'
+  return 'Search is temporarily unavailable. Please try again.'
+}
+
+// ─── Embed a single query ─────────────────────────────────────────────────────
+
+async function embedQuery(text: string): Promise<number[]> {
+  const response = await openai.embeddings.create({
+    model: EMBEDDING_MODEL,
+    input: text,
+    dimensions: EMBEDDING_DIMENSIONS,
+  })
+  return response.data[0]?.embedding ?? []
+}
+
+// ─── Semantic search via pgvector ─────────────────────────────────────────────
+
+async function semanticSearch(
+  orgId: string,
+  accessTier: 'internal' | 'external',
+  queryEmbedding: number[],
+  limit: number
+): Promise<Array<{ id: string; documentId: string; compartmentId: string; content: string; score: number; chunkIndex: number }>> {
+  const vectorLiteral = `[${queryEmbedding.join(',')}]`
+
+  const rows = await db.execute(sql`
+    SELECT
+      c.id,
+      c.document_id,
+      c.compartment_id,
+      c.content,
+      c.chunk_index,
+      c.visibility,
+      1 - (c.embedding <=> ${vectorLiteral}::vector) AS score
+    FROM chunks c
+    WHERE c.org_id = ${orgId}
+      AND c.access_tier = ${accessTier}
+      AND c.status = 'active'
+    ORDER BY c.embedding <=> ${vectorLiteral}::vector
+    LIMIT ${limit * 3}
+  `)
+
+  return (rows as unknown[]).map((r: unknown) => {
+    const row = r as Record<string, unknown>
+    return {
+      id: row['id'] as string,
+      documentId: row['document_id'] as string,
+      compartmentId: row['compartment_id'] as string,
+      content: row['content'] as string,
+      score: Number(row['score']),
+      chunkIndex: Number(row['chunk_index']),
+      visibility: row['visibility'] as Record<string, unknown>,
+    }
+  })
+}
+
+// ─── Full-text search via tsvector ────────────────────────────────────────────
+
+async function fullTextSearch(
+  orgId: string,
+  accessTier: 'internal' | 'external',
+  query: string,
+  limit: number
+): Promise<Array<{ id: string; documentId: string; compartmentId: string; content: string; rank: number; chunkIndex: number }>> {
+  const rows = await db.execute(sql`
+    SELECT
+      c.id,
+      c.document_id,
+      c.compartment_id,
+      c.content,
+      c.chunk_index,
+      c.visibility,
+      ts_rank(to_tsvector('english', c.content), plainto_tsquery('english', ${query})) AS rank
+    FROM chunks c
+    WHERE c.org_id = ${orgId}
+      AND c.access_tier = ${accessTier}
+      AND c.status = 'active'
+      AND to_tsvector('english', c.content) @@ plainto_tsquery('english', ${query})
+    ORDER BY rank DESC
+    LIMIT ${limit * 3}
+  `)
+
+  return (rows as unknown[]).map((r: unknown) => {
+    const row = r as Record<string, unknown>
+    return {
+      id: row['id'] as string,
+      documentId: row['document_id'] as string,
+      compartmentId: row['compartment_id'] as string,
+      content: row['content'] as string,
+      rank: Number(row['rank']),
+      chunkIndex: Number(row['chunk_index']),
+      visibility: row['visibility'] as Record<string, unknown>,
+    }
+  })
+}
+
+// ─── Small-to-big: expand to parent section ───────────────────────────────────
+
+async function expandToParent(chunkId: string): Promise<string | null> {
+  const rows = await db.execute(sql`
+    SELECT c2.content
+    FROM chunks c1
+    JOIN chunks c2 ON c2.id = c1.parent_chunk_id
+    WHERE c1.id = ${chunkId}
+    LIMIT 1
+  `)
+  const first = (rows as unknown[])[0]
+  if (!first) return null
+  return (first as Record<string, unknown>)['content'] as string
+}
+
+// ─── Get document filename for citations ─────────────────────────────────────
+
+async function getDocumentFilename(documentId: string): Promise<string> {
+  const rows = await db
+    .select({ filename: documents.filename })
+    .from(documents)
+    .where(eq(documents.id, documentId))
+    .limit(1)
+  return rows[0]?.filename ?? 'Unknown document'
+}
+
+async function getCompartmentName(compartmentId: string): Promise<string> {
+  const rows = await db
+    .select({ name: compartments.name })
+    .from(compartments)
+    .where(eq(compartments.id, compartmentId))
+    .limit(1)
+  return rows[0]?.name ?? 'Unknown compartment'
+}
+
+// ─── Main retrieve function ───────────────────────────────────────────────────
+
+export async function retrieveChunks(
+  params: RetrieveParams
+): Promise<ServiceResult<{ chunks: ChunkContext[]; confidence: number }>> {
+  const { orgId, userId, query, accessTier, userRole, topK = TOP_K_CHUNKS } = params
+
+  try {
+    const queryEmbedding = await embedQuery(query)
+
+    // Run semantic + full-text search in parallel
+    const [semanticResults, ftsResults] = await Promise.all([
+      semanticSearch(orgId, accessTier, queryEmbedding, topK),
+      fullTextSearch(orgId, accessTier, query, topK),
+    ])
+
+    // Merge results into a map keyed by chunk ID
+    const merged = new Map<
+      string,
+      { id: string; documentId: string; compartmentId: string; content: string; chunkIndex: number; semanticScore: number; bm25Score: number; visibility: unknown }
+    >()
+
+    for (const r of semanticResults) {
+      merged.set(r.id, {
+        id: r.id,
+        documentId: r.documentId,
+        compartmentId: r.compartmentId,
+        content: r.content,
+        chunkIndex: r.chunkIndex,
+        semanticScore: r.score,
+        bm25Score: 0,
+        visibility: (r as Record<string, unknown>)['visibility'],
+      })
+    }
+
+    for (const r of ftsResults) {
+      const existing = merged.get(r.id)
+      if (existing) {
+        existing.bm25Score = r.rank
+      } else {
+        merged.set(r.id, {
+          id: r.id,
+          documentId: r.documentId,
+          compartmentId: r.compartmentId,
+          content: r.content,
+          chunkIndex: r.chunkIndex,
+          semanticScore: 0,
+          bm25Score: r.rank,
+          visibility: (r as Record<string, unknown>)['visibility'],
+        })
+      }
+    }
+
+    // Normalise BM25 scores to [0,1]
+    const bm25Scores = Array.from(merged.values()).map((v) => v.bm25Score)
+    const maxBm25 = Math.max(...bm25Scores, 1)
+
+    // Score, filter by access control, take top K
+    const scored: ChunkContext[] = []
+    for (const item of merged.values()) {
+      const normalisedBm25 = item.bm25Score / maxBm25
+      const finalScore = SEMANTIC_WEIGHT * item.semanticScore + BM25_WEIGHT * normalisedBm25
+
+      const canAccess = canAccessChunk({
+        visibility: item.visibility as Parameters<typeof canAccessChunk>[0]['visibility'],
+        userRole,
+        userId,
+      })
+      if (!canAccess) continue
+
+      scored.push({
+        chunkId: item.id,
+        documentId: item.documentId,
+        compartmentId: item.compartmentId,
+        filename: '',
+        content: item.content,
+        semanticScore: item.semanticScore,
+        bm25Score: normalisedBm25,
+        finalScore,
+        chunkIndex: item.chunkIndex,
+      })
+    }
+
+    scored.sort((a, b) => b.finalScore - a.finalScore)
+    const topChunks = scored.slice(0, topK)
+
+    const confidence = topChunks[0]?.finalScore ?? 0
+
+    if (confidence < CONFIDENCE_GATE_THRESHOLD || topChunks.length === 0) {
+      return { success: true, data: { chunks: [], confidence } }
+    }
+
+    // Small-to-big: expand content to parent section where available
+    const enriched = await Promise.all(
+      topChunks.map(async (chunk) => {
+        const [parentContent, filename, compartmentName] = await Promise.all([
+          expandToParent(chunk.chunkId),
+          getDocumentFilename(chunk.documentId),
+          getCompartmentName(chunk.compartmentId),
+        ])
+        return {
+          ...chunk,
+          content: parentContent ?? chunk.content,
+          filename,
+          compartmentId: compartmentName,
+        }
+      })
+    )
+
+    return { success: true, data: { chunks: enriched, confidence } }
+  } catch (err) {
+    console.error('[retrieval]', err)
+    const raw = err instanceof Error ? err.message : ''
+    const message = friendlyServiceError(raw)
+    return { success: false, error: { code: 'RETRIEVAL_ERROR', message } }
+  }
+}
