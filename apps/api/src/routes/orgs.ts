@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { db } from '@company-brain/db'
 import { orgs, users } from '@company-brain/db'
-import { eq } from 'drizzle-orm'
+import { eq, desc } from 'drizzle-orm'
 import { hasPermission } from '@company-brain/shared'
 import type { AuthVars } from '../middleware/auth'
 
@@ -13,6 +13,21 @@ const createOrgSchema = z.object({
   orgName: z.string().min(1).max(200),
   adminEmail: z.string().email(),
   adminTemporaryPassword: z.string().min(8),
+})
+
+// GET /api/v1/orgs — list orgs (platform-level, not org-scoped)
+orgsRoute.get('/', async (c) => {
+  const role = c.get('role')
+  if (!hasPermission(role, 'orgs:manage')) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
+
+  const rows = await db
+    .select({ id: orgs.id, name: orgs.name, plan: orgs.plan, createdAt: orgs.createdAt })
+    .from(orgs)
+    .orderBy(desc(orgs.createdAt))
+
+  return c.json({ success: true, data: rows })
 })
 
 // POST /api/v1/orgs — provisions a new org and its first org_admin

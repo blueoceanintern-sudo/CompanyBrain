@@ -6,7 +6,7 @@ import type { Route } from 'next'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   MessageSquare, FileText, BarChart2, ClipboardCheck,
-  Users, Settings, Brain, User, LogOut, Menu, X,
+  Users, Settings, Brain, User, LogOut, Menu, X, Building2,
 } from 'lucide-react'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -20,6 +20,7 @@ const NAV_ICONS: Record<string, React.ElementType> = {
   '/analytics': BarChart2,
   '/audit':     ClipboardCheck,
   '/users':     Users,
+  '/orgs':      Building2,
   '/settings':  Settings,
 }
 

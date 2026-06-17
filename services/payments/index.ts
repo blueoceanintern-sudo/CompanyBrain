@@ -184,18 +184,38 @@ export async function getSubscriptionStatus(
     }
 
     const o = org[0]
+    let plan = o.plan
+    let subscriptionId = o.stripeSubscriptionId
     let status: string | null = null
 
-    if (o.stripeSubscriptionId) {
-      const sub = await stripe.subscriptions.retrieve(o.stripeSubscriptionId)
+    if (subscriptionId) {
+      const sub = await stripe.subscriptions.retrieve(subscriptionId)
       status = sub.status
+    } else if (o.stripeCustomerId && plan === 'free') {
+      // Read-through: webhook may not have landed yet. Check Stripe directly and
+      // sync the DB if Stripe is ahead — webhooks remain the primary update path.
+      const activeSubs = await stripe.subscriptions.list({
+        customer: o.stripeCustomerId,
+        status: 'active',
+        limit: 1,
+      })
+      if (activeSubs.data.length > 0) {
+        const active = activeSubs.data[0]
+        await db
+          .update(orgs)
+          .set({ plan: 'paid', stripeSubscriptionId: active.id, updatedAt: new Date() })
+          .where(eq(orgs.id, orgId))
+        plan = 'paid'
+        subscriptionId = active.id
+        status = active.status
+      }
     }
 
     return {
       success: true,
       data: {
-        plan: o.plan,
-        subscriptionId: o.stripeSubscriptionId,
+        plan,
+        subscriptionId,
         status,
         externalPriceCents: o.externalPriceCents,
       },
@@ -339,6 +359,85 @@ export async function createClientCheckoutSession(params: {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to create checkout session'
     return { success: false, error: { code: 'STRIPE_CHECKOUT_ERROR', message } }
+  }
+}
+
+// ─── Self-service org upgrade (free → paid) ───────────────────────────────────
+
+export async function createOrgUpgradeSession(
+  orgId: string,
+  orgName: string,
+  email: string
+): Promise<ServiceResult<{ url: string }>> {
+  const priceId = process.env.STRIPE_ORG_PRICE_ID
+  if (!priceId) {
+    return { success: false, error: { code: 'CONFIG_ERROR', message: 'Org subscription price not configured — set STRIPE_ORG_PRICE_ID' } }
+  }
+
+  try {
+    const customerResult = await ensureStripeCustomer(orgId, orgName, email)
+    if (!customerResult.success) return customerResult
+
+    // Ask Stripe directly — the DB may lag behind the webhook by several seconds,
+    // so we cannot rely on plan === 'paid' alone to block a second checkout.
+    const activeSubs = await stripe.subscriptions.list({
+      customer: customerResult.data.customerId,
+      status: 'active',
+      limit: 1,
+    })
+    if (activeSubs.data.length > 0) {
+      return { success: false, error: { code: 'ALREADY_SUBSCRIBED', message: 'This organisation already has an active subscription' } }
+    }
+
+    const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000'
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer: customerResult.data.customerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      subscription_data: { metadata: { orgId } },
+      metadata: { orgId },
+      success_url: `${webUrl}/settings?upgrade=success`,
+      cancel_url: `${webUrl}/settings?upgrade=cancel`,
+    })
+
+    if (!session.url) {
+      return { success: false, error: { code: 'STRIPE_CHECKOUT_ERROR', message: 'No checkout URL returned' } }
+    }
+
+    return { success: true, data: { url: session.url } }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to create upgrade session'
+    return { success: false, error: { code: 'STRIPE_CHECKOUT_ERROR', message } }
+  }
+}
+
+// ─── Stripe Customer Portal (manage billing, payment methods, invoices) ───────
+
+export async function createBillingPortalSession(
+  orgId: string
+): Promise<ServiceResult<{ url: string }>> {
+  try {
+    const org = await db
+      .select({ stripeCustomerId: orgs.stripeCustomerId })
+      .from(orgs)
+      .where(eq(orgs.id, orgId))
+      .limit(1)
+
+    const customerId = org[0]?.stripeCustomerId
+    if (!customerId) {
+      return { success: false, error: { code: 'NO_CUSTOMER', message: 'No billing account found for this organisation' } }
+    }
+
+    const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000'
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${webUrl}/settings`,
+    })
+
+    return { success: true, data: { url: session.url } }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to create billing portal session'
+    return { success: false, error: { code: 'STRIPE_PORTAL_ERROR', message } }
   }
 }
 

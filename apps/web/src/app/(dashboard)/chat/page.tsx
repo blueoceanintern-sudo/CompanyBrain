@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   Search, Send, BookOpen, FileText, Calendar,
   Paperclip, Globe, Bot, ThumbsUp, Copy, RefreshCw,
-  Sparkles, Clock, Plus,
+  Sparkles, Clock, Plus, CreditCard,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSubmitQuery } from '@/hooks/use-queries'
+import { useExternalPricing, useStartCheckout } from '@/hooks/use-payments'
 import { getAuthUser } from '@/lib/auth'
 import type { QueryResponse } from '@company-brain/shared'
 
@@ -25,6 +27,44 @@ const SUGGESTIONS = [
   { icon: FileText,  label: 'Project Phoenix summary' },
   { icon: Calendar,  label: 'Holiday calendar 2024' },
 ]
+
+// ─── External client subscribe gate ───────────────────────────────────────────
+
+function SubscribeGate({ orgId }: { orgId: string }) {
+  const { data: pricing, isLoading } = useExternalPricing(orgId)
+  const checkout = useStartCheckout(orgId)
+
+  const price = pricing?.priceCents != null
+    ? `$${(pricing.priceCents / 100).toFixed(2)}/month`
+    : null
+
+  return (
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ffffff', padding: 32 }}>
+      <div style={{ maxWidth: 460, width: '100%', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}>
+        <div style={{ width: 64, height: 64, borderRadius: 16, background: '#e5eeff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <CreditCard size={28} color="#004ac6" />
+        </div>
+        <div>
+          <h2 style={{ fontSize: 24, fontWeight: 700, color: '#0b1c30', margin: '0 0 8px' }}>Subscribe to access</h2>
+          <p style={{ fontSize: 15, color: '#585f67', margin: 0, lineHeight: 1.6 }}>Get full access to this organisation&apos;s knowledge base. Ask questions, find documents, and get AI-powered answers.</p>
+        </div>
+        {!isLoading && price && (
+          <div style={{ padding: '16px 32px', background: '#eff4ff', borderRadius: 12, border: '1px solid #d3e4fe' }}>
+            <span style={{ fontSize: 28, fontWeight: 700, color: '#004ac6' }}>{price}</span>
+          </div>
+        )}
+        <button
+          onClick={() => checkout.mutate()}
+          disabled={checkout.isPending || isLoading}
+          style={{ padding: '14px 40px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 12, fontSize: 16, fontWeight: 600, cursor: checkout.isPending ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: checkout.isPending ? 0.7 : 1 }}
+        >
+          {checkout.isPending ? 'Redirecting to payment…' : 'Subscribe now'}
+        </button>
+        <p style={{ fontSize: 12, color: '#737686', margin: 0 }}>Secure payment via Stripe. Cancel anytime.</p>
+      </div>
+    </div>
+  )
+}
 
 // ─── Header bar ───────────────────────────────────────────────────────────────
 
@@ -334,6 +374,30 @@ function ActiveChat({
 export default function ChatPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
+  const isExternalClient = user?.role === 'external_client'
+
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  const [hasAccess, setHasAccess] = useState(() => {
+    if (!isExternalClient) return true
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(`cb_ext_access_${orgId}`) === '1'
+  })
+
+  useEffect(() => {
+    if (!isExternalClient) return
+    const checkout = searchParams.get('checkout')
+    if (checkout === 'success') {
+      localStorage.setItem(`cb_ext_access_${orgId}`, '1')
+      setHasAccess(true)
+      toast.success('Subscription active — welcome!')
+      router.replace('/chat')
+    } else if (checkout === 'cancel') {
+      toast.info('Checkout cancelled')
+      router.replace('/chat')
+    }
+  }, [searchParams, router, orgId, isExternalClient])
 
   const [input, setInput] = useState('')
   const [history, setHistory] = useState<HistoryEntry[]>([])
@@ -393,7 +457,9 @@ export default function ChatPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <PageHeader onNew={handleNewChat} />
-      {isEmpty ? (
+      {isExternalClient && !hasAccess ? (
+        <SubscribeGate orgId={orgId} />
+      ) : isEmpty ? (
         <EmptyState
           input={input}
           onChange={setInput}
@@ -416,6 +482,7 @@ export default function ChatPage() {
           onNew={handleNewChat}
         />
       )}
+
     </div>
   )
 }

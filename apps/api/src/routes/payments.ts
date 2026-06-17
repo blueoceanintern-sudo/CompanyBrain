@@ -9,6 +9,8 @@ import {
   ensureConnectOnboardingLink,
   getConnectStatus,
   createClientCheckoutSession,
+  createOrgUpgradeSession,
+  createBillingPortalSession,
 } from '@company-brain/payments'
 import { db } from '@company-brain/db'
 import { orgs, users } from '@company-brain/db'
@@ -152,6 +154,56 @@ paymentsRoute.patch('/external-pricing', zValidator('json', externalPricingSchem
     .where(eq(orgs.id, orgId))
 
   return c.json({ success: true, data: null })
+})
+
+// GET /orgs/:id/external-pricing — price-only read, available to any org member (no billing data)
+paymentsRoute.get('/external-pricing', async (c) => {
+  const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
+  const role = c.get('role')
+  if (!hasPermission(role, 'queries:submit')) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
+
+  const orgRow = await db.select({ externalPriceCents: orgs.externalPriceCents }).from(orgs).where(eq(orgs.id, orgId)).limit(1)
+  if (!orgRow[0]) {
+    return c.json({ success: false, error: { code: 'ORG_NOT_FOUND', message: 'Organisation not found' } }, 404)
+  }
+
+  return c.json({ success: true, data: { priceCents: orgRow[0].externalPriceCents } })
+})
+
+// POST /orgs/:id/upgrade — self-service free → paid upgrade via Stripe Checkout
+paymentsRoute.post('/upgrade', async (c) => {
+  const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
+  const role = c.get('role')
+  if (!hasPermission(role, 'billing:manage')) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
+  const userId = c.get('userId')
+
+  const orgRows = await db.select({ name: orgs.name }).from(orgs).where(eq(orgs.id, orgId)).limit(1)
+  const userRows = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1)
+  const orgName = orgRows[0]?.name ?? 'Unknown Org'
+  const email = userRows[0]?.email ?? ''
+
+  const result = await createOrgUpgradeSession(orgId, orgName, email)
+  if (!result.success) return c.json({ success: false, error: result.error }, 500)
+  return c.json({ success: true, data: result.data })
+})
+
+// POST /orgs/:id/billing-portal — open Stripe billing portal for managing payment methods
+paymentsRoute.post('/billing-portal', async (c) => {
+  const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
+  const role = c.get('role')
+  if (!hasPermission(role, 'billing:manage')) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
+  const result = await createBillingPortalSession(orgId)
+  if (!result.success) return c.json({ success: false, error: result.error }, 500)
+  return c.json({ success: true, data: result.data })
 })
 
 // POST /orgs/:id/checkout — external_client subscribes to this org's external knowledge plane

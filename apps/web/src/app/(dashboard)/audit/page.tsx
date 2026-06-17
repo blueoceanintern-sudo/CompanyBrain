@@ -209,7 +209,7 @@ export default function AuditPage() {
           </div>
 
           {/* Filter bar */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '24px 0', borderTop: '1px solid #c3c6d7', borderBottom: '1px solid #c3c6d7' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '12px 0'}}>
             <div style={{ flex: 1, minWidth: 240, position: 'relative' }}>
               <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#737686' }} />
               <input
