@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { db } from '@company-brain/db'
-import { queries, auditLogs } from '@company-brain/db'
+import { queries, auditLogs, users, orgs } from '@company-brain/db'
 import { eq, and, gte, sql, count } from 'drizzle-orm'
 import { hasPermission, CONFIDENCE_GATE_THRESHOLD } from '@company-brain/shared'
 import type { AuthVars } from '../middleware/auth'
@@ -111,6 +111,7 @@ analyticsRoute.get('/queries', async (c) => {
 })
 
 // GET /orgs/:id/analytics/export (audit log CSV)
+// super_admin receives all orgs; everyone else is scoped to their org
 analyticsRoute.get('/export', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
@@ -120,22 +121,42 @@ analyticsRoute.get('/export', async (c) => {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
+  const isSuperAdmin = role === 'super_admin'
+
   const rows = await db
-    .select()
+    .select({
+      id: auditLogs.id,
+      orgId: auditLogs.orgId,
+      userId: auditLogs.userId,
+      action: auditLogs.action,
+      resourceType: auditLogs.resourceType,
+      resourceId: auditLogs.resourceId,
+      createdAt: auditLogs.createdAt,
+      actorEmail: users.email,
+      orgName: orgs.name,
+    })
     .from(auditLogs)
-    .where(eq(auditLogs.orgId, orgId))
+    .leftJoin(users, eq(auditLogs.userId, users.id))
+    .leftJoin(orgs, eq(auditLogs.orgId, orgs.id))
+    .where(isSuperAdmin ? undefined : eq(auditLogs.orgId, orgId))
     .orderBy(auditLogs.createdAt)
 
-  const header = 'timestamp,actor_id,action,resource_type,resource_id\n'
+  const f = (v: string | null | undefined) => {
+    const s = v ?? ''
+    return s.includes(',') ? `"${s.replace(/"/g, '""')}"` : s
+  }
+
+  const header = 'timestamp,actor_id,actor_email,action,resource_type,resource_id,org_id,org_name\n'
   const body = rows
     .map(
       (r) =>
-        `${r.createdAt.toISOString()},${r.userId ?? ''},${r.action},${r.resourceType},${r.resourceId ?? ''}`
+        `${r.createdAt.toISOString()},${f(r.userId)},${f(r.actorEmail)},${f(r.action)},${f(r.resourceType)},${f(r.resourceId)},${f(r.orgId)},${f(r.orgName)}`
     )
     .join('\n')
 
+  const filename = isSuperAdmin ? 'audit-all-orgs.csv' : `audit-${orgId}.csv`
   c.header('Content-Type', 'text/csv')
-  c.header('Content-Disposition', `attachment; filename="audit-${orgId}.csv"`)
+  c.header('Content-Disposition', `attachment; filename="${filename}"`)
   return c.body(header + body)
 })
 

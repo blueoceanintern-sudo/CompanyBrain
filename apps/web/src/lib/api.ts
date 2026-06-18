@@ -161,6 +161,10 @@ export async function updateUserRole(orgId: string, userId: string, role: string
   })
 }
 
+export async function deleteUser(orgId: string, userId: string) {
+  return apiFetch<null>(`/api/v1/orgs/${orgId}/users/${userId}`, { method: 'DELETE' })
+}
+
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
 export async function getAnalyticsOverview(orgId: string, days: number = 30) {

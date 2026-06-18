@@ -11,8 +11,7 @@ export const queries = pgTable('queries', {
     .notNull()
     .references(() => orgs.id, { onDelete: 'cascade' }),
   userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onDelete: 'set null' }),
   queryText: text('query_text').notNull(),
   answer: text('answer'),
   citations: jsonb('citations').$type<Citation[]>(),

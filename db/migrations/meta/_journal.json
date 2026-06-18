@@ -22,6 +22,13 @@
       "when": 1781598619872,
       "tag": "0002_futuristic_newton_destine",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781759643438,
+      "tag": "0003_jazzy_nightshade",
+      "breakpoints": true
     }
   ]
 }

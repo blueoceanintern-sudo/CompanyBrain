@@ -172,6 +172,7 @@ export async function getSubscriptionStatus(
     const org = await db
       .select({
         plan: orgs.plan,
+        stripeCustomerId: orgs.stripeCustomerId,
         stripeSubscriptionId: orgs.stripeSubscriptionId,
         externalPriceCents: orgs.externalPriceCents,
       })

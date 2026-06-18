@@ -8,7 +8,7 @@ export const auditLogs = pgTable('audit_logs', {
   orgId: uuid('org_id')
     .notNull()
     .references(() => orgs.id, { onDelete: 'cascade' }),
-  userId: uuid('user_id').references(() => users.id),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
   action: text('action').notNull(),
   resourceType: text('resource_type').notNull(),
   resourceId: text('resource_id'),

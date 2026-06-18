@@ -22,7 +22,6 @@ function PageHeader() {
         <span style={{ fontSize: 14, color: '#585f67' }}>Company&apos;s Brain</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <span style={{ padding: '4px 12px', background: '#e5eeff', color: '#434655', borderRadius: 9999, fontSize: 13 }}>Status: Internal</span>
         <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         </button>

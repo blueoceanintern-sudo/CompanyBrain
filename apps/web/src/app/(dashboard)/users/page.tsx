@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Users, Shield, UserCheck, MoreVertical, UserPlus, X } from 'lucide-react'
-import { useUsers, useInviteUser, useUpdateUserRole } from '@/hooks/use-users'
+import { useUsers, useInviteUser, useUpdateUserRole, useDeleteUser } from '@/hooks/use-users'
 import { getAuthUser } from '@/lib/auth'
 import { formatDate } from '@/lib/utils'
 
@@ -14,6 +14,11 @@ interface PendingRoleChange {
   email: string
   currentRole: string
   pendingRole: string
+}
+
+interface PendingDelete {
+  userId: string
+  email: string
 }
 
 const ROLE_STYLE: Record<string, { bg: string; color: string; label: string }> = {
@@ -55,6 +60,28 @@ function RoleConfirmDialog({ pending, onConfirm, onCancel }: { pending: PendingR
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
           <button type="button" onClick={onCancel} style={{ height: 40, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>Cancel</button>
           <button type="button" onClick={onConfirm} style={{ height: 40, padding: '0 20px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Confirm</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Delete confirm dialog ────────────────────────────────────────────────────
+
+function DeleteConfirmDialog({ pending, onConfirm, onCancel, isPending }: { pending: PendingDelete; onConfirm: () => void; onCancel: () => void; isPending: boolean }) {
+  return (
+    <div role="dialog" onClick={(e) => e.target === e.currentTarget && onCancel()}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }}>
+      <div style={{ background: '#ffffff', border: '1px solid #ffdad6', borderRadius: 12, padding: 32, width: 'min(400px, 90vw)', boxShadow: '0 10px 30px rgba(0,0,0,0.12)' }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, color: '#ba1a1a', margin: '0 0 12px' }}>Remove user?</h2>
+        <p style={{ fontSize: 14, color: '#585f67', margin: '0 0 24px', lineHeight: 1.6 }}>
+          <strong style={{ color: '#0b1c30' }}>{pending.email}</strong> will lose access immediately. Their documents and query history will be retained.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+          <button type="button" onClick={onCancel} disabled={isPending} style={{ height: 40, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>Cancel</button>
+          <button type="button" onClick={onConfirm} disabled={isPending} style={{ height: 40, padding: '0 20px', border: 'none', borderRadius: 8, background: '#ba1a1a', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: isPending ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: isPending ? 0.7 : 1 }}>
+            {isPending ? 'Removing…' : 'Remove'}
+          </button>
         </div>
       </div>
     </div>
@@ -128,11 +155,14 @@ export default function UsersPage() {
   const orgId = user?.orgId ?? ''
   const [showInvite, setShowInvite] = useState(false)
   const [pendingRole, setPendingRole] = useState<PendingRoleChange | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [cancelKey, setCancelKey] = useState(0)
   const [page, setPage] = useState(1)
 
   const { data: users = [], isLoading } = useUsers(orgId)
   const updateRole = useUpdateUserRole(orgId)
+  const deleteUserMut = useDeleteUser(orgId)
 
   const totalUsers = users.length
   const adminCount = users.filter((u) => u.role === 'org_admin' || u.role === 'super_admin').length
@@ -150,7 +180,6 @@ export default function UsersPage() {
           <span style={{ fontSize: 18, fontWeight: 700, color: '#004ac6' }}>Users</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontSize: 14, color: '#434655' }}>Status: Internal</span>
           <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           </button>
@@ -204,23 +233,25 @@ export default function UsersPage() {
             <table aria-label="Users" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, background: '#ffffff' }}>
               <thead style={{ background: '#eff4ff', borderBottom: '1px solid #c3c6d7' }}>
                 <tr>
-                  {['Name', 'Email', 'Role', 'Joined Date', 'Actions'].map((h, i) => (
-                    <th key={h} style={{ padding: '16px 24px', textAlign: i === 4 ? 'right' : 'left', fontSize: 11, fontWeight: 500, color: '#585f67', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                  {['Name', 'Email', 'Role', 'Joined', 'Last Updated', 'Actions'].map((h, i) => (
+                    <th key={h} style={{ padding: '16px 24px', textAlign: i === 5 ? 'right' : 'left', fontSize: 11, fontWeight: 500, color: '#585f67', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {isLoading && Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}><td colSpan={5} style={{ padding: '12px 24px' }}><Skel h={28} /></td></tr>
+                  <tr key={i}><td colSpan={6} style={{ padding: '12px 24px' }}><Skel h={28} /></td></tr>
                 ))}
                 {!isLoading && users.length === 0 && (
-                  <tr><td colSpan={5} style={{ padding: 48, textAlign: 'center' }}>
+                  <tr><td colSpan={6} style={{ padding: 48, textAlign: 'center' }}>
                     <p style={{ fontSize: 18, fontWeight: 500, color: '#0b1c30', margin: '0 0 8px' }}>No users yet</p>
                     <p style={{ fontSize: 14, color: '#585f67', margin: 0 }}>Invite team members to get started.</p>
                   </td></tr>
                 )}
                 {pageSlice.map((u) => {
                   const rs = ROLE_STYLE[u.role] ?? ROLE_STYLE['staff']!
+                  const isSelf = u.id === user?.id
+                  const isProtected = isSelf || u.role === 'super_admin'
                   return (
                     <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#fafbff' }}
@@ -241,28 +272,57 @@ export default function UsersPage() {
                         </span>
                       </td>
                       <td style={{ padding: '16px 24px', color: '#585f67' }}>{formatDate(u.createdAt)}</td>
+                      <td style={{ padding: '16px 24px', color: '#585f67' }}>{formatDate(u.updatedAt)}</td>
                       <td style={{ padding: '16px 24px', textAlign: 'right' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
-                          <select
-                            key={u.id + '-' + cancelKey}
-                            defaultValue={u.role}
-                            aria-label={`Change role for ${u.email}`}
-                            onChange={(e) => {
-                              const newRole = e.target.value
-                              if (newRole !== u.role) {
-                                setPendingRole({ userId: u.id, email: u.email, currentRole: u.role, pendingRole: newRole })
-                              }
-                            }}
-                            style={{ height: 32, padding: '0 8px', border: '1px solid #c3c6d7', borderRadius: 6, background: '#ffffff', fontSize: 12, color: '#0b1c30', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}
-                          >
-                            <option value="staff">Staff</option>
-                            <option value="dept_admin">Dept Admin</option>
-                            <option value="org_admin">Org Admin</option>
-                            <option value="external_client">External Client</option>
-                          </select>
-                          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>
-                            <MoreVertical size={16} />
-                          </button>
+                          {isProtected ? (
+                            <span style={{ display: 'inline-block', padding: '0 8px', height: 32, lineHeight: '32px', border: '1px solid #e5eeff', borderRadius: 6, background: '#f8f9ff', fontSize: 12, color: '#737686' }}>
+                              {isSelf ? 'You' : 'Protected'}
+                            </span>
+                          ) : (
+                            <select
+                              key={u.id + '-' + cancelKey}
+                              defaultValue={u.role}
+                              aria-label={`Change role for ${u.email}`}
+                              onChange={(e) => {
+                                const newRole = e.target.value
+                                if (newRole !== u.role) {
+                                  setPendingRole({ userId: u.id, email: u.email, currentRole: u.role, pendingRole: newRole })
+                                }
+                              }}
+                              style={{ height: 32, padding: '0 8px', border: '1px solid #c3c6d7', borderRadius: 6, background: '#ffffff', fontSize: 12, color: '#0b1c30', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}
+                            >
+                              <option value="staff">Staff</option>
+                              <option value="dept_admin">Dept Admin</option>
+                              <option value="org_admin">Org Admin</option>
+                              <option value="external_client">External Client</option>
+                            </select>
+                          )}
+                          {!isProtected && (
+                            <div style={{ position: 'relative' }}>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === u.id ? null : u.id) }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex', padding: 4, borderRadius: 4 }}
+                              >
+                                <MoreVertical size={16} />
+                              </button>
+                              {menuOpenId === u.id && (
+                                <>
+                                  <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setMenuOpenId(null)} />
+                                  <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', zIndex: 50, minWidth: 160, overflow: 'hidden' }}>
+                                    <button
+                                      onClick={() => { setMenuOpenId(null); setPendingDelete({ userId: u.id, email: u.email }) }}
+                                      style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 14, color: '#ba1a1a', cursor: 'pointer', fontFamily: 'inherit', display: 'block' }}
+                                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#fff1f0' }}
+                                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none' }}
+                                    >
+                                      Remove user
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -309,6 +369,16 @@ export default function UsersPage() {
             setCancelKey((k) => k + 1)
             setPendingRole(null)
           }}
+        />
+      )}
+      {pendingDelete && (
+        <DeleteConfirmDialog
+          pending={pendingDelete}
+          isPending={deleteUserMut.isPending}
+          onConfirm={() => {
+            deleteUserMut.mutate(pendingDelete.userId, { onSettled: () => setPendingDelete(null) })
+          }}
+          onCancel={() => setPendingDelete(null)}
         />
       )}
       <style>{`@keyframes cb-skel { 0%,100%{opacity:.5}50%{opacity:1} }`}</style>
