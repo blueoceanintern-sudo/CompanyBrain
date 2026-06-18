@@ -73,7 +73,6 @@ function PageHeader({ onNew }: { onNew?: () => void }) {
     <header style={{ height: 50, borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ fontSize: 20, fontWeight: 700, color: '#004ac6' }}>Chat</span>
-        <span style={{ padding: '2px 8px', background: '#dce3ec', color: '#40484f', fontSize: 10, borderRadius: 4, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Internal</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex', alignItems: 'center' }}>
