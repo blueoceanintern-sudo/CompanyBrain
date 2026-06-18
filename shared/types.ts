@@ -22,11 +22,13 @@ export type UserRole =
   | 'external_client'
 
 export type Permission =
+  | 'orgs:manage'
   | 'documents:manage'
   | 'analytics:view'
   | 'users:manage'
   | 'billing:manage'
   | 'queries:submit'
+  | 'external-access:subscribe'
 
 // ─── Visibility policy (JSONB) ────────────────────────────────────────────────
 
@@ -121,6 +123,7 @@ export interface UserSummary {
   email: string
   role: UserRole
   createdAt: string
+  updatedAt: string
 }
 
 export interface QueryHistoryItem {

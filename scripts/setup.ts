@@ -22,7 +22,7 @@ async function main() {
     orgId: org.id,
     email: adminEmail,
     passwordHash,
-    role: 'org_admin',
+    role: 'super_admin',
   })
 
   console.log(`

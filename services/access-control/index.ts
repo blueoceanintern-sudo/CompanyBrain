@@ -1,4 +1,4 @@
-import type { VisibilityPolicy, UserRole } from '@company-brain/shared'
+import type { VisibilityPolicy, UserRole, OrgPlan } from '@company-brain/shared'
 
 export { hasPermission } from '@company-brain/shared'
 
@@ -13,6 +13,10 @@ export function canAccessChunk({ visibility, userRole, userId }: CanAccessParams
   if (visibility.deniedGroups.includes(userRole)) return false
   if (visibility.allowedGroups.length === 0) return true
   return visibility.allowedGroups.includes(userRole)
+}
+
+export function canPublishExternal(orgPlan: OrgPlan): boolean {
+  return orgPlan === 'paid'
 }
 
 export function defaultVisibility(userRole: UserRole): VisibilityPolicy {

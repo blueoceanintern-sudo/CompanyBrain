@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { getUsers, inviteUser, updateUserRole } from '@/lib/api'
+import { getUsers, inviteUser, updateUserRole, deleteUser } from '@/lib/api'
 
 export function useUsers(orgId: string) {
   return useQuery({
@@ -45,5 +45,21 @@ export function useUpdateUserRole(orgId: string) {
       qc.invalidateQueries({ queryKey: ['users', orgId] })
     },
     onError: () => toast.error('Role update failed'),
+  })
+}
+
+export function useDeleteUser(orgId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const result = await deleteUser(orgId, userId)
+      if (!result.success) throw new Error(result.error.message)
+      return null
+    },
+    onSuccess: () => {
+      toast.success('User removed')
+      qc.invalidateQueries({ queryKey: ['users', orgId] })
+    },
+    onError: (err: Error) => toast.error(err.message),
   })
 }

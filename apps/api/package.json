@@ -6,17 +6,21 @@
     "start": "bun --env-file=../../.env run src/index.ts"
   },
   "dependencies": {
-    "@company-brain/db": "workspace:*",
-    "@company-brain/shared": "workspace:*",
-    "@company-brain/ingestion": "workspace:*",
-    "@company-brain/retrieval": "workspace:*",
-    "@company-brain/synthesis": "workspace:*",
     "@company-brain/access-control": "workspace:*",
+    "@company-brain/db": "workspace:*",
+    "@company-brain/ingestion": "workspace:*",
     "@company-brain/payments": "workspace:*",
-    "drizzle-orm": "^0.31.4",
+    "@company-brain/retrieval": "workspace:*",
+    "@company-brain/shared": "workspace:*",
+    "@company-brain/synthesis": "workspace:*",
     "@hono/zod-validator": "^0.2.2",
+    "drizzle-orm": "^0.31.4",
     "hono": "^4.4.6",
     "jose": "^5.4.0",
+    "nodemailer": "^9.0.1",
     "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^8.0.1"
   }
 }

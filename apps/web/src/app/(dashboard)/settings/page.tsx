@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { FolderOpen, FileText, Plus, Pencil, Trash2 } from 'lucide-react'
+import { FolderOpen, FileText, Plus, Pencil, Trash2, CreditCard } from 'lucide-react'
 import { useCompartments, useCreateCompartment } from '@/hooks/use-compartments'
+import { useConnectStatus, useStartConnectOnboarding, useExternalPricing, useSetExternalPricing, useStartOrgUpgrade, useOpenBillingPortal } from '@/hooks/use-payments'
 import { getAuthUser } from '@/lib/auth'
 import { getSubscription, cancelSubscription } from '@/lib/api'
+import { hasPermission } from '@company-brain/shared'
 
 type Tab = 'general' | 'compartments' | 'subscription' | 'danger'
 
@@ -38,6 +41,85 @@ function Skel({ h }: { h: number }) {
   return <div style={{ height: h, background: '#eff4ff', borderRadius: 8, animation: 'cb-skel 1.5s ease-in-out infinite' }} />
 }
 
+// ─── Billing (org_admin / super_admin only) ────────────────────────────────────
+
+function BillingSection({ orgId, plan, inputBase }: { orgId: string; plan: string | undefined; inputBase: React.CSSProperties }) {
+  const { data: connectStatus, isLoading: connectLoading } = useConnectStatus(orgId)
+  const startOnboarding = useStartConnectOnboarding(orgId)
+  const { data: pricing, isLoading: pricingLoading } = useExternalPricing(orgId)
+  const setPricing = useSetExternalPricing(orgId)
+  const [priceInput, setPriceInput] = useState('')
+
+  useEffect(() => {
+    if (pricing?.priceCents != null) setPriceInput((pricing.priceCents / 100).toFixed(2))
+  }, [pricing?.priceCents])
+
+  const isPaid = plan === 'paid'
+
+  return (
+    <div style={{ border: '1px solid #c3c6d7', borderRadius: 12, padding: 32, background: '#ffffff', display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <div>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: '#0b1c30', margin: '0 0 4px' }}>External Knowledge Access</h3>
+        <p style={{ fontSize: 13, color: '#585f67', margin: 0 }}>Connect a payout account and set a price so external clients can subscribe to your published knowledge base. BlueOcean takes a 15% platform fee automatically.</p>
+      </div>
+
+      {!isPaid && (
+        <div style={{ padding: '12px 16px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, fontSize: 13, color: '#9a3412' }}>
+          External access requires the paid plan. Upgrade above before connecting payouts or setting a price.
+        </div>
+      )}
+
+      {/* Connect status */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <CreditCard size={20} color={connectStatus?.chargesEnabled ? '#16a34a' : '#585f67'} />
+          <div>
+            <p style={{ fontSize: 14, fontWeight: 500, color: '#0b1c30', margin: 0 }}>Payout account</p>
+            <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>
+              {connectLoading ? 'Checking…' : connectStatus?.chargesEnabled ? 'Connected and ready to receive payouts' : connectStatus?.connected ? 'Onboarding started but not yet complete' : 'Not connected'}
+            </p>
+          </div>
+        </div>
+        <button
+          disabled={!isPaid || startOnboarding.isPending}
+          onClick={() => startOnboarding.mutate()}
+          style={{ height: 40, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: '#ffffff', fontSize: 13, fontWeight: 500, cursor: (!isPaid || startOnboarding.isPending) ? 'not-allowed' : 'pointer', opacity: !isPaid ? 0.5 : 1, color: '#0b1c30', fontFamily: 'inherit', flexShrink: 0 }}
+        >
+          {startOnboarding.isPending ? 'Redirecting…' : connectStatus?.connected ? 'Manage payout account' : 'Connect with Stripe'}
+        </button>
+      </div>
+
+      {/* External pricing */}
+      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 24, display: 'flex', alignItems: 'flex-end', gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Monthly price for external clients (USD)</label>
+          {pricingLoading ? <Skel h={48} /> : (
+            <input
+              type="number" min="0" step="0.01"
+              value={priceInput}
+              onChange={(e) => setPriceInput(e.target.value)}
+              disabled={!isPaid}
+              placeholder="e.g. 50.00"
+              style={{ ...inputBase, opacity: !isPaid ? 0.6 : 1 }}
+            />
+          )}
+        </div>
+        <button
+          disabled={!isPaid || setPricing.isPending || !priceInput.trim()}
+          onClick={() => {
+            const cents = Math.round(parseFloat(priceInput) * 100)
+            if (Number.isNaN(cents) || cents <= 0) { toast.error('Enter a valid price'); return }
+            setPricing.mutate(cents)
+          }}
+          style={{ height: 48, padding: '0 20px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: (!isPaid || setPricing.isPending) ? 'not-allowed' : 'pointer', opacity: !isPaid ? 0.5 : 1, fontFamily: 'inherit' }}
+        >
+          {setPricing.isPending ? 'Saving…' : 'Save Price'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -47,10 +129,37 @@ export default function SettingsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
 
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const qc = useQueryClient()
+
+  useEffect(() => {
+    const connect = searchParams.get('connect')
+    const upgrade = searchParams.get('upgrade')
+    if (connect === 'success') {
+      toast.success('Stripe onboarding completed')
+      router.replace('/settings')
+    } else if (connect === 'refresh') {
+      toast.info('Onboarding link expired — click "Connect with Stripe" to try again')
+      router.replace('/settings')
+    } else if (upgrade === 'success') {
+      toast.success('Plan upgraded — you\'re now on the paid plan')
+      qc.invalidateQueries({ queryKey: ['subscription', orgId] })
+      setTab('subscription')
+      router.replace('/settings')
+    } else if (upgrade === 'cancel') {
+      toast.info('Upgrade cancelled')
+      router.replace('/settings')
+    }
+  }, [searchParams, router, qc, orgId])
+
   const { data: compartments = [], isLoading: compartmentsLoading } = useCompartments(orgId)
   const { data: sub, isLoading: subLoading } = useSubscription(orgId)
   const createComp = useCreateCompartment(orgId)
   const cancelSub = useCancelSubscription(orgId)
+  const orgUpgrade = useStartOrgUpgrade(orgId)
+  const billingPortal = useOpenBillingPortal(orgId)
+  const canManageBilling = !!user?.role && hasPermission(user.role, 'billing:manage')
 
   const inputBase: React.CSSProperties = {
     width: '100%', height: 48, padding: '0 16px', border: '1px solid #c3c6d7', borderRadius: 8,
@@ -73,7 +182,6 @@ export default function SettingsPage() {
           <span style={{ fontSize: 18, fontWeight: 700, color: '#004ac6' }}>Settings</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ padding: '4px 12px', background: '#e5eeff', color: '#434655', borderRadius: 9999, fontSize: 13 }}>Status: Internal</span>
           <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           </button>
@@ -242,9 +350,6 @@ export default function SettingsPage() {
                       <p style={{ fontSize: 14, color: '#434655', margin: 0 }}>Professional grade intelligence for large scale educational institutions.</p>
                       {sub?.subscriptionId && <p style={{ fontSize: 12, color: '#585f67', fontFamily: 'JetBrains Mono, monospace', margin: '8px 0 0' }}>{sub.subscriptionId}</p>}
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: 14, color: '#585f67', margin: 0 }}>Contact us for pricing</p>
-                    </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
@@ -262,14 +367,30 @@ export default function SettingsPage() {
                     ))}
                   </div>
 
-                  <button
-                    style={{ width: '100%', padding: '12px 0', border: '1px solid #c3c6d7', borderRadius: 8, background: '#ffffff', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#eff4ff' }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#ffffff' }}
-                  >
-                    Manage Billing &amp; Payment Methods
-                  </button>
+                  {sub?.plan === 'paid' ? (
+                    <button
+                      disabled={billingPortal.isPending}
+                      onClick={() => billingPortal.mutate()}
+                      style={{ width: '100%', padding: '12px 0', border: '1px solid #c3c6d7', borderRadius: 8, background: '#ffffff', fontSize: 14, cursor: billingPortal.isPending ? 'not-allowed' : 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}
+                      onMouseEnter={(e) => { if (!billingPortal.isPending) (e.currentTarget as HTMLElement).style.background = '#eff4ff' }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#ffffff' }}
+                    >
+                      {billingPortal.isPending ? 'Opening…' : 'Manage Billing & Payment Methods'}
+                    </button>
+                  ) : canManageBilling && (
+                    <button
+                      disabled={orgUpgrade.isPending}
+                      onClick={() => orgUpgrade.mutate()}
+                      style={{ width: '100%', padding: '14px 0', border: 'none', borderRadius: 8, background: '#2563eb', color: '#ffffff', fontSize: 15, fontWeight: 600, cursor: orgUpgrade.isPending ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: orgUpgrade.isPending ? 0.7 : 1 }}
+                    >
+                      {orgUpgrade.isPending ? 'Redirecting to payment…' : 'Upgrade to Paid Plan'}
+                    </button>
+                  )}
                 </div>
+              )}
+
+              {canManageBilling && (
+                <BillingSection orgId={orgId} plan={sub?.plan} inputBase={inputBase} />
               )}
             </div>
           )}

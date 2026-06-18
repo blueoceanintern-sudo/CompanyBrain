@@ -1,6 +1,6 @@
 import Stripe from 'stripe'
 import { db } from '@company-brain/db'
-import { orgs, stripeEvents } from '@company-brain/db'
+import { orgs, stripeEvents, users } from '@company-brain/db'
 import { eq } from 'drizzle-orm'
 import type { ServiceResult } from '@company-brain/shared'
 import { STRIPE_PLATFORM_FEE_PERCENT } from '@company-brain/shared'
@@ -82,16 +82,99 @@ export async function createSubscription(params: {
   }
 }
 
+// ─── Stripe Connect onboarding (org's own connected account) ────────────────
+
+export async function ensureConnectOnboardingLink(
+  orgId: string
+): Promise<ServiceResult<{ url: string }>> {
+  try {
+    const org = await db
+      .select({ stripeConnectAccountId: orgs.stripeConnectAccountId })
+      .from(orgs)
+      .where(eq(orgs.id, orgId))
+      .limit(1)
+
+    if (!org[0]) {
+      return { success: false, error: { code: 'ORG_NOT_FOUND', message: 'Organisation not found' } }
+    }
+
+    let accountId = org[0].stripeConnectAccountId
+
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        metadata: { orgId },
+      })
+      accountId = account.id
+
+      await db
+        .update(orgs)
+        .set({ stripeConnectAccountId: accountId, updatedAt: new Date() })
+        .where(eq(orgs.id, orgId))
+    }
+
+    const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000'
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${webUrl}/settings?connect=refresh`,
+      return_url: `${webUrl}/settings?connect=success`,
+      type: 'account_onboarding',
+    })
+
+    return { success: true, data: { url: accountLink.url } }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to create Stripe Connect onboarding link'
+    return { success: false, error: { code: 'STRIPE_CONNECT_ERROR', message } }
+  }
+}
+
+export async function getConnectStatus(
+  orgId: string
+): Promise<ServiceResult<{ connected: boolean; chargesEnabled: boolean }>> {
+  try {
+    const org = await db
+      .select({
+        stripeConnectAccountId: orgs.stripeConnectAccountId,
+        stripeConnectChargesEnabled: orgs.stripeConnectChargesEnabled,
+      })
+      .from(orgs)
+      .where(eq(orgs.id, orgId))
+      .limit(1)
+
+    if (!org[0]) {
+      return { success: false, error: { code: 'ORG_NOT_FOUND', message: 'Organisation not found' } }
+    }
+
+    return {
+      success: true,
+      data: {
+        connected: org[0].stripeConnectAccountId !== null,
+        chargesEnabled: org[0].stripeConnectChargesEnabled,
+      },
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to fetch Stripe Connect status'
+    return { success: false, error: { code: 'STRIPE_CONNECT_STATUS_ERROR', message } }
+  }
+}
+
 // ─── Get subscription status ──────────────────────────────────────────────────
 
 export async function getSubscriptionStatus(
   orgId: string
-): Promise<ServiceResult<{ plan: string; subscriptionId: string | null; status: string | null }>> {
+): Promise<ServiceResult<{
+  plan: string
+  subscriptionId: string | null
+  status: string | null
+  externalPriceCents: number | null
+}>> {
   try {
     const org = await db
       .select({
         plan: orgs.plan,
+        stripeCustomerId: orgs.stripeCustomerId,
         stripeSubscriptionId: orgs.stripeSubscriptionId,
+        externalPriceCents: orgs.externalPriceCents,
       })
       .from(orgs)
       .where(eq(orgs.id, orgId))
@@ -102,19 +185,40 @@ export async function getSubscriptionStatus(
     }
 
     const o = org[0]
+    let plan = o.plan
+    let subscriptionId = o.stripeSubscriptionId
     let status: string | null = null
 
-    if (o.stripeSubscriptionId) {
-      const sub = await stripe.subscriptions.retrieve(o.stripeSubscriptionId)
+    if (subscriptionId) {
+      const sub = await stripe.subscriptions.retrieve(subscriptionId)
       status = sub.status
+    } else if (o.stripeCustomerId && plan === 'free') {
+      // Read-through: webhook may not have landed yet. Check Stripe directly and
+      // sync the DB if Stripe is ahead — webhooks remain the primary update path.
+      const activeSubs = await stripe.subscriptions.list({
+        customer: o.stripeCustomerId,
+        status: 'active',
+        limit: 1,
+      })
+      if (activeSubs.data.length > 0) {
+        const active = activeSubs.data[0]
+        await db
+          .update(orgs)
+          .set({ plan: 'paid', stripeSubscriptionId: active.id, updatedAt: new Date() })
+          .where(eq(orgs.id, orgId))
+        plan = 'paid'
+        subscriptionId = active.id
+        status = active.status
+      }
     }
 
     return {
       success: true,
       data: {
-        plan: o.plan,
-        subscriptionId: o.stripeSubscriptionId,
+        plan,
+        subscriptionId,
         status,
+        externalPriceCents: o.externalPriceCents,
       },
     }
   } catch (err) {
@@ -152,6 +256,192 @@ export async function cancelOrgSubscription(
   }
 }
 
+// ─── External client checkout (subscribe to an org's external knowledge plane) ──
+
+export async function ensureClientStripeCustomer(
+  userId: string,
+  email: string
+): Promise<ServiceResult<{ customerId: string }>> {
+  try {
+    const userRow = await db
+      .select({ stripeCustomerId: users.stripeCustomerId })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
+
+    if (userRow[0]?.stripeCustomerId) {
+      return { success: true, data: { customerId: userRow[0].stripeCustomerId } }
+    }
+
+    const customer = await stripe.customers.create({ email })
+
+    await db
+      .update(users)
+      .set({ stripeCustomerId: customer.id, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+
+    return { success: true, data: { customerId: customer.id } }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Stripe customer creation failed'
+    return { success: false, error: { code: 'STRIPE_CUSTOMER_ERROR', message } }
+  }
+}
+
+export async function createClientCheckoutSession(params: {
+  orgId: string
+  userId: string
+  userEmail: string
+}): Promise<ServiceResult<{ url: string }>> {
+  const { orgId, userId, userEmail } = params
+
+  try {
+    const orgRow = await db
+      .select({
+        name: orgs.name,
+        externalPriceCents: orgs.externalPriceCents,
+        stripeConnectAccountId: orgs.stripeConnectAccountId,
+        stripeConnectChargesEnabled: orgs.stripeConnectChargesEnabled,
+      })
+      .from(orgs)
+      .where(eq(orgs.id, orgId))
+      .limit(1)
+
+    const org = orgRow[0]
+    if (!org) {
+      return { success: false, error: { code: 'ORG_NOT_FOUND', message: 'Organisation not found' } }
+    }
+    if (!org.externalPriceCents) {
+      return {
+        success: false,
+        error: { code: 'PRICING_NOT_SET', message: 'This organisation has not set a price for external access' },
+      }
+    }
+    if (!org.stripeConnectAccountId || !org.stripeConnectChargesEnabled) {
+      return {
+        success: false,
+        error: { code: 'CONNECT_NOT_READY', message: 'This organisation has not completed payment setup' },
+      }
+    }
+
+    const customerResult = await ensureClientStripeCustomer(userId, userEmail)
+    if (!customerResult.success) return customerResult
+
+    const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000'
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer: customerResult.data.customerId,
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: { name: `${org.name} — External Knowledge Access` },
+            unit_amount: org.externalPriceCents,
+            recurring: { interval: 'month' },
+          },
+          quantity: 1,
+        },
+      ],
+      subscription_data: {
+        application_fee_percent: platformFeePercent * 100,
+        transfer_data: { destination: org.stripeConnectAccountId },
+        metadata: { orgId, userId },
+      },
+      metadata: { orgId, userId },
+      success_url: `${webUrl}/chat?checkout=success`,
+      cancel_url: `${webUrl}/chat?checkout=cancel`,
+    })
+
+    if (!session.url) {
+      return { success: false, error: { code: 'STRIPE_CHECKOUT_ERROR', message: 'Failed to create checkout session URL' } }
+    }
+
+    return { success: true, data: { url: session.url } }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to create checkout session'
+    return { success: false, error: { code: 'STRIPE_CHECKOUT_ERROR', message } }
+  }
+}
+
+// ─── Self-service org upgrade (free → paid) ───────────────────────────────────
+
+export async function createOrgUpgradeSession(
+  orgId: string,
+  orgName: string,
+  email: string
+): Promise<ServiceResult<{ url: string }>> {
+  const priceId = process.env.STRIPE_ORG_PRICE_ID
+  if (!priceId) {
+    return { success: false, error: { code: 'CONFIG_ERROR', message: 'Org subscription price not configured — set STRIPE_ORG_PRICE_ID' } }
+  }
+
+  try {
+    const customerResult = await ensureStripeCustomer(orgId, orgName, email)
+    if (!customerResult.success) return customerResult
+
+    // Ask Stripe directly — the DB may lag behind the webhook by several seconds,
+    // so we cannot rely on plan === 'paid' alone to block a second checkout.
+    const activeSubs = await stripe.subscriptions.list({
+      customer: customerResult.data.customerId,
+      status: 'active',
+      limit: 1,
+    })
+    if (activeSubs.data.length > 0) {
+      return { success: false, error: { code: 'ALREADY_SUBSCRIBED', message: 'This organisation already has an active subscription' } }
+    }
+
+    const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000'
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer: customerResult.data.customerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      subscription_data: { metadata: { orgId } },
+      metadata: { orgId },
+      success_url: `${webUrl}/settings?upgrade=success`,
+      cancel_url: `${webUrl}/settings?upgrade=cancel`,
+    })
+
+    if (!session.url) {
+      return { success: false, error: { code: 'STRIPE_CHECKOUT_ERROR', message: 'No checkout URL returned' } }
+    }
+
+    return { success: true, data: { url: session.url } }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to create upgrade session'
+    return { success: false, error: { code: 'STRIPE_CHECKOUT_ERROR', message } }
+  }
+}
+
+// ─── Stripe Customer Portal (manage billing, payment methods, invoices) ───────
+
+export async function createBillingPortalSession(
+  orgId: string
+): Promise<ServiceResult<{ url: string }>> {
+  try {
+    const org = await db
+      .select({ stripeCustomerId: orgs.stripeCustomerId })
+      .from(orgs)
+      .where(eq(orgs.id, orgId))
+      .limit(1)
+
+    const customerId = org[0]?.stripeCustomerId
+    if (!customerId) {
+      return { success: false, error: { code: 'NO_CUSTOMER', message: 'No billing account found for this organisation' } }
+    }
+
+    const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000'
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${webUrl}/settings`,
+    })
+
+    return { success: true, data: { url: session.url } }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to create billing portal session'
+    return { success: false, error: { code: 'STRIPE_PORTAL_ERROR', message } }
+  }
+}
+
 // ─── Handle Stripe webhook ────────────────────────────────────────────────────
 
 export async function handleStripeWebhook(params: {
@@ -161,7 +451,7 @@ export async function handleStripeWebhook(params: {
   const { payload, signature } = params
 
   try {
-    const event = stripe.webhooks.constructEvent(
+    const event = await stripe.webhooks.constructEventAsync(
       payload,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
@@ -210,6 +500,30 @@ export async function handleStripeWebhook(params: {
         .update(orgs)
         .set({ plan: 'free', stripeSubscriptionId: null, cancelledAt: new Date(), updatedAt: new Date() })
         .where(eq(orgs.stripeSubscriptionId, sub.id))
+    }
+
+    // Client subscription lifecycle (external_client subscribing to an org's external knowledge plane).
+    // Matches on stripeCustomerId, which only exists on a user row for client-side subscriptions —
+    // so this is a no-op for the org-level subscription events handled above.
+    if (
+      event.type === 'customer.subscription.created' ||
+      event.type === 'customer.subscription.updated' ||
+      event.type === 'customer.subscription.deleted'
+    ) {
+      const sub = event.data.object as Stripe.Subscription
+      await db
+        .update(users)
+        .set({ stripeSubscriptionId: sub.id, subscriptionStatus: sub.status, updatedAt: new Date() })
+        .where(eq(users.stripeCustomerId, sub.customer as string))
+    }
+
+    // Connect account onboarding status (org's own connected account)
+    if (event.type === 'account.updated') {
+      const account = event.data.object as Stripe.Account
+      await db
+        .update(orgs)
+        .set({ stripeConnectChargesEnabled: account.charges_enabled ?? false, updatedAt: new Date() })
+        .where(eq(orgs.stripeConnectAccountId, account.id))
     }
 
     return { success: true, data: { eventType: event.type } }

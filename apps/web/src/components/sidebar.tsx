@@ -6,9 +6,10 @@ import type { Route } from 'next'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   MessageSquare, FileText, BarChart2, ClipboardCheck,
-  Users, Settings, Brain, User, LogOut, Menu, X,
+  Users, Settings, Brain, LogOut, Menu, X, Building2,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
-import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getAuthUser, clearAuth } from '@/lib/auth'
 import { NAV } from '@/lib/nav'
@@ -20,21 +21,27 @@ const NAV_ICONS: Record<string, React.ElementType> = {
   '/analytics': BarChart2,
   '/audit':     ClipboardCheck,
   '/users':     Users,
+  '/orgs':      Building2,
   '/settings':  Settings,
 }
 
 // ─── Sidebar content ──────────────────────────────────────────────────────────
 
 function SidebarContent({
+  collapsed = false,
+  onToggle,
   isSheet = false,
   onClose,
 }: {
+  collapsed?: boolean
+  onToggle?: () => void
   isSheet?: boolean
   onClose?: () => void
 }) {
   const pathname = usePathname()
   const router = useRouter()
   const [user, setUser] = useState<ReturnType<typeof getAuthUser>>(null)
+  const [logoHovered, setLogoHovered] = useState(false)
 
   useEffect(() => { setUser(getAuthUser()) }, [])
 
@@ -42,39 +49,97 @@ function SidebarContent({
   const initial = (user?.email?.[0] ?? '?').toUpperCase()
   const handleLogout = () => { clearAuth(); router.replace('/login') }
 
-  const bgActive   = '#2563eb'
-  const bgHover    = '#dce9ff'
-  const textActive = '#ffffff'
+  const bgActive     = '#2563eb'
+  const bgHover      = '#dce9ff'
+  const textActive   = '#ffffff'
   const textInactive = '#585f67'
-  const borderLeft = '2px solid #004ac6'
+
+  // Fixed-width icon zone — always flex-centered, no conditional padding.
+  // At 64px collapsed width, nav/footer px-2 (8px each side) leaves 48px content = iconZone width,
+  // so every icon lands exactly at the sidebar's geometric centre.
+  const iconZone: React.CSSProperties = {
+    width: 48,
+    flexShrink: 0,
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+  }
+
+  // Labels collapse their max-width in sync with the sidebar, then fade out.
+  // No layout space is held while hidden, so icons stay perfectly centred.
+  const labelStyle: React.CSSProperties = {
+    opacity: collapsed ? 0 : 1,
+    maxWidth: collapsed ? '0px' : '200px',
+    overflow: 'hidden',
+    whiteSpace: 'nowrap',
+    pointerEvents: collapsed ? 'none' : 'auto',
+    transition: collapsed
+      ? 'max-width 200ms ease, opacity 150ms ease'
+      : 'max-width 200ms ease, opacity 150ms ease 60ms',
+  }
 
   return (
-    <div
-      className="flex flex-col h-full"
-      style={{ background: '#eff4ff', borderRight: '1px solid #c3c6d7', width: isSheet ? 240 : 80 }}
-    >
-      {/* Logo */}
-      <div className="flex items-center justify-center py-6 mb-2">
+    <div className="flex flex-col h-full" style={{ background: '#eff4ff', borderRight: '1px solid #c3c6d7' }}>
+
+      {/* Logo — padding-left 16px keeps Brain icon (32px wide) centred: 16 + 16 = 32px = 64px / 2 */}
+      <div
+        className="flex items-center shrink-0"
+        style={{ height: 64, padding: '0 16px', borderBottom: '1px solid #c3c6d7', overflow: 'hidden', gap: 12 }}
+      >
+        {collapsed && !isSheet ? (
+          <button
+            onClick={onToggle}
+            aria-label="Expand sidebar"
+            onMouseEnter={() => setLogoHovered(true)}
+            onMouseLeave={() => setLogoHovered(false)}
+            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors"
+            style={{ background: logoHovered ? '#1d4ed8' : '#2563eb', border: 'none', cursor: 'pointer', color: '#ffffff' }}
+          >
+            {logoHovered ? <ChevronRight size={18} /> : <Brain size={18} />}
+          </button>
+        ) : (
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#2563eb' }}>
+            <Brain size={18} color="#ffffff" />
+          </div>
+        )}
+
         {isSheet ? (
-          <div className="flex items-center gap-3 px-4 w-full">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#2563eb' }}>
-              <Brain size={18} color="#ffffff" />
-            </div>
-            <div>
+          <>
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-bold" style={{ color: '#004ac6', lineHeight: 1.2 }}>Brain</p>
               <p className="text-xs" style={{ color: '#585f67', opacity: 0.7 }}>AI Agent</p>
             </div>
-            <button onClick={onClose} className="ml-auto p-1 rounded" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67' }}>
+            <button onClick={onClose} className="p-1 rounded shrink-0" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67' }}>
               <X size={18} />
             </button>
-          </div>
+          </>
         ) : (
-          <Brain size={28} style={{ color: '#004ac6' }} />
+          <>
+            {/* Text stays in DOM and collapses via labelStyle — no reflow jump */}
+            <div className="flex-1 min-w-0" style={labelStyle}>
+              <p className="text-sm font-bold" style={{ color: '#004ac6', lineHeight: 1.2 }}>Brain</p>
+              <p className="text-xs" style={{ color: '#585f67', opacity: 0.7 }}>AI Agent</p>
+            </div>
+            {onToggle && (
+              <span style={{ ...labelStyle, display: 'flex', alignItems: 'center' }}>
+                <button
+                  onClick={onToggle}
+                  aria-label="Collapse sidebar"
+                  className="p-1 rounded transition-colors"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#737686', display: 'flex' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#004ac6' }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#737686' }}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+              </span>
+            )}
+          </>
         )}
       </div>
 
-      {/* Nav */}
-      <nav className="flex flex-col items-center gap-1 flex-1 px-2">
+      {/* Nav — px-2 (8px each side) + 64px sidebar = 48px content = iconZone width */}
+      <nav className="flex flex-col gap-1 flex-1 px-2 pt-3">
         {visible.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + '/')
           const Icon = NAV_ICONS[item.href]
@@ -82,27 +147,30 @@ function SidebarContent({
             <Link
               href={item.href as Route}
               {...(isSheet && onClose ? { onClick: onClose } : {})}
-              className="flex items-center justify-center rounded-xl transition-colors"
+              className="flex items-center rounded-xl"
               style={{
-                width: isSheet ? '100%' : 48,
                 height: 48,
                 background: active ? bgActive : 'transparent',
                 color: active ? textActive : textInactive,
-                borderLeft: active ? borderLeft : '2px solid transparent',
+                // inset shadow replaces borderLeft — zero layout impact, icon never shifts
+                boxShadow: active ? 'inset 2px 0 0 #004ac6' : 'none',
                 textDecoration: 'none',
-                gap: isSheet ? 12 : 0,
-                padding: isSheet ? '0 16px' : 0,
-                justifyContent: isSheet ? 'flex-start' : 'center',
+                overflow: 'hidden',
+                transition: 'background 0.15s',
               }}
               onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = bgHover }}
               onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
             >
-              {Icon && <Icon size={20} aria-hidden className="shrink-0" />}
-              {isSheet && <span className="text-sm font-medium">{item.label}</span>}
+              <span style={iconZone}>
+                {Icon && <Icon size={20} aria-hidden />}
+              </span>
+              <span className="text-sm font-medium" style={isSheet ? { whiteSpace: 'nowrap' } : labelStyle}>
+                {item.label}
+              </span>
             </Link>
           )
 
-          if (!isSheet) {
+          if (collapsed && !isSheet) {
             return (
               <Tooltip key={item.href}>
                 <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
@@ -114,23 +182,23 @@ function SidebarContent({
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="flex flex-col items-center gap-2 px-2 pb-6 mt-auto" style={{ borderTop: '1px solid #c3c6d7', paddingTop: 16 }}>
+      {/* Footer — same px-2 centering as nav */}
+      <div className="flex flex-col gap-2 px-2 pb-6 mt-auto" style={{ borderTop: '1px solid #c3c6d7', paddingTop: 16 }}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div
-              className="flex items-center justify-center rounded-xl cursor-default"
-              style={{ width: isSheet ? '100%' : 48, height: 48, gap: isSheet ? 12 : 0, padding: isSheet ? '0 16px' : 0, justifyContent: isSheet ? 'flex-start' : 'center' }}
-            >
-              <div className="flex items-center justify-center rounded-full text-xs font-bold shrink-0" style={{ width: 32, height: 32, background: '#e5eeff', color: '#004ac6' }}>
-                {initial}
+            <div className="flex items-center rounded-xl cursor-default" style={{ height: 48, overflow: 'hidden' }}>
+              <span style={iconZone}>
+                <span
+                  className="flex items-center justify-center rounded-full text-xs font-bold"
+                  style={{ width: 32, height: 32, background: '#e5eeff', color: '#004ac6', flexShrink: 0 }}
+                >
+                  {initial}
+                </span>
+              </span>
+              <div className="min-w-0" style={isSheet ? undefined : labelStyle}>
+                <p className="text-xs font-semibold truncate" style={{ color: '#0b1c30' }}>{user?.email}</p>
+                <p className="text-xs capitalize" style={{ color: '#585f67' }}>{user?.role?.replace(/_/g, ' ')}</p>
               </div>
-              {isSheet && (
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold truncate" style={{ color: '#0b1c30' }}>{user?.email}</p>
-                  <p className="text-xs capitalize" style={{ color: '#585f67' }}>{user?.role?.replace(/_/g, ' ')}</p>
-                </div>
-              )}
             </div>
           </TooltipTrigger>
           <TooltipContent side="right">
@@ -144,13 +212,15 @@ function SidebarContent({
             <button
               onClick={handleLogout}
               aria-label="Log out"
-              className="flex items-center justify-center rounded-xl transition-colors"
-              style={{ width: isSheet ? '100%' : 48, height: 36, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', gap: isSheet ? 12 : 0, padding: isSheet ? '0 16px' : 0, justifyContent: isSheet ? 'flex-start' : 'center' }}
+              className="flex items-center rounded-xl w-full"
+              style={{ height: 36, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', overflow: 'hidden', transition: 'color 0.15s' }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#0b1c30' }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#585f67' }}
             >
-              <LogOut size={18} aria-hidden />
-              {isSheet && <span className="text-sm">Log out</span>}
+              <span style={iconZone}>
+                <LogOut size={18} aria-hidden />
+              </span>
+              <span className="text-sm" style={isSheet ? undefined : labelStyle}>Log out</span>
             </button>
           </TooltipTrigger>
           <TooltipContent side="right">Log out</TooltipContent>
@@ -163,10 +233,16 @@ function SidebarContent({
 // ─── Public exports ───────────────────────────────────────────────────────────
 
 export function Sidebar() {
+  const [collapsed, setCollapsed] = useState(false)
+  const width = collapsed ? 64 : 240
+
   return (
     <TooltipProvider delayDuration={200}>
-      <aside className="h-screen shrink-0 hidden md:block" style={{ width: 80 }}>
-        <SidebarContent />
+      <aside
+        className="h-screen shrink-0 hidden md:block overflow-hidden"
+        style={{ width, transition: 'width 200ms ease' }}
+      >
+        <SidebarContent collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
       </aside>
     </TooltipProvider>
   )
@@ -187,6 +263,7 @@ export function MobileMenuButton() {
         </button>
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetContent side="left" className="p-0 w-[240px]" style={{ background: '#eff4ff' }}>
+            <SheetTitle className="sr-only">Navigation</SheetTitle>
             <SidebarContent isSheet onClose={() => setOpen(false)} />
           </SheetContent>
         </Sheet>

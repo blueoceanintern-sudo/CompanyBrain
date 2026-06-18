@@ -11,6 +11,19 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002'
 
 type ApiResult<T> = { success: true; data: T } | { success: false; error: { code: string; message: string } }
 
+export class ApiError extends Error {
+  code: string
+  constructor(code: string, message: string) {
+    super(message)
+    this.code = code
+  }
+}
+
+export function unwrap<T>(result: ApiResult<T>): T {
+  if (!result.success) throw new ApiError(result.error.code, result.error.message)
+  return result.data
+}
+
 function networkError(message: string): { success: false; error: { code: string; message: string } } {
   return { success: false, error: { code: 'NETWORK_ERROR', message } }
 }
@@ -148,6 +161,10 @@ export async function updateUserRole(orgId: string, userId: string, role: string
   })
 }
 
+export async function deleteUser(orgId: string, userId: string) {
+  return apiFetch<null>(`/api/v1/orgs/${orgId}/users/${userId}`, { method: 'DELETE' })
+}
+
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
 export async function getAnalyticsOverview(orgId: string, days: number = 30) {
@@ -168,13 +185,75 @@ export async function getTopUnanswered(orgId: string, days: number = 30) {
 // ─── Subscriptions ────────────────────────────────────────────────────────────
 
 export async function getSubscription(orgId: string) {
-  return apiFetch<{ plan: string; subscriptionId: string | null; status: string | null }>(
-    `/api/v1/orgs/${orgId}/subscriptions`
-  )
+  return apiFetch<{
+    plan: string
+    subscriptionId: string | null
+    status: string | null
+    externalPriceCents: number | null
+  }>(`/api/v1/orgs/${orgId}/subscriptions`)
 }
 
 export async function cancelSubscription(orgId: string) {
   return apiFetch<null>(`/api/v1/orgs/${orgId}/subscriptions`, { method: 'DELETE' })
+}
+
+// ─── Orgs (platform-level) ─────────────────────────────────────────────────────
+
+export interface OrgSummary {
+  id: string
+  name: string
+  plan: string
+  createdAt: string
+}
+
+export async function listOrgs() {
+  return apiFetch<OrgSummary[]>('/api/v1/orgs')
+}
+
+export async function createOrg(data: { orgName: string; adminEmail: string; adminTemporaryPassword: string }) {
+  return apiFetch<{ orgId: string; orgName: string; admin: { id: string; email: string; role: UserRole } }>(
+    '/api/v1/orgs',
+    { method: 'POST', body: JSON.stringify(data) }
+  )
+}
+
+// ─── Stripe Connect (org's own connected account) ──────────────────────────────
+
+export async function getConnectStatus(orgId: string) {
+  return apiFetch<{ connected: boolean; chargesEnabled: boolean }>(`/api/v1/orgs/${orgId}/connect-account`)
+}
+
+export async function startConnectOnboarding(orgId: string) {
+  return apiFetch<{ url: string }>(`/api/v1/orgs/${orgId}/connect-account`, { method: 'POST' })
+}
+
+// ─── External pricing (org admin sets; any org member can read) ───────────────
+
+export async function getExternalPricing(orgId: string) {
+  return apiFetch<{ priceCents: number | null }>(`/api/v1/orgs/${orgId}/external-pricing`)
+}
+
+export async function setExternalPricing(orgId: string, priceCents: number) {
+  return apiFetch<null>(`/api/v1/orgs/${orgId}/external-pricing`, {
+    method: 'PATCH',
+    body: JSON.stringify({ priceCents }),
+  })
+}
+
+// ─── Org self-service upgrade + billing portal ────────────────────────────────
+
+export async function startOrgUpgrade(orgId: string) {
+  return apiFetch<{ url: string }>(`/api/v1/orgs/${orgId}/upgrade`, { method: 'POST' })
+}
+
+export async function openBillingPortal(orgId: string) {
+  return apiFetch<{ url: string }>(`/api/v1/orgs/${orgId}/billing-portal`, { method: 'POST' })
+}
+
+// ─── External client checkout ──────────────────────────────────────────────────
+
+export async function startCheckout(orgId: string) {
+  return apiFetch<{ url: string }>(`/api/v1/orgs/${orgId}/checkout`, { method: 'POST' })
 }
 
 export async function exportAuditLog(orgId: string): Promise<Blob> {

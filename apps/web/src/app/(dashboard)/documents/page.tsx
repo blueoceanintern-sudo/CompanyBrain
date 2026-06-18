@@ -322,7 +322,7 @@ export default function DocumentsPage() {
         </div>
 
         {/* Filters */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#ffffff', padding: 16, borderRadius: 12, border: '1px solid #c3c6d7' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#ffffff' }}>
           <div style={{ position: 'relative', flex: 1, minWidth: 240 }}>
             <Search size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#737686' }} />
             <input

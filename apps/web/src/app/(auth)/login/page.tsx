@@ -75,6 +75,7 @@ function LoginForm() {
               <input
                 id="email"
                 type="email"
+                autoComplete="username"
                 {...register('email')}
                 placeholder="name@blueocean.edu"
                 style={{ ...inputBase, borderColor: errors.email ? '#ba1a1a' : '#c3c6d7' }}
@@ -94,6 +95,7 @@ function LoginForm() {
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
                   {...register('password')}
                   placeholder="••••••••"
                   style={{ ...inputBase, paddingRight: 44, borderColor: errors.password ? '#ba1a1a' : '#c3c6d7' }}

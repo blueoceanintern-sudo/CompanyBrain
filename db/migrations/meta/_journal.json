@@ -8,6 +8,27 @@
       "when": 1781491505650,
       "tag": "0000_safe_khan",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781597922653,
+      "tag": "0001_nappy_madame_masque",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781598619872,
+      "tag": "0002_futuristic_newton_destine",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781759643438,
+      "tag": "0003_jazzy_nightshade",
+      "breakpoints": true
     }
   ]
 }

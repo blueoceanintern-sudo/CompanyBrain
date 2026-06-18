@@ -13,10 +13,32 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002'
 interface AuditEntry {
   id: string
   userId: string | null
+  actorEmail: string | null
   action: string
   resourceType: string
   resourceId: string | null
+  orgId: string | null
+  orgName: string | null
   createdAt: string
+}
+
+function parseCSVLine(line: string): string[] {
+  const fields: string[] = []
+  let current = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
+      else inQuotes = !inQuotes
+    } else if (ch === ',' && !inQuotes) {
+      fields.push(current); current = ''
+    } else {
+      current += ch
+    }
+  }
+  fields.push(current)
+  return fields
 }
 
 function useAuditLogs(orgId: string) {
@@ -30,13 +52,16 @@ function useAuditLogs(orgId: string) {
       if (!res.ok) throw new Error('Failed to fetch audit log')
       const text = await res.text()
       return text.trim().split('\n').slice(1).filter(Boolean).map((line): AuditEntry => {
-        const [createdAt, userId, action, resourceType, resourceId] = line.split(',')
+        const [createdAt, userId, actorEmail, action, resourceType, resourceId, orgId, orgName] = parseCSVLine(line)
         return {
           id: crypto.randomUUID(),
           userId: userId || null,
+          actorEmail: actorEmail || null,
           action: action ?? '',
           resourceType: resourceType ?? '',
           resourceId: resourceId || null,
+          orgId: orgId || null,
+          orgName: orgName || null,
           createdAt: createdAt ?? '',
         }
       })
@@ -91,16 +116,20 @@ function DetailPanel({ entry, onClose }: { entry: AuditEntry; onClose: () => voi
           {/* Event Context */}
           <div>
             <h4 style={{ fontSize: 11, fontWeight: 500, color: '#585f67', textTransform: 'uppercase', letterSpacing: '0.12em', margin: '0 0 16px' }}>Event Context</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
-                { label: 'Action ID', value: `evt_${entry.id.slice(0, 10)}`, mono: true },
-                { label: 'IP Address', value: '—', mono: true },
-                { label: 'User Agent', value: '—', mono: false },
-                { label: 'Region', value: '—', mono: false },
+                { label: 'Actor ID', value: entry.userId || '—', mono: true },
+                { label: 'Actor Email', value: entry.actorEmail || '—', mono: false },
+                { label: 'Org ID', value: entry.orgId || '—', mono: true },
+                { label: 'Org Name', value: entry.orgName || '—', mono: false },
+                { label: 'Action', value: entry.action, mono: true },
+                { label: 'Resource Type', value: entry.resourceType || '—', mono: false },
+                { label: 'Resource ID', value: entry.resourceId || '—', mono: true },
+                { label: 'Timestamp', value: entry.createdAt, mono: true },
               ].map(({ label, value, mono }) => (
-                <div key={label}>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: '#434655', display: 'block', marginBottom: 4 }}>{label}</span>
-                  <span style={{ fontSize: 14, color: '#0b1c30', fontFamily: mono ? 'JetBrains Mono, monospace' : 'inherit' }}>{value}</span>
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16 }}>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: '#737686', flexShrink: 0 }}>{label}</span>
+                  <span style={{ fontSize: 13, color: '#0b1c30', fontFamily: mono ? 'JetBrains Mono, monospace' : 'inherit', textAlign: 'right', wordBreak: 'break-all' }}>{value}</span>
                 </div>
               ))}
             </div>
@@ -156,6 +185,7 @@ function DetailPanel({ entry, onClose }: { entry: AuditEntry; onClose: () => voi
 export default function AuditPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
+  const isSuperAdmin = user?.role === 'super_admin'
   const { data: logs = [], isLoading } = useAuditLogs(orgId)
   const [search, setSearch] = useState('')
   const [actionFilter, setActionFilter] = useState('all')
@@ -209,7 +239,7 @@ export default function AuditPage() {
           </div>
 
           {/* Filter bar */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '24px 0', borderTop: '1px solid #c3c6d7', borderBottom: '1px solid #c3c6d7' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '12px 0'}}>
             <div style={{ flex: 1, minWidth: 240, position: 'relative' }}>
               <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#737686' }} />
               <input
@@ -252,17 +282,17 @@ export default function AuditPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
               <thead style={{ background: '#eff4ff', borderBottom: '1px solid #c3c6d7' }}>
                 <tr>
-                  {['Timestamp', 'Actor', 'Action', 'Resource', 'Details'].map((h, i) => (
-                    <th key={h} style={{ padding: '12px 16px', textAlign: i === 4 ? 'right' : 'left', fontSize: 11, fontWeight: 500, color: '#585f67', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{h}</th>
+                  {['Timestamp', 'Actor', 'Action', 'Resource', ...(isSuperAdmin ? ['Org'] : []), 'Details'].map((h, i, arr) => (
+                    <th key={h} style={{ padding: '12px 16px', textAlign: i === arr.length - 1 ? 'right' : 'left', fontSize: 11, fontWeight: 500, color: '#585f67', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody style={{ borderBottom: '1px solid #c3c6d7' }}>
                 {isLoading && Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={i}><td colSpan={5} style={{ padding: '8px 16px' }}><Skel h={24} /></td></tr>
+                  <tr key={i}><td colSpan={isSuperAdmin ? 6 : 5} style={{ padding: '8px 16px' }}><Skel h={24} /></td></tr>
                 ))}
                 {!isLoading && filtered.length === 0 && (
-                  <tr><td colSpan={5} style={{ padding: 48, textAlign: 'center', color: '#585f67' }}>No audit log entries</td></tr>
+                  <tr><td colSpan={isSuperAdmin ? 6 : 5} style={{ padding: 48, textAlign: 'center', color: '#585f67' }}>No audit log entries</td></tr>
                 )}
                 {filtered.map((log) => {
                   const isError = log.action.includes('fail') || log.action.includes('error') || log.action.includes('spike')
@@ -279,15 +309,18 @@ export default function AuditPage() {
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <div style={{ width: 24, height: 24, borderRadius: '50%', background: isError ? '#ffdad6' : '#dbe1ff', color: isError ? '#93000a' : '#00174b', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            {log.userId ? initials(log.userId) : '?'}
+                            {log.actorEmail ? initials(log.actorEmail) : '?'}
                           </div>
-                          <span style={{ fontSize: 14, color: '#0b1c30' }}>{log.userId ?? 'System'}</span>
+                          <span style={{ fontSize: 14, color: '#0b1c30' }}>{log.actorEmail ?? 'System'}</span>
                         </div>
                       </td>
                       <td style={{ padding: '12px 16px', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: isError ? '#ba1a1a' : '#004ac6', fontWeight: 500 }}>
                         {log.action}
                       </td>
                       <td style={{ padding: '12px 16px', fontSize: 14, color: '#434655' }}>{log.resourceType || log.resourceId || '—'}</td>
+                      {isSuperAdmin && (
+                        <td style={{ padding: '12px 16px', fontSize: 14, color: '#0b1c30' }}>{log.orgName || '—'}</td>
+                      )}
                       <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                         <button onClick={(e) => { e.stopPropagation(); setSelected(log) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#004ac6', fontSize: 14, fontWeight: 500, fontFamily: 'inherit' }}>View</button>
                       </td>
@@ -297,7 +330,7 @@ export default function AuditPage() {
               </tbody>
             </table>
             {/* Loading footer */}
-            {!isLoading && (
+            {isLoading && (
               <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: '#fafbff', borderTop: '1px solid #c3c6d7' }}>
                 <div style={{ width: 20, height: 20, border: '2px solid #2563eb', borderTopColor: 'transparent', borderRadius: '50%', animation: 'cb-spin 0.8s linear infinite' }} />
                 <p style={{ fontSize: 12, fontWeight: 500, color: '#585f67', margin: 0 }}>Loading older events...</p>

@@ -20,8 +20,7 @@ export const documents = pgTable(
     contentHash: text('content_hash').notNull(),
     status: ingestionStatusEnum('status').notNull().default('queued'),
     uploadedBy: uuid('uploaded_by')
-      .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: 'set null' }),
     version: integer('version').notNull().default(1),
     previousVersionId: uuid('previous_version_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
