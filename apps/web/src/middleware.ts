@@ -1,18 +1,32 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { jwtVerify } from 'jose'
 
-const PUBLIC_PATHS = ['/login']
+const PUBLIC_PATHS = ['/login', '/api/auth']
+const COOKIE_NAME = 'auth_token'
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next()
   }
 
-  // Auth is checked client-side via localStorage in this v1 implementation.
-  // In production, migrate to httpOnly cookies and validate the JWT here.
-  return NextResponse.next()
+  const token = request.cookies.get(COOKIE_NAME)?.value
+
+  if (!token) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  try {
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET!)
+    await jwtVerify(token, secret)
+    return NextResponse.next()
+  } catch {
+    const response = NextResponse.redirect(new URL('/login', request.url))
+    response.cookies.delete(COOKIE_NAME)
+    return response
+  }
 }
 
 export const config = {

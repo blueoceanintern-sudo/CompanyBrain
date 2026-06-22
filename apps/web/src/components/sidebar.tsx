@@ -47,7 +47,11 @@ function SidebarContent({
 
   const visible = NAV.filter((n) => user?.role && hasPermission(user.role, n.permission))
   const initial = (user?.email?.[0] ?? '?').toUpperCase()
-  const handleLogout = () => { clearAuth(); router.replace('/login') }
+  const handleLogout = async () => {
+    clearAuth()
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+    router.replace('/login')
+  }
 
   const bgActive     = '#2563eb'
   const bgHover      = '#dce9ff'

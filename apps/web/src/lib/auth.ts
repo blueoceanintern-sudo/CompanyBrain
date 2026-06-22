@@ -2,13 +2,7 @@
 
 import type { AuthUser } from './api'
 
-export function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem('auth_token')
-}
-
-export function setAuth(token: string, user: AuthUser): void {
-  localStorage.setItem('auth_token', token)
+export function setAuth(user: AuthUser): void {
   localStorage.setItem('auth_user', JSON.stringify(user))
 }
 
@@ -24,10 +18,9 @@ export function getAuthUser(): AuthUser | null {
 }
 
 export function clearAuth(): void {
-  localStorage.removeItem('auth_token')
   localStorage.removeItem('auth_user')
 }
 
 export function isAuthenticated(): boolean {
-  return !!getAuthToken()
+  return !!getAuthUser()
 }
