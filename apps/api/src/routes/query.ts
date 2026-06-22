@@ -12,9 +12,12 @@ import type { AuthVars } from '../middleware/auth'
 
 const queryRoute = new Hono<AuthVars>()
 
+const SOURCE_TYPES = ['hr_policy', 'sop', 'faq', 'case_note', 'compliance', 'product_doc', 'other'] as const
+
 const querySchema = z.object({
   query: z.string().min(1).max(2000),
   accessTier: z.enum(['internal', 'external']).default('internal'),
+  sourceTypes: z.array(z.enum(SOURCE_TYPES)).optional(),
 })
 
 // POST /orgs/:id/query
@@ -23,7 +26,7 @@ queryRoute.post('/', zValidator('json', querySchema), async (c) => {
   if (!orgId) return c.json({ success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } }, 400)
   const userId = c.get('userId')
   const userRole = c.get('role')
-  const { query, accessTier } = c.req.valid('json')
+  const { query, accessTier, sourceTypes } = c.req.valid('json')
 
   if (accessTier === 'external') {
     const orgRow = await db.select({ plan: orgs.plan }).from(orgs).where(eq(orgs.id, orgId)).limit(1)
@@ -54,6 +57,7 @@ queryRoute.post('/', zValidator('json', querySchema), async (c) => {
       query,
       accessTier,
       userRole,
+      ...(sourceTypes !== undefined ? { sourceTypes } : {}),
     })
 
     if (!retrievalResult.success) {

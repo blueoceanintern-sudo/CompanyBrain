@@ -3,10 +3,11 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { createHash } from 'crypto'
 import { db } from '@company-brain/db'
-import { documents, ingestionJobs, chunks, orgs } from '@company-brain/db'
+import { documents, ingestionJobs, chunks, orgs, compartments } from '@company-brain/db'
 import { eq, and, desc } from 'drizzle-orm'
 import { ingestDocument } from '@company-brain/ingestion'
 import { hasPermission } from '@company-brain/shared'
+import type { VisibilityPolicy } from '@company-brain/shared'
 import { canPublishExternal } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
 
@@ -73,6 +74,19 @@ documentsRoute.post('/', async (c) => {
     }
   }
 
+  const compartmentRow = await db
+    .select({ id: compartments.id })
+    .from(compartments)
+    .where(and(eq(compartments.id, compartmentId), eq(compartments.orgId, orgId)))
+    .limit(1)
+
+  if (!compartmentRow[0]) {
+    return c.json(
+      { success: false, error: { code: 'NOT_FOUND', message: 'Compartment not found' } },
+      404
+    )
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer())
   const contentHash = createHash('sha256').update(buffer).digest('hex')
 
@@ -104,12 +118,19 @@ documentsRoute.post('/', async (c) => {
     )
     .limit(1)
 
-  const defaultVisibility = {
-    allowedGroups: ['super_admin', 'org_admin', 'dept_admin', 'staff'] as Parameters<typeof ingestDocument>[0]['visibility']['allowedGroups'],
-    deniedGroups: [] as Parameters<typeof ingestDocument>[0]['visibility']['deniedGroups'],
-    allowedPrincipals: [],
-    classification: 'restricted' as const,
-  }
+  const visibilityPolicy: VisibilityPolicy = accessTier === 'external'
+    ? {
+        allowedGroups: ['super_admin', 'org_admin', 'dept_admin', 'staff', 'external_client'],
+        deniedGroups: [],
+        allowedPrincipals: [],
+        classification: 'public',
+      }
+    : {
+        allowedGroups: ['super_admin', 'org_admin', 'dept_admin', 'staff'],
+        deniedGroups: [],
+        allowedPrincipals: [],
+        classification: 'restricted',
+      }
 
   // Archive previous version's chunks before creating the new record
   if (previousDoc[0]) {
@@ -153,7 +174,7 @@ documentsRoute.post('/', async (c) => {
     compartmentId,
     accessTier,
     sourceType,
-    visibility: defaultVisibility,
+    visibility: visibilityPolicy,
     fileBuffer: buffer,
     filename: file.name,
     uploadedBy: userId,
@@ -210,6 +231,28 @@ documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) =
       ...(updates.sourceType !== undefined ? { sourceType: updates.sourceType } : {}),
     })
     .where(and(eq(documents.id, docId), eq(documents.orgId, orgId)))
+
+  // When access tier changes, propagate matching visibility to the document's active chunks
+  if (updates.accessTier !== undefined) {
+    const updatedVisibility: VisibilityPolicy = updates.accessTier === 'external'
+      ? {
+          allowedGroups: ['super_admin', 'org_admin', 'dept_admin', 'staff', 'external_client'],
+          deniedGroups: [],
+          allowedPrincipals: [],
+          classification: 'public',
+        }
+      : {
+          allowedGroups: ['super_admin', 'org_admin', 'dept_admin', 'staff'],
+          deniedGroups: [],
+          allowedPrincipals: [],
+          classification: 'restricted',
+        }
+
+    await db
+      .update(chunks)
+      .set({ visibility: updatedVisibility })
+      .where(and(eq(chunks.documentId, docId), eq(chunks.status, 'active')))
+  }
 
   return c.json({ success: true, data: null })
 })

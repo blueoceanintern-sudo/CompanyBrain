@@ -1,5 +1,5 @@
 import { pgTable, text, uuid, timestamp, integer, boolean } from 'drizzle-orm/pg-core'
-import { orgPlanEnum, compartmentModeEnum } from './enums'
+import { orgPlanEnum } from './enums'
 
 export const orgs = pgTable('orgs', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -10,7 +10,6 @@ export const orgs = pgTable('orgs', {
   stripeConnectAccountId: text('stripe_connect_account_id'),
   stripeConnectChargesEnabled: boolean('stripe_connect_charges_enabled').notNull().default(false),
   externalPriceCents: integer('external_price_cents'),
-  compartmentMode: compartmentModeEnum('compartment_mode').notNull().default('autonomous'),
   cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
