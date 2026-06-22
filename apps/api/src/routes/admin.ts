@@ -2,8 +2,8 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { db } from '@company-brain/db'
-import { compartments, users, auditLogs, orgs } from '@company-brain/db'
-import { eq, and, count } from 'drizzle-orm'
+import { compartments, users, auditLogs, orgs, documents, chunks } from '@company-brain/db'
+import { eq, and, ne, count } from 'drizzle-orm'
 import { hasPermission } from '@company-brain/shared'
 import type { AuthVars } from '../middleware/auth'
 import { sendOrgAdminWelcome, sendUserInvite } from '../lib/email'
@@ -15,7 +15,6 @@ const adminRoute = new Hono<AuthVars>()
 const compartmentCreateSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().optional(),
-  mode: z.enum(['autonomous', 'schema_driven']).default('autonomous'),
 })
 
 const BAD_ORG = { success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } } as const
@@ -43,7 +42,6 @@ adminRoute.post('/compartments', zValidator('json', compartmentCreateSchema), as
     .values({
       orgId,
       name: body.name,
-      mode: body.mode,
       ...(body.description !== undefined ? { description: body.description } : {}),
     })
     .returning()
@@ -76,9 +74,67 @@ adminRoute.patch('/compartments/:cId', zValidator('json', compartmentCreateSchem
       updatedAt: new Date(),
       ...(updates.name !== undefined ? { name: updates.name } : {}),
       ...(updates.description !== undefined ? { description: updates.description } : {}),
-      ...(updates.mode !== undefined ? { mode: updates.mode } : {}),
     })
     .where(and(eq(compartments.id, cId), eq(compartments.orgId, orgId)))
+
+  return c.json({ success: true, data: null })
+})
+
+const deleteCompartmentSchema = z.object({
+  targetCompartmentId: z.string().uuid().optional(),
+})
+
+adminRoute.delete('/compartments/:cId', zValidator('json', deleteCompartmentSchema), async (c) => {
+  const orgId = c.req.param('id')
+  const cId = c.req.param('cId')
+  if (!orgId || !cId) return c.json(BAD_ORG, 400)
+  const role = c.get('role')
+  const userId = c.get('userId')
+  const { targetCompartmentId } = c.req.valid('json')
+
+  if (!hasPermission(role, 'users:manage')) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
+
+  if (targetCompartmentId) {
+    const [targetRow] = await db
+      .select({ id: compartments.id })
+      .from(compartments)
+      .where(and(eq(compartments.id, targetCompartmentId), eq(compartments.orgId, orgId)))
+      .limit(1)
+
+    if (!targetRow) {
+      return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Target compartment not found' } }, 404)
+    }
+
+    await db.update(documents)
+      .set({ compartmentId: targetCompartmentId })
+      .where(and(eq(documents.compartmentId, cId), eq(documents.orgId, orgId)))
+
+    await db.update(chunks)
+      .set({ compartmentId: targetCompartmentId })
+      .where(and(eq(chunks.compartmentId, cId), eq(chunks.orgId, orgId)))
+  } else {
+    await db.delete(chunks).where(and(eq(chunks.compartmentId, cId), eq(chunks.orgId, orgId)))
+    await db.delete(documents).where(and(eq(documents.compartmentId, cId), eq(documents.orgId, orgId)))
+  }
+
+  const [deleted] = await db
+    .delete(compartments)
+    .where(and(eq(compartments.id, cId), eq(compartments.orgId, orgId)))
+    .returning({ name: compartments.name })
+
+  if (!deleted) {
+    return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Compartment not found' } }, 404)
+  }
+
+  await db.insert(auditLogs).values({
+    orgId, userId,
+    action: 'compartment.delete',
+    resourceType: 'compartment',
+    resourceId: cId,
+    metadata: { name: deleted.name, targetCompartmentId: targetCompartmentId ?? null },
+  })
 
   return c.json({ success: true, data: null })
 })

@@ -136,10 +136,24 @@ export async function getCompartments(orgId: string) {
   return apiFetch<CompartmentSummary[]>(`/api/v1/orgs/${orgId}/compartments`)
 }
 
-export async function createCompartment(orgId: string, data: { name: string; description?: string; mode?: string }) {
+export async function createCompartment(orgId: string, data: { name: string; description?: string }) {
   return apiFetch<CompartmentSummary>(`/api/v1/orgs/${orgId}/compartments`, {
     method: 'POST',
     body: JSON.stringify(data),
+  })
+}
+
+export async function updateCompartment(orgId: string, cId: string, data: { name?: string; description?: string }) {
+  return apiFetch<null>(`/api/v1/orgs/${orgId}/compartments/${cId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteCompartment(orgId: string, cId: string, targetCompartmentId?: string) {
+  return apiFetch<null>(`/api/v1/orgs/${orgId}/compartments/${cId}`, {
+    method: 'DELETE',
+    body: JSON.stringify(targetCompartmentId ? { targetCompartmentId } : {}),
   })
 }
 

@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { db } from '@company-brain/db'
-import { queries, auditLogs, users, orgs } from '@company-brain/db'
-import { eq, and, gte, sql, count } from 'drizzle-orm'
+import { queries, auditLogs, users, orgs, documents } from '@company-brain/db'
+import { eq, and, gte, ne, sql, count } from 'drizzle-orm'
+import type { SourceType } from '@company-brain/shared'
 import { hasPermission, CONFIDENCE_GATE_THRESHOLD } from '@company-brain/shared'
 import type { AuthVars } from '../middleware/auth'
 
@@ -28,7 +29,7 @@ analyticsRoute.get('/overview', async (c) => {
 
   const since = daysAgoDate(days)
 
-  const [totalResult, answeredResult, citedResult] = await Promise.all([
+  const [totalResult, answeredResult, citedResult, docsBySourceType] = await Promise.all([
     db
       .select({ total: count() })
       .from(queries)
@@ -53,11 +54,24 @@ analyticsRoute.get('/overview', async (c) => {
           sql`jsonb_array_length(citations) > 0`
         )
       ),
+    db
+      .select({ sourceType: documents.sourceType, count: count() })
+      .from(documents)
+      .where(and(eq(documents.orgId, orgId), ne(documents.status, 'archived')))
+      .groupBy(documents.sourceType),
   ])
 
   const total = totalResult[0]?.total ?? 0
   const answered = answeredResult[0]?.answered ?? 0
   const cited = citedResult[0]?.cited ?? 0
+
+  const documentsBySourceType = docsBySourceType.reduce<Partial<Record<SourceType, number>>>(
+    (acc, row) => {
+      acc[row.sourceType as SourceType] = Number(row.count)
+      return acc
+    },
+    {}
+  )
 
   return c.json({
     success: true,
@@ -66,6 +80,7 @@ analyticsRoute.get('/overview', async (c) => {
       queryVolume: total,
       citationHitRate: answered > 0 ? Math.round((cited / answered) * 100) : 0,
       iDontKnowRate: total > 0 ? Math.round(((total - answered) / total) * 100) : 0,
+      documentsBySourceType,
     },
   })
 })

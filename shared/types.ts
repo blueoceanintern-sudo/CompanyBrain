@@ -2,7 +2,6 @@
 
 export type AccessTier = 'internal' | 'external'
 export type VisibilityClass = 'public' | 'restricted' | 'confidential'
-export type CompartmentMode = 'autonomous' | 'schema_driven'
 export type ChunkStatus = 'active' | 'processing' | 'error' | 'archived'
 export type OrgPlan = 'free' | 'paid'
 export type SourceType =
@@ -113,7 +112,6 @@ export interface CompartmentSummary {
   orgId: string
   name: string
   description: string | null
-  mode: CompartmentMode
   createdAt: string
   updatedAt: string
 }
@@ -160,6 +158,7 @@ export interface RetrieveParams {
   accessTier: AccessTier
   userRole: UserRole
   topK?: number
+  sourceTypes?: SourceType[]
 }
 
 export interface SynthesisParams {
@@ -174,6 +173,7 @@ export interface AnalyticsOverview {
   queryVolume: number
   citationHitRate: number
   iDontKnowRate: number
+  documentsBySourceType: Partial<Record<SourceType, number>>
 }
 
 export interface UnansweredQuery {
