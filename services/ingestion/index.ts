@@ -2,7 +2,7 @@ import { createHash } from 'crypto'
 import OpenAI from 'openai'
 import { db } from '@company-brain/db'
 import { chunks, documents, ingestionJobs } from '@company-brain/db'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, sql } from 'drizzle-orm'
 import type {
   IngestParams,
   ServiceResult,
@@ -139,7 +139,7 @@ export async function ingestDocument(
       content: c.content,
       embedding: allEmbeddings[i] ?? [],
       contentHash: c.hash,
-      visibility,
+      visibility: sql`${JSON.stringify(visibility)}::jsonb`,
       accessTier,
       sourceType,
       chunkIndex: c.index,
