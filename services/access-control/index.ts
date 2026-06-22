@@ -9,9 +9,10 @@ interface CanAccessParams {
 }
 
 export function canAccessChunk({ visibility, userRole, userId }: CanAccessParams): boolean {
-  if (visibility.allowedPrincipals.includes(userId)) return true
-  if (visibility.deniedGroups.includes(userRole)) return false
-  if (visibility.allowedGroups.length === 0) return true
+  if (!visibility) return true
+  if (visibility.allowedPrincipals?.includes(userId)) return true
+  if (visibility.deniedGroups?.includes(userRole)) return false
+  if (!visibility.allowedGroups?.length) return true
   return visibility.allowedGroups.includes(userRole)
 }
 
