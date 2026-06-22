@@ -1,0 +1,5 @@
+ALTER TABLE "orgs" ADD COLUMN "stripe_connect_account_id" text;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN "external_price_cents" integer;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "stripe_customer_id" text;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "stripe_subscription_id" text;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "subscription_status" text;

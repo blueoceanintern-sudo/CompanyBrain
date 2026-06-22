@@ -1,0 +1,1 @@
+ALTER TABLE "compartments" ADD COLUMN "allowed_source_types" text[];
