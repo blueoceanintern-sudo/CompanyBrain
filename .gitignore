@@ -11,5 +11,3 @@ build/
 *.log
 *.tsbuildinfo
 .DS_Store
-
-db/migrations/*.sql

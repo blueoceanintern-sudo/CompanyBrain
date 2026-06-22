@@ -1,0 +1,1 @@
+ALTER TABLE "orgs" ADD COLUMN "stripe_connect_charges_enabled" boolean DEFAULT false NOT NULL;
