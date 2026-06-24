@@ -2,7 +2,7 @@ import OpenAI from 'openai'
 import { db } from '@company-brain/db'
 import { chunks, documents, compartments } from '@company-brain/db'
 import { eq, and, sql } from 'drizzle-orm'
-import type { RetrieveParams, ServiceResult, ChunkContext } from '@company-brain/shared'
+import type { RetrieveParams, ServiceResult, ChunkContext, SourceType } from '@company-brain/shared'
 import {
   EMBEDDING_MODEL,
   EMBEDDING_DIMENSIONS,
@@ -49,9 +49,13 @@ async function semanticSearch(
   orgId: string,
   accessTier: 'internal' | 'external',
   queryEmbedding: number[],
-  limit: number
+  limit: number,
+  sourceTypes?: SourceType[]
 ): Promise<Array<{ id: string; documentId: string; compartmentId: string; content: string; score: number; chunkIndex: number }>> {
   const vectorLiteral = `[${queryEmbedding.join(',')}]`
+  const sourceFilter = sourceTypes && sourceTypes.length > 0
+    ? sql` AND c.source_type::text = ANY(ARRAY[${sql.join(sourceTypes.map((t) => sql`${t}`), sql`, `)}])`
+    : sql``
 
   const rows = await db.execute(sql`
     SELECT
@@ -66,6 +70,7 @@ async function semanticSearch(
     WHERE c.org_id = ${orgId}
       AND c.access_tier = ${accessTier}
       AND c.status = 'active'
+      ${sourceFilter}
     ORDER BY c.embedding <=> ${vectorLiteral}::vector
     LIMIT ${limit * 3}
   `)
@@ -90,8 +95,13 @@ async function fullTextSearch(
   orgId: string,
   accessTier: 'internal' | 'external',
   query: string,
-  limit: number
+  limit: number,
+  sourceTypes?: SourceType[]
 ): Promise<Array<{ id: string; documentId: string; compartmentId: string; content: string; rank: number; chunkIndex: number }>> {
+  const sourceFilter = sourceTypes && sourceTypes.length > 0
+    ? sql` AND c.source_type::text = ANY(ARRAY[${sql.join(sourceTypes.map((t) => sql`${t}`), sql`, `)}])`
+    : sql``
+
   const rows = await db.execute(sql`
     SELECT
       c.id,
@@ -106,6 +116,7 @@ async function fullTextSearch(
       AND c.access_tier = ${accessTier}
       AND c.status = 'active'
       AND to_tsvector('english', c.content) @@ plainto_tsquery('english', ${query})
+      ${sourceFilter}
     ORDER BY rank DESC
     LIMIT ${limit * 3}
   `)
@@ -164,15 +175,15 @@ async function getCompartmentName(compartmentId: string): Promise<string> {
 export async function retrieveChunks(
   params: RetrieveParams
 ): Promise<ServiceResult<{ chunks: ChunkContext[]; confidence: number }>> {
-  const { orgId, userId, query, accessTier, userRole, topK = TOP_K_CHUNKS } = params
+  const { orgId, userId, query, accessTier, userRole, topK = TOP_K_CHUNKS, sourceTypes } = params
 
   try {
     const queryEmbedding = await embedQuery(query)
 
     // Run semantic + full-text search in parallel
     const [semanticResults, ftsResults] = await Promise.all([
-      semanticSearch(orgId, accessTier, queryEmbedding, topK),
-      fullTextSearch(orgId, accessTier, query, topK),
+      semanticSearch(orgId, accessTier, queryEmbedding, topK, sourceTypes),
+      fullTextSearch(orgId, accessTier, query, topK, sourceTypes),
     ])
 
     // Merge results into a map keyed by chunk ID

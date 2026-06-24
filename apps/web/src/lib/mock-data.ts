@@ -12,10 +12,10 @@ export const MOCK_USER = {
 }
 
 export const MOCK_COMPARTMENTS = [
-  { id: 'comp-001', orgId: MOCK_ORG_ID, name: 'Human Resources', description: 'HR policies and procedures', mode: 'autonomous', createdAt: '2026-01-10T09:00:00Z', updatedAt: '2026-01-10T09:00:00Z' },
-  { id: 'comp-002', orgId: MOCK_ORG_ID, name: 'Curriculum & Teaching', description: 'Teaching standards and curriculum guides', mode: 'autonomous', createdAt: '2026-01-10T09:00:00Z', updatedAt: '2026-01-10T09:00:00Z' },
-  { id: 'comp-003', orgId: MOCK_ORG_ID, name: 'Compliance & Legal', description: 'Regulatory and compliance documentation', mode: 'schema_driven', createdAt: '2026-01-10T09:00:00Z', updatedAt: '2026-01-10T09:00:00Z' },
-  { id: 'comp-004', orgId: MOCK_ORG_ID, name: 'IT & Systems', description: 'Technology policies and system guides', mode: 'autonomous', createdAt: '2026-02-01T09:00:00Z', updatedAt: '2026-02-01T09:00:00Z' },
+  { id: 'comp-001', orgId: MOCK_ORG_ID, name: 'Human Resources', description: 'HR policies and procedures', createdAt: '2026-01-10T09:00:00Z', updatedAt: '2026-01-10T09:00:00Z' },
+  { id: 'comp-002', orgId: MOCK_ORG_ID, name: 'Curriculum & Teaching', description: 'Teaching standards and curriculum guides', createdAt: '2026-01-10T09:00:00Z', updatedAt: '2026-01-10T09:00:00Z' },
+  { id: 'comp-003', orgId: MOCK_ORG_ID, name: 'Compliance & Legal', description: 'Regulatory and compliance documentation', createdAt: '2026-01-10T09:00:00Z', updatedAt: '2026-01-10T09:00:00Z' },
+  { id: 'comp-004', orgId: MOCK_ORG_ID, name: 'IT & Systems', description: 'Technology policies and system guides', createdAt: '2026-02-01T09:00:00Z', updatedAt: '2026-02-01T09:00:00Z' },
 ]
 
 export const MOCK_DOCUMENTS = [

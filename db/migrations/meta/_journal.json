@@ -29,6 +29,20 @@
       "when": 1781759643438,
       "tag": "0003_jazzy_nightshade",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781780896884,
+      "tag": "0004_volatile_midnight",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782118266583,
+      "tag": "0005_shallow_madelyne_pryor",
+      "breakpoints": true
     }
   ]
 }
