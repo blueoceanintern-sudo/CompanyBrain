@@ -1,17 +1,18 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   Search, Send, BookOpen, FileText, Calendar,
   Paperclip, Globe, Bot, ThumbsUp, Copy, RefreshCw,
-  Sparkles, Clock, Plus, CreditCard,
+  Sparkles, Clock, CreditCard,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useSubmitQuery } from '@/hooks/use-queries'
+import { useMutation } from '@tanstack/react-query'
+import { submitQuery as apiSubmitQuery } from '@/lib/api'
 import { useExternalPricing, useStartCheckout } from '@/hooks/use-payments'
 import { getAuthUser } from '@/lib/auth'
-import type { QueryResponse } from '@company-brain/shared'
+import type { QueryResponse, ConversationTurn } from '@company-brain/shared'
 
 interface HistoryEntry {
   id: string
@@ -108,19 +109,13 @@ function EmptyState({
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#ffffff', overflow: 'hidden', position: 'relative' }}>
-      {/* Centered content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px 80px' }}>
         <div style={{ width: '100%', maxWidth: 640, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32 }}>
-          {/* Heading */}
           <div style={{ textAlign: 'center' }}>
             <h1 style={{ fontSize: 32, fontWeight: 700, color: '#0b1c30', margin: '0 0 8px' }}>{greeting}, {name.charAt(0).toUpperCase() + name.slice(1)}</h1>
             <p style={{ fontSize: 16, color: '#434655', margin: 0 }}>Ask anything from BlueOcean&apos;s knowledge base</p>
           </div>
-
-          {/* Search bar */}
-          <div
-            style={{ width: '100%', background: '#ffffff', borderRadius: 24, border: '1px solid #c3c6d7', padding: 8, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 10px 30px -10px rgba(0,0,0,0.08)' }}
-          >
+          <div style={{ width: '100%', background: '#ffffff', borderRadius: 24, border: '1px solid #c3c6d7', padding: 8, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 10px 30px -10px rgba(0,0,0,0.08)' }}>
             <div style={{ paddingLeft: 12, color: '#737686', display: 'flex', alignItems: 'center' }}>
               <Search size={20} />
             </div>
@@ -140,8 +135,6 @@ function EmptyState({
               Send <Send size={14} />
             </button>
           </div>
-
-          {/* Suggestion chips */}
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10 }}>
             {SUGGESTIONS.map(({ icon: Icon, label }) => (
               <button
@@ -159,7 +152,6 @@ function EmptyState({
         </div>
       </div>
 
-      {/* Recent activity strip */}
       {recentQueries.length > 0 && (
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 32px 32px', background: 'linear-gradient(to top, #ffffff 60%, transparent)' }}>
           <div style={{ borderTop: '1px solid rgba(195,198,215,0.3)', paddingTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -232,34 +224,31 @@ function ActiveChat({
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#ffffff', overflow: 'hidden' }}>
-      {/* Scrollable messages */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <div style={{ width: '100%', maxWidth: 800, padding: '48px 32px', display: 'flex', flexDirection: 'column', gap: 40 }}>
-          {/* Date divider */}
           <div style={{ textAlign: 'center' }}>
-            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#737686' }}>Yesterday</span>
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#737686' }}>
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            </span>
           </div>
 
           {history.map((entry) => (
             <div key={entry.id} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* User message */}
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <div style={{ background: '#dce3ec', color: '#40484f', padding: '12px 20px', borderRadius: '16px 16px 4px 16px', maxWidth: '85%', fontSize: 14, lineHeight: 1.6 }}>
                   {entry.question}
                 </div>
               </div>
 
-              {/* Pending */}
               {entry.pending && (
                 <div style={{ display: 'flex', gap: 8, padding: '16px 0' }}>
                   {[0, 1, 2].map((i) => (
-                    <span key={i} className="inline-block w-2 h-2 rounded-full" style={{ background: '#c3c6d7', animation: `cb-pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />
+                    <span key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: '#c3c6d7', display: 'inline-block', animation: `cb-pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />
                   ))}
                   <style>{`@keyframes cb-pulse{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}`}</style>
                 </div>
               )}
 
-              {/* Error */}
               {entry.error && (
                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   <div style={{ flex: 1, background: '#ffdad6', color: '#ba1a1a', padding: '12px 16px', borderRadius: 8, fontSize: 14 }}>{entry.error}</div>
@@ -267,10 +256,8 @@ function ActiveChat({
                 </div>
               )}
 
-              {/* AI response */}
               {!entry.pending && !entry.error && entry.response && (
                 <div style={{ background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 16, padding: 32, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: 24 }}>
-                  {/* Header */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{ width: 32, height: 32, borderRadius: 8, background: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <Sparkles size={16} color="#ffffff" />
@@ -278,12 +265,10 @@ function ActiveChat({
                     <span style={{ fontSize: 14, fontWeight: 700, color: '#004ac6' }}>Brain AI</span>
                   </div>
 
-                  {/* Answer */}
                   <div style={{ fontSize: 16, color: '#0b1c30', lineHeight: 1.7 }}>
                     {entry.response.answer}
                   </div>
 
-                  {/* Sources */}
                   {entry.response.citations && entry.response.citations.length > 0 && (
                     <div style={{ borderTop: '1px solid #c3c6d7', paddingTop: 24 }}>
                       <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#737686', marginBottom: 12 }}>Sources</p>
@@ -295,7 +280,6 @@ function ActiveChat({
                     </div>
                   )}
 
-                  {/* Actions */}
                   <div style={{ display: 'flex', gap: 16 }}>
                     {[
                       { icon: ThumbsUp, label: 'Helpful', onClick: () => toast.success('Marked as helpful') },
@@ -320,10 +304,9 @@ function ActiveChat({
         </div>
       </div>
 
-      {/* Sticky input */}
       <div style={{ background: '#ffffff', borderTop: '1px solid #c3c6d7', padding: '16px 32px 32px', display: 'flex', justifyContent: 'center' }}>
         <div style={{ width: '100%', maxWidth: 800 }}>
-          <div style={{ border: '1px solid #c3c6d7', borderRadius: 16, background: '#ffffff', display: 'flex', flexDirection: 'column', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', transition: 'border-color 0.2s' }}>
+          <div style={{ border: '1px solid #c3c6d7', borderRadius: 16, background: '#ffffff', display: 'flex', flexDirection: 'column', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
             <textarea
               ref={textareaRef}
               value={input}
@@ -340,7 +323,8 @@ function ActiveChat({
                   { Icon: Globe, title: 'Web search', handler: () => toast.info('Web search coming soon') },
                   { Icon: Bot, title: 'AI settings', handler: () => toast.info('AI model selection coming soon') },
                 ].map(({ Icon, title, handler }) => (
-                  <button key={title} title={title} onClick={handler} style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 8 }}
+                  <button key={title} title={title} onClick={handler}
+                    style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 8 }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#eff4ff'; (e.currentTarget as HTMLElement).style.color = '#004ac6' }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none'; (e.currentTarget as HTMLElement).style.color = '#585f67' }}
                   >
@@ -397,11 +381,29 @@ export default function ChatPage() {
   const [input, setInput] = useState('')
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [recentQueries, setRecentQueries] = useState<string[]>([])
-  const submit = useSubmitQuery(orgId)
+  const [isPending, setIsPending] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const submitQuery = (q: string, entryId?: string) => {
+  useEffect(() => {
+    const q = searchParams.get('q')
+    const isNew = searchParams.get('new') === '1'
+    if (isNew) {
+      setHistory([])
+      setInput('')
+      if (textareaRef.current) textareaRef.current.style.height = 'auto'
+      router.replace('/chat')
+    } else if (q) {
+      setInput(q)
+      router.replace('/chat')
+      textareaRef.current?.focus()
+    }
+  }, [searchParams, router])
+
+  // Use a plain async function instead of useMutation to avoid reset/dedup issues
+  const submitQuery = useCallback(async (q: string, entryId?: string, historySnapshot?: ConversationTurn[]) => {
     const id = entryId ?? crypto.randomUUID()
+
+    // Set pending state
     if (!entryId) {
       setHistory((prev) => [
         ...prev.map((h) => ({ ...h, expanded: false })),
@@ -410,30 +412,43 @@ export default function ChatPage() {
     } else {
       setHistory((prev) => prev.map((h) => {
         if (h.id !== id) return h
-        const { error: _removed, ...rest } = h
+        const { error: _e, response: _r, ...rest } = h
         return { ...rest, pending: true as const }
       }))
     }
-    submit.mutate(q, {
-      onSuccess: (data) => {
-        setHistory((prev) => prev.map((h) =>
-          h.id === id ? { id, question: q, response: data, expanded: true } : h
-        ))
-      },
-      onError: (err: Error) => {
-        setHistory((prev) => prev.map((h) =>
-          h.id === id ? { id, question: q, error: err.message, expanded: true } : h
-        ))
-      },
-    })
-  }
+
+    setIsPending(true)
+    try {
+      const result = await apiSubmitQuery(orgId, q, 'internal', historySnapshot?.length ? historySnapshot : undefined)
+      if (!result.success) throw new Error(result.error.message)
+      setHistory((prev) => prev.map((h) =>
+        h.id === id ? { id, question: q, response: result.data, expanded: true } : h
+      ))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Something went wrong'
+      toast.error(message)
+      setHistory((prev) => prev.map((h) =>
+        h.id === id ? { id, question: q, error: message, expanded: true } : h
+      ))
+    } finally {
+      setIsPending(false)
+    }
+  }, [orgId])
+
+  const buildHistorySnapshot = (): ConversationTurn[] =>
+    history.flatMap((h) =>
+      h.response ? [
+        { role: 'user' as const, content: h.question },
+        { role: 'assistant' as const, content: h.response.answer },
+      ] : []
+    )
 
   const handleSubmit = () => {
     const q = input.trim()
-    if (!q || submit.isPending) return
+    if (!q || isPending) return
     setInput('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
-    submitQuery(q)
+    submitQuery(q, undefined, buildHistorySnapshot())
   }
 
   const isEmpty = history.length === 0
@@ -459,7 +474,7 @@ export default function ChatPage() {
           input={input}
           onChange={setInput}
           onSubmit={handleSubmit}
-          disabled={submit.isPending}
+          disabled={isPending}
           textareaRef={textareaRef as React.RefObject<HTMLTextAreaElement>}
           recentQueries={recentQueries}
           onClearRecent={() => setRecentQueries([])}
@@ -470,14 +485,21 @@ export default function ChatPage() {
           input={input}
           onChange={setInput}
           onSubmit={handleSubmit}
-          disabled={submit.isPending}
+          disabled={isPending}
           textareaRef={textareaRef}
           onToggle={(id) => setHistory((prev) => prev.map((h) => h.id === id ? { ...h, expanded: !h.expanded } : h))}
-          onRetry={(id, q) => submitQuery(q, id)}
+          onRetry={(id, q) => {
+            const priorHistory = history
+              .slice(0, history.findIndex((h) => h.id === id))
+              .flatMap((h) => h.response ? [
+                { role: 'user' as const, content: h.question },
+                { role: 'assistant' as const, content: h.response.answer },
+              ] : [])
+            submitQuery(q, id, priorHistory)
+          }}
           onNew={handleNewChat}
         />
       )}
-
     </div>
   )
 }
