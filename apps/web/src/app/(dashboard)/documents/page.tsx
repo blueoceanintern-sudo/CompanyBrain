@@ -4,9 +4,9 @@ import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Search, Upload, Paperclip, X, FileText, Table2, Link, File } from 'lucide-react'
+import { Search, Upload, Paperclip, X, FileText, Table2, Link, File, FolderPlus } from 'lucide-react'
 import { useDocuments, useUploadDocument, useDeleteDocument } from '@/hooks/use-documents'
-import { useCompartments } from '@/hooks/use-compartments'
+import { useCompartments, useCreateCompartment } from '@/hooks/use-compartments'
 import { getAuthUser } from '@/lib/auth'
 import { formatDate } from '@/lib/utils'
 
@@ -223,7 +223,7 @@ function UploadDialog({ orgId, onClose }: { orgId: string; onClose: () => void }
         <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 24px', color: '#0b1c30' }}>Upload Document</h2>
         {noCompartments && (
           <div style={{ padding: 12, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, marginBottom: 16 }}>
-            <p style={{ fontSize: 13, color: '#92400e', margin: 0 }}>No compartments yet — create one in Settings first.</p>
+            <p style={{ fontSize: 13, color: '#92400e', margin: 0 }}>No compartments yet — use the &ldquo;New Compartment&rdquo; button to create one first.</p>
           </div>
         )}
         <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -266,6 +266,56 @@ function UploadDialog({ orgId, onClose }: { orgId: string; onClose: () => void }
   )
 }
 
+// ─── Create compartment dialog ────────────────────────────────────────────────
+
+function CreateCompartmentDialog({ orgId, onClose }: { orgId: string; onClose: () => void }) {
+  const [name, setName] = useState('')
+  const create = useCreateCompartment(orgId)
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', height: 44, padding: '0 12px',
+    border: '1px solid #c3c6d7', borderRadius: 8,
+    background: '#ffffff', color: '#0b1c30', fontSize: 14, fontFamily: 'inherit',
+  }
+
+  return (
+    <div role="dialog" onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+      <div style={{ background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 16, padding: 32, width: 'min(400px, 90vw)', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 24px', color: '#0b1c30' }}>New Compartment</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Name</label>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && name.trim()) create.mutate({ name: name.trim() }, { onSuccess: onClose })
+                if (e.key === 'Escape') onClose()
+              }}
+              placeholder="e.g. HR Department"
+              style={inputStyle}
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+            <button type="button" onClick={onClose}
+              style={{ height: 44, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>
+              Cancel
+            </button>
+            <button
+              disabled={!name.trim() || create.isPending}
+              onClick={() => create.mutate({ name: name.trim() }, { onSuccess: onClose })}
+              style={{ height: 44, padding: '0 20px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: (!name.trim() || create.isPending) ? 'not-allowed' : 'pointer', opacity: !name.trim() ? 0.5 : 1, fontFamily: 'inherit' }}>
+              {create.isPending ? 'Creating…' : 'Create'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 type DocItem = Awaited<ReturnType<typeof useDocuments>>['data'] extends Array<infer T> | undefined ? T : never
@@ -274,6 +324,7 @@ export default function DocumentsPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
   const [showUpload, setShowUpload] = useState(false)
+  const [showCreateCompartment, setShowCreateCompartment] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<DocItem | null>(null)
   const [search, setSearch] = useState('')
   const [sourceTypeFilter, setSourceTypeFilter] = useState('')
@@ -313,12 +364,20 @@ export default function DocumentsPage() {
             <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0b1c30', margin: '0 0 4px' }}>Knowledge Base</h1>
             <p style={{ fontSize: 14, color: '#585f67', margin: 0 }}>Manage and audit your organization&apos;s ingested documents.</p>
           </div>
-          <button
-            onClick={() => setShowUpload(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 12, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
-          >
-            <Upload size={16} /> Upload Document
-          </button>
+          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+            <button
+              onClick={() => setShowCreateCompartment(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', color: '#004ac6', border: '1px solid #004ac6', borderRadius: 12, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              <FolderPlus size={16} /> New Compartment
+            </button>
+            <button
+              onClick={() => setShowUpload(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 12, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              <Upload size={16} /> Upload Document
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -433,6 +492,7 @@ export default function DocumentsPage() {
 
       <style>{`@keyframes cb-skel { 0%,100%{opacity:.5}50%{opacity:1} }`}</style>
       {showUpload && <UploadDialog orgId={orgId} onClose={() => setShowUpload(false)} />}
+      {showCreateCompartment && <CreateCompartmentDialog orgId={orgId} onClose={() => setShowCreateCompartment(false)} />}
     </div>
   )
 }
