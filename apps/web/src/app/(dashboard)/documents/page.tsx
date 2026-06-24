@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -195,10 +195,17 @@ function UploadDialog({ orgId, onClose }: { orgId: string; onClose: () => void }
   const upload = useUploadDocument(orgId)
   const noCompartments = !compartmentsLoading && compartments.length === 0
 
-  const { register, handleSubmit, formState: { errors } } = useForm<UploadFormValues>({
-    resolver: zodResolver(uploadSchema),
-    defaultValues: { accessTier: 'internal', sourceType: 'other', compartmentId: compartments[0]?.id ?? '' },
+  const { register, handleSubmit, formState: { errors }, setValue } = useForm<UploadFormValues>({
+   resolver: zodResolver(uploadSchema),
+   defaultValues: { accessTier: 'internal', sourceType: 'other', compartmentId: '' },
   })
+
+  // Set compartmentId once compartments load
+  useEffect(() => {
+   if (compartments[0]?.id) {
+     setValue('compartmentId', compartments[0].id)
+   }
+  }, [compartments, setValue])
 
   const onSubmit = async (values: UploadFormValues) => {
     if (!file) return
