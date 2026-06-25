@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -9,6 +9,7 @@ import { useDocuments, useUploadDocument, useDeleteDocument } from '@/hooks/use-
 import { useCompartments, useCreateCompartment } from '@/hooks/use-compartments'
 import { getAuthUser } from '@/lib/auth'
 import { formatDate } from '@/lib/utils'
+import type { CompartmentSummary } from '@company-brain/shared'
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   hr_policy: 'HR Policy', sop: 'SOP', faq: 'FAQ',
@@ -189,23 +190,32 @@ const uploadSchema = z.object({
 type UploadFormValues = z.infer<typeof uploadSchema>
 
 function UploadDialog({ orgId, onClose }: { orgId: string; onClose: () => void }) {
+  const { data: compartments = [], isLoading: compartmentsLoading } = useCompartments(orgId)
+
+  return (
+    <div role="dialog" onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+      <div style={{ background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 16, padding: 32, width: 'min(480px, 90vw)', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 24px', color: '#0b1c30' }}>Upload Document</h2>
+        {compartmentsLoading
+          ? <p style={{ fontSize: 14, color: '#585f67', margin: 0 }}>Loading compartments…</p>
+          : <UploadForm orgId={orgId} compartments={compartments} onClose={onClose} />}
+      </div>
+    </div>
+  )
+}
+
+function UploadForm({ orgId, compartments, onClose }: { orgId: string; compartments: CompartmentSummary[]; onClose: () => void }) {
   const [file, setFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { data: compartments = [], isLoading: compartmentsLoading } = useCompartments(orgId)
   const upload = useUploadDocument(orgId)
-  const noCompartments = !compartmentsLoading && compartments.length === 0
+  const noCompartments = compartments.length === 0
 
-  const { register, handleSubmit, formState: { errors }, setValue } = useForm<UploadFormValues>({
+  // Compartments are loaded by the time this form mounts, so defaults can read them directly.
+  const { register, handleSubmit } = useForm<UploadFormValues>({
    resolver: zodResolver(uploadSchema),
-   defaultValues: { accessTier: 'internal', sourceType: 'other', compartmentId: '' },
+   defaultValues: { accessTier: 'internal', sourceType: 'other', compartmentId: compartments[0]?.id ?? '' },
   })
-
-  // Set compartmentId once compartments load
-  useEffect(() => {
-   if (compartments[0]?.id) {
-     setValue('compartmentId', compartments[0].id)
-   }
-  }, [compartments, setValue])
 
   const onSubmit = async (values: UploadFormValues) => {
     if (!file) return
@@ -224,16 +234,13 @@ function UploadDialog({ orgId, onClose }: { orgId: string; onClose: () => void }
   }
 
   return (
-    <div role="dialog" onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-      <div style={{ background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 16, padding: 32, width: 'min(480px, 90vw)', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 24px', color: '#0b1c30' }}>Upload Document</h2>
-        {noCompartments && (
-          <div style={{ padding: 12, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, marginBottom: 16 }}>
-            <p style={{ fontSize: 13, color: '#92400e', margin: 0 }}>No compartments yet — use the &ldquo;New Compartment&rdquo; button to create one first.</p>
-          </div>
-        )}
-        <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <>
+      {noCompartments && (
+        <div style={{ padding: 12, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, marginBottom: 16 }}>
+          <p style={{ fontSize: 13, color: '#92400e', margin: 0 }}>No compartments yet — use the &ldquo;New Compartment&rdquo; button to create one first.</p>
+        </div>
+      )}
+      <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>File (PDF, Word, or plain text)</label>
             <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.txt" onChange={(e) => setFile(e.target.files?.[0] ?? null)} style={{ display: 'none' }} />
@@ -267,9 +274,8 @@ function UploadDialog({ orgId, onClose }: { orgId: string; onClose: () => void }
               {upload.isPending ? 'Uploading…' : 'Upload'}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </>
   )
 }
 
