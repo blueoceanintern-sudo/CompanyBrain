@@ -36,6 +36,13 @@ async function embedQuery(text: string): Promise<number[]> {
   return response.data[0]?.embedding ?? []
 }
 
+function parseVisibility(raw: unknown): Record<string, unknown> {
+  if (typeof raw === 'string') {
+    try { return JSON.parse(raw) } catch { return {} }
+  }
+  return (raw as Record<string, unknown>) ?? {}
+}
+
 // ─── Semantic search via pgvector ─────────────────────────────────────────────
 
 async function semanticSearch(
@@ -77,7 +84,7 @@ async function semanticSearch(
       content: row['content'] as string,
       score: Number(row['score']),
       chunkIndex: Number(row['chunk_index']),
-      visibility: row['visibility'] as Record<string, unknown>,
+      visibility: parseVisibility(row['visibility']),
     }
   })
 }
@@ -123,7 +130,7 @@ async function fullTextSearch(
       content: row['content'] as string,
       rank: Number(row['rank']),
       chunkIndex: Number(row['chunk_index']),
-      visibility: row['visibility'] as Record<string, unknown>,
+      visibility: parseVisibility(row['visibility']),
     }
   })
 }

@@ -12,7 +12,7 @@ export function hasPermission(role: UserRole, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role]?.includes(permission) ?? false
 }
 
-export const CONFIDENCE_GATE_THRESHOLD = 0.5
+export const CONFIDENCE_GATE_THRESHOLD = 0.38
 export const SEMANTIC_WEIGHT = 0.7
 export const BM25_WEIGHT = 0.3
 export const TOP_K_CHUNKS = 5
@@ -20,7 +20,7 @@ export const CHUNK_SIZE_CHARS = 2000
 export const CHUNK_OVERLAP_CHARS = 200
 export const EMBEDDING_DIMENSIONS = 1536
 export const EMBEDDING_MODEL = 'text-embedding-3-large'
-export const SYNTHESIS_MODEL = 'claude-haiku-4-5'
+export const SYNTHESIS_MODEL = 'claude-haiku-4-5-20251001'
 export const QUERY_LOG_RETENTION_DAYS = 90
 export const ORG_QUARANTINE_DAYS = 30
 export const STRIPE_PLATFORM_FEE_PERCENT = 15

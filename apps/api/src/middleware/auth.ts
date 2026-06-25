@@ -1,5 +1,6 @@
 import { createMiddleware } from 'hono/factory'
 import { jwtVerify } from 'jose'
+import { getCookie } from 'hono/cookie'
 import type { UserRole } from '@company-brain/shared'
 
 export type AuthVars = {
@@ -11,8 +12,9 @@ export type AuthVars = {
 }
 
 export const authMiddleware = createMiddleware<AuthVars>(async (c, next) => {
+  const cookie = getCookie(c, 'auth_token')
   const authHeader = c.req.header('Authorization')
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+  const token = cookie ?? (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null)
 
   if (!token) {
     return c.json(

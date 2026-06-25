@@ -280,11 +280,7 @@ function ActiveChat({
 
                   {/* Answer */}
                   <div style={{ fontSize: 16, color: '#0b1c30', lineHeight: 1.7 }}>
-                    {(entry.response.confidence ?? 1) < 0.5 ? (
-                      <p style={{ color: '#585f67', fontStyle: 'italic' }}>No answer found in the knowledge base.</p>
-                    ) : (
-                      entry.response.answer
-                    )}
+                    {entry.response.answer}
                   </div>
 
                   {/* Sources */}
