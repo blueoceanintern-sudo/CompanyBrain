@@ -265,7 +265,7 @@ function ActiveChat({
                     <span style={{ fontSize: 14, fontWeight: 700, color: '#004ac6' }}>Brain AI</span>
                   </div>
 
-                  <div style={{ fontSize: 16, color: '#0b1c30', lineHeight: 1.7 }}>
+                  <div style={{ fontSize: 16, color: '#0b1c30', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
                     {entry.response.answer}
                   </div>
 

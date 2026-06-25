@@ -5,7 +5,7 @@ import { db } from '@company-brain/db'
 import { queries, orgs, users } from '@company-brain/db'
 import { eq, desc } from 'drizzle-orm'
 import { retrieveChunks } from '@company-brain/retrieval'
-import { synthesizeAnswer } from '@company-brain/synthesis'
+import { synthesizeAnswer, contextualizeQuery } from '@company-brain/synthesis'
 import { CONFIDENCE_GATE_THRESHOLD } from '@company-brain/shared'
 import { canPublishExternal } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
@@ -14,10 +14,16 @@ const queryRoute = new Hono<AuthVars>()
 
 const SOURCE_TYPES = ['hr_policy', 'sop', 'faq', 'case_note', 'compliance', 'product_doc', 'other'] as const
 
+const conversationTurnSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string(),
+})
+
 const querySchema = z.object({
   query: z.string().min(1).max(2000),
   accessTier: z.enum(['internal', 'external']).default('internal'),
   sourceTypes: z.array(z.enum(SOURCE_TYPES)).optional(),
+  history: z.array(conversationTurnSchema).max(40).optional(),
 })
 
 // POST /orgs/:id/query
@@ -26,7 +32,7 @@ queryRoute.post('/', zValidator('json', querySchema), async (c) => {
   if (!orgId) return c.json({ success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } }, 400)
   const userId = c.get('userId')
   const userRole = c.get('role')
-  const { query, accessTier, sourceTypes } = c.req.valid('json')
+  const { query, accessTier, sourceTypes, history } = c.req.valid('json')
 
   if (accessTier === 'external') {
     const orgRow = await db.select({ plan: orgs.plan }).from(orgs).where(eq(orgs.id, orgId)).limit(1)
@@ -50,11 +56,17 @@ queryRoute.post('/', zValidator('json', querySchema), async (c) => {
   }
 
   try {
+    // For follow-up questions, rewrite the query into a standalone search query
+    // so retrieval finds relevant chunks even for short contextual questions.
+    const retrievalQuery = history?.length
+      ? await contextualizeQuery(query, history)
+      : query
+
     // Retrieve
     const retrievalResult = await retrieveChunks({
       orgId,
       userId,
-      query,
+      query: retrievalQuery,
       accessTier,
       userRole,
       ...(sourceTypes !== undefined ? { sourceTypes } : {}),
@@ -66,8 +78,11 @@ queryRoute.post('/', zValidator('json', querySchema), async (c) => {
 
     const { chunks, confidence } = retrievalResult.data
 
-    // Confidence gate
-    if (confidence < CONFIDENCE_GATE_THRESHOLD || chunks.length === 0) {
+    // Confidence gate — skip when there is conversation history so follow-up
+    // questions ("reframe that", "tell me more") reach synthesis instead of
+    // short-circuiting here with "I don't know".
+    const isFollowUp = history && history.length > 0
+    if (!isFollowUp && (confidence < CONFIDENCE_GATE_THRESHOLD || chunks.length === 0)) {
       const response = {
         answer: "I don't know — this question is not in the knowledge base.",
         citations: [] as never[],
@@ -84,7 +99,7 @@ queryRoute.post('/', zValidator('json', querySchema), async (c) => {
     }
 
     // Synthesize
-    const synthesisResult = await synthesizeAnswer({ query, chunks })
+    const synthesisResult = await synthesizeAnswer({ query, chunks, history })
 
     if (!synthesisResult.success) {
       return c.json({ success: false, error: synthesisResult.error }, 500)
