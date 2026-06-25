@@ -2,11 +2,15 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { SignJWT } from 'jose'
+import { setCookie, deleteCookie } from 'hono/cookie'
 import { db } from '@company-brain/db'
 import { users } from '@company-brain/db'
 import { eq } from 'drizzle-orm'
 
 const authRoute = new Hono()
+
+const COOKIE_NAME = 'auth_token'
+const COOKIE_MAX_AGE = 8 * 60 * 60
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -49,13 +53,25 @@ authRoute.post('/login', zValidator('json', loginSchema), async (c) => {
     .setExpirationTime('8h')
     .sign(secret)
 
+  setCookie(c, COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: COOKIE_MAX_AGE,
+    secure: process.env.NODE_ENV === 'production',
+  })
+
   return c.json({
     success: true,
     data: {
-      token,
       user: { id: user.id, email: user.email, role: user.role, orgId: user.orgId },
     },
   })
+})
+
+authRoute.post('/logout', (c) => {
+  deleteCookie(c, COOKIE_NAME, { path: '/' })
+  return c.json({ success: true, data: null })
 })
 
 export default authRoute

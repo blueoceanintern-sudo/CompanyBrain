@@ -12,7 +12,7 @@ import { getAuthUser } from '@/lib/auth'
 import { getSubscription, cancelSubscription } from '@/lib/api'
 import { hasPermission } from '@company-brain/shared'
 
-type Tab = 'general' | 'compartments' | 'subscription' | 'danger'
+type Tab = 'general' | 'subscription' | 'danger'
 
 function useSubscription(orgId: string) {
   return useQuery({
@@ -158,7 +158,6 @@ export default function SettingsPage() {
     }
   }, [searchParams, router, qc, orgId])
 
-  const { data: compartments = [], isLoading: compartmentsLoading } = useCompartments(orgId)
   const { data: sub, isLoading: subLoading } = useSubscription(orgId)
   const createComp = useCreateCompartment(orgId)
   const updateComp = useUpdateCompartment(orgId)
@@ -176,7 +175,6 @@ export default function SettingsPage() {
 
   const TABS: { key: Tab; label: string }[] = [
     { key: 'general', label: 'General' },
-    { key: 'compartments', label: 'Compartments' },
     { key: 'subscription', label: 'Subscription' },
     { key: 'danger', label: 'Danger Zone' },
   ]

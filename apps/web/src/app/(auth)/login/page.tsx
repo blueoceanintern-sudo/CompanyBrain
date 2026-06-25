@@ -34,7 +34,7 @@ function LoginForm() {
       toast.error(result.error.message)
       return
     }
-    setAuth(result.data.token, result.data.user)
+    setAuth(result.data.user)
     router.push('/chat')
   }
 

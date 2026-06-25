@@ -44,20 +44,16 @@ async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<ApiResult<T>> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
-
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> | undefined),
   }
 
-  if (token) headers['Authorization'] = `Bearer ${token}`
-
   try {
-    const res = await fetch(`${API_URL}${path}`, { ...options, headers })
-    if (res.status === 401 && path !== '/api/v1/auth/login') {
+    const res = await fetch(`${API_URL}${path}`, { ...options, headers, credentials: 'include' })
+    if (res.status === 401) {
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('auth_token')
+        fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
         localStorage.removeItem('auth_user')
         window.location.replace('/login')
       }
@@ -72,12 +68,8 @@ async function apiUpload<T>(
   path: string,
   formData: FormData
 ): Promise<ApiResult<T>> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
-  const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
-
   try {
-    const res = await fetch(`${API_URL}${path}`, { method: 'POST', headers, body: formData })
+    const res = await fetch(`${API_URL}${path}`, { method: 'POST', body: formData, credentials: 'include' })
     return parseResult<T>(res)
   } catch {
     return networkError('Could not reach the server. Check your connection.')
@@ -94,10 +86,25 @@ export interface AuthUser {
 }
 
 export async function login(email: string, password: string) {
-  return apiFetch<{ token: string; user: AuthUser }>('/api/v1/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  })
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    return parseResult<{ user: AuthUser }>(res)
+  } catch {
+    return networkError('Could not reach the server. Check your connection.')
+  }
+}
+
+export async function logout() {
+  try {
+    const res = await fetch('/api/auth/logout', { method: 'POST' })
+    return parseResult<null>(res)
+  } catch {
+    return networkError('Could not reach the server.')
+  }
 }
 
 // ─── Documents ────────────────────────────────────────────────────────────────
@@ -271,10 +278,9 @@ export async function startCheckout(orgId: string) {
 }
 
 export async function exportAuditLog(orgId: string): Promise<Blob> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
   try {
     const res = await fetch(`${API_URL}/api/v1/orgs/${orgId}/analytics/export`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'include',
     })
     if (!res.ok) throw new Error(`Server error: ${res.status}`)
     return res.blob()
