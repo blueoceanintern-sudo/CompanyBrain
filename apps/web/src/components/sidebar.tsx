@@ -7,10 +7,10 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   MessageSquare, FileText, BarChart2, ClipboardCheck,
   Users, Settings, Brain, LogOut, Menu, X, Building2,
-  ChevronLeft, ChevronRight, Plus, Clock,
+  ChevronLeft, ChevronRight, Plus, MessageCircle,
 } from 'lucide-react'
-import { useQueryHistory } from '@/hooks/use-queries'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import { useChatHistory } from '@/lib/chat-history-context'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getAuthUser, clearAuth } from '@/lib/auth'
 import { NAV } from '@/lib/nav'
@@ -46,11 +46,7 @@ function SidebarContent({
 
   useEffect(() => { setUser(getAuthUser()) }, [])
 
-  const isChatSection = pathname.startsWith('/chat')
-  const queryHistory = useQueryHistory(user?.orgId ?? '')
-  const recentSessions = (queryHistory.data ?? [])
-    .filter((s) => s.userId === user?.id)
-    .slice(0, 5)
+  const { sessions, loadSession } = useChatHistory()
 
   const visible = NAV.filter((n) => user?.role && hasPermission(user.role, n.permission))
   const initial = (user?.email?.[0] ?? '?').toUpperCase()
@@ -190,7 +186,7 @@ function SidebarContent({
             )
           }
 
-          if (item.href === '/chat' && isChatSection) {
+          if (item.href === '/chat') {
             return (
               <div key={item.href} className="w-full">
                 {linkEl}
@@ -203,16 +199,16 @@ function SidebarContent({
                   >
                     <Plus size={13} /> New Chat
                   </button>
-                  {recentSessions.map((s) => (
+                  {sessions.map((s) => (
                     <button
                       key={s.id}
-                      onClick={() => router.push(`/chat?q=${encodeURIComponent(s.queryText)}`)}
+                      onClick={() => { loadSession(s.id); router.push('/chat') }}
                       style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 8px', background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', fontSize: 12, fontFamily: 'inherit', borderRadius: 8, width: '100%', textAlign: 'left', overflow: 'hidden' }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#dce9ff'; (e.currentTarget as HTMLElement).style.color = '#0b1c30' }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none'; (e.currentTarget as HTMLElement).style.color = '#585f67' }}
                     >
-                      <Clock size={12} style={{ flexShrink: 0, color: '#737686' }} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.queryText}</span>
+                      <MessageCircle size={12} style={{ flexShrink: 0, color: '#737686' }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.title}</span>
                     </button>
                   ))}
                 </div>

@@ -8,20 +8,12 @@ import {
   Sparkles, Clock, CreditCard,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useMutation } from '@tanstack/react-query'
 import { submitQuery as apiSubmitQuery } from '@/lib/api'
 import { useExternalPricing, useStartCheckout } from '@/hooks/use-payments'
 import { getAuthUser } from '@/lib/auth'
-import type { QueryResponse, ConversationTurn } from '@company-brain/shared'
-
-interface HistoryEntry {
-  id: string
-  question: string
-  response?: QueryResponse
-  expanded: boolean
-  pending?: true
-  error?: string
-}
+import { useChatHistory } from '@/lib/chat-history-context'
+import type { ConversationTurn } from '@company-brain/shared'
+import type { HistoryEntry } from '@/lib/chat-history-context'
 
 const SUGGESTIONS = [
   { icon: BookOpen,  label: 'Company remote policy' },
@@ -300,6 +292,7 @@ function ActiveChat({
                     ))}
                   </div>
                 </div>
+                </div>
               )}
             </div>
           ))}
@@ -380,17 +373,27 @@ export default function ChatPage() {
     }
   }, [searchParams, router, orgId, isExternalClient])
 
+  const { history, setHistory, recentQueries, setRecentQueries, saveCurrentAsSession, pendingSession, clearPendingSession } = useChatHistory()
   const [input, setInput] = useState('')
-  const [history, setHistory] = useState<HistoryEntry[]>([])
-  const [recentQueries, setRecentQueries] = useState<string[]>([])
   const [isPending, setIsPending] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // On mount: restore a clicked session, otherwise start fresh
+  useEffect(() => {
+    if (pendingSession) {
+      setHistory(pendingSession)
+      clearPendingSession()
+    } else {
+      setHistory([])
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     const q = searchParams.get('q')
     const isNew = searchParams.get('new') === '1'
     if (isNew) {
-      setHistory([])
+      saveCurrentAsSession()
       setInput('')
       if (textareaRef.current) textareaRef.current.style.height = 'auto'
       router.replace('/chat')
@@ -456,12 +459,7 @@ export default function ChatPage() {
   const isEmpty = history.length === 0
 
   const handleNewChat = () => {
-    const questions = history.map((h) => h.question).filter(Boolean)
-    setRecentQueries((prev) => {
-      const merged = [...questions.filter((q) => !prev.includes(q)), ...prev]
-      return merged.slice(0, 8)
-    })
-    setHistory([])
+    saveCurrentAsSession()
     setInput('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
   }
