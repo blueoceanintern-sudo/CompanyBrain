@@ -266,6 +266,8 @@ function ActiveChat({
                   </div>
 
                   <div style={{ fontSize: 16, color: '#0b1c30', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                  {/* Answer */}
+                  <div style={{ fontSize: 16, color: '#0b1c30', lineHeight: 1.7 }}>
                     {entry.response.answer}
                   </div>
 
