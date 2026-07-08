@@ -5,6 +5,7 @@ import type {
   UserSummary,
   QueryHistoryItem,
   UserRole,
+  ConversationTurn,
 } from '@company-brain/shared'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002'
@@ -126,10 +127,15 @@ export async function deleteDocument(orgId: string, docId: string) {
 
 // ─── Query ────────────────────────────────────────────────────────────────────
 
-export async function submitQuery(orgId: string, query: string, accessTier: 'internal' | 'external' = 'internal') {
+export async function submitQuery(
+  orgId: string,
+  query: string,
+  accessTier: 'internal' | 'external' = 'internal',
+  history?: ConversationTurn[]
+) {
   return apiFetch<QueryResponse>(`/api/v1/orgs/${orgId}/query`, {
     method: 'POST',
-    body: JSON.stringify({ query, accessTier }),
+    body: JSON.stringify({ query, accessTier, ...(history?.length ? { history } : {}) }),
   })
 }
 

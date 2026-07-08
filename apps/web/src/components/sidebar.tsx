@@ -7,9 +7,10 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   MessageSquare, FileText, BarChart2, ClipboardCheck,
   Users, Settings, Brain, LogOut, Menu, X, Building2,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Plus, MessageCircle,
 } from 'lucide-react'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import { useChatHistory } from '@/lib/chat-history-context'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getAuthUser, clearAuth } from '@/lib/auth'
 import { NAV } from '@/lib/nav'
@@ -44,6 +45,8 @@ function SidebarContent({
   const [logoHovered, setLogoHovered] = useState(false)
 
   useEffect(() => { setUser(getAuthUser()) }, [])
+
+  const { sessions, loadSession } = useChatHistory()
 
   const visible = NAV.filter((n) => user?.role && hasPermission(user.role, n.permission))
   const initial = (user?.email?.[0] ?? '?').toUpperCase()
@@ -182,6 +185,37 @@ function SidebarContent({
               </Tooltip>
             )
           }
+
+          if (item.href === '/chat') {
+            return (
+              <div key={item.href} className="w-full">
+                {linkEl}
+                <div style={{ paddingLeft: 48, paddingRight: 8, display: 'flex', flexDirection: 'column', gap: 1, marginTop: 2 }}>
+                  <button
+                    onClick={() => router.push('/chat?new=1')}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 8px', background: 'none', border: 'none', cursor: 'pointer', color: '#004ac6', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', borderRadius: 8, width: '100%', textAlign: 'left' }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#dce9ff' }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none' }}
+                  >
+                    <Plus size={13} /> New Chat
+                  </button>
+                  {sessions.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => { loadSession(s.id); router.push('/chat') }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 8px', background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', fontSize: 12, fontFamily: 'inherit', borderRadius: 8, width: '100%', textAlign: 'left', overflow: 'hidden' }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#dce9ff'; (e.currentTarget as HTMLElement).style.color = '#0b1c30' }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none'; (e.currentTarget as HTMLElement).style.color = '#585f67' }}
+                    >
+                      <MessageCircle size={12} style={{ flexShrink: 0, color: '#737686' }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.title}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          }
+
           return <div key={item.href} className="w-full">{linkEl}</div>
         })}
       </nav>

@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { Sidebar, MobileMenuButton } from '@/components/sidebar'
 import { Providers } from '@/app/providers'
+import { ChatHistoryProvider, useChatHistory } from '@/lib/chat-history-context'
 import { getAuthUser, isAuthenticated } from '@/lib/auth'
 import { routePermission } from '@/lib/nav'
 import { hasPermission } from '@company-brain/shared'
@@ -12,6 +13,16 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [allowed, setAllowed] = useState(false)
+  const { saveCurrentAsSession } = useChatHistory()
+  const prevPathRef = useRef(pathname)
+
+  useEffect(() => {
+    const prev = prevPathRef.current
+    prevPathRef.current = pathname
+    if (prev.startsWith('/chat') && !pathname.startsWith('/chat')) {
+      saveCurrentAsSession()
+    }
+  }, [pathname, saveCurrentAsSession])
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -65,7 +76,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <Providers>
-      <DashboardShell>{children}</DashboardShell>
+      <ChatHistoryProvider>
+        <DashboardShell>{children}</DashboardShell>
+      </ChatHistoryProvider>
     </Providers>
   )
 }
