@@ -6,6 +6,11 @@ COPY tsconfig.base.json ./
 COPY shared/package.json ./shared/
 COPY workers/package.json ./workers/
 COPY db/package.json ./db/
+COPY services/ingestion/package.json ./services/ingestion/
+COPY services/retrieval/package.json ./services/retrieval/
+COPY services/synthesis/package.json ./services/synthesis/
+COPY services/access-control/package.json ./services/access-control/
+COPY services/payments/package.json ./services/payments/
 COPY apps/web/package.json ./apps/web/
 
 RUN bun install --frozen-lockfile 2>/dev/null || bun install
