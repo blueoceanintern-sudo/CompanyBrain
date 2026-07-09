@@ -164,6 +164,12 @@ export interface RetrieveParams {
 export interface SynthesisParams {
   query: string
   chunks: ChunkContext[]
+  conversationHistory?: ConversationTurn[]
+}
+
+export interface ConversationTurn {
+  role: 'user' | 'assistant'
+  content: string
 }
 
 // ─── Analytics types ──────────────────────────────────────────────────────────
