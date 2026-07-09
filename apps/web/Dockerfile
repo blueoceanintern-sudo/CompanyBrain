@@ -4,6 +4,8 @@ WORKDIR /app
 COPY package.json bun.lockb* ./
 COPY tsconfig.base.json ./
 COPY shared/package.json ./shared/
+COPY workers/package.json ./workers/
+COPY db/package.json ./db/
 COPY apps/web/package.json ./apps/web/
 
 RUN bun install --frozen-lockfile 2>/dev/null || bun install
