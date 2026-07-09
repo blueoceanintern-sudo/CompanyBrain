@@ -15,7 +15,9 @@ import {
   EMBEDDING_DIMENSIONS,
 } from '@company-brain/shared'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? '' })
+}
 
 // ─── Text extraction ──────────────────────────────────────────────────────────
 
@@ -66,7 +68,7 @@ function chunkText(text: string): string[] {
 // ─── Embedding ────────────────────────────────────────────────────────────────
 
 async function embedBatch(texts: string[]): Promise<number[][]> {
-  const response = await openai.embeddings.create({
+  const response = await getOpenAI().embeddings.create({
     model: EMBEDDING_MODEL,
     input: texts,
     dimensions: EMBEDDING_DIMENSIONS,

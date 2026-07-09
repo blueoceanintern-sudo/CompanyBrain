@@ -13,7 +13,9 @@ import {
 } from '@company-brain/shared'
 import { canAccessChunk } from '@company-brain/access-control'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? '' })
+}
 
 function friendlyServiceError(raw: string): string {
   if (raw.includes('401') || /api.?key|authentication|unauthorized/i.test(raw))
@@ -28,7 +30,7 @@ function friendlyServiceError(raw: string): string {
 // ─── Embed a single query ─────────────────────────────────────────────────────
 
 async function embedQuery(text: string): Promise<number[]> {
-  const response = await openai.embeddings.create({
+  const response = await getOpenAI().embeddings.create({
     model: EMBEDDING_MODEL,
     input: text,
     dimensions: EMBEDDING_DIMENSIONS,

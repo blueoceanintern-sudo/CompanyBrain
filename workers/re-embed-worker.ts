@@ -4,7 +4,9 @@ import { eq, sql } from 'drizzle-orm'
 import OpenAI from 'openai'
 import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@company-brain/shared'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? '' })
+}
 
 /**
  * Re-embeds all active chunks. Run manually after an embedding model change.
@@ -27,7 +29,7 @@ export async function runReEmbed(): Promise<void> {
     if (batch.length === 0) break
 
     const texts = batch.map((c) => c.content)
-    const response = await openai.embeddings.create({
+    const response = await getOpenAI().embeddings.create({
       model: EMBEDDING_MODEL,
       input: texts,
       dimensions: EMBEDDING_DIMENSIONS,
