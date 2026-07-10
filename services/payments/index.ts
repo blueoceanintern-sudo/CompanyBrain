@@ -5,9 +5,11 @@ import { eq } from 'drizzle-orm'
 import type { ServiceResult } from '@company-brain/shared'
 import { STRIPE_PLATFORM_FEE_PERCENT } from '@company-brain/shared'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-06-20',
-})
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY ?? '', {
+    apiVersion: '2024-06-20',
+  })
+}
 
 const platformFeePercent =
   Number(process.env.STRIPE_PLATFORM_FEE_PERCENT ?? STRIPE_PLATFORM_FEE_PERCENT) / 100
@@ -30,7 +32,7 @@ export async function ensureStripeCustomer(
       return { success: true, data: { customerId: org[0].stripeCustomerId } }
     }
 
-    const customer = await stripe.customers.create({ name: orgName, email })
+    const customer = await getStripe().customers.create({ name: orgName, email })
 
     await db
       .update(orgs)
@@ -55,7 +57,7 @@ export async function createSubscription(params: {
   const { orgId, customerId, priceId, connectedAccountId } = params
 
   try {
-    const subscription = await stripe.subscriptions.create({
+    const subscription = await getStripe().subscriptions.create({
       customer: customerId,
       items: [{ price: priceId }],
       application_fee_percent: platformFeePercent * 100,
@@ -101,7 +103,7 @@ export async function ensureConnectOnboardingLink(
     let accountId = org[0].stripeConnectAccountId
 
     if (!accountId) {
-      const account = await stripe.accounts.create({
+      const account = await getStripe().accounts.create({
         type: 'express',
         metadata: { orgId },
       })
@@ -114,7 +116,7 @@ export async function ensureConnectOnboardingLink(
     }
 
     const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000'
-    const accountLink = await stripe.accountLinks.create({
+    const accountLink = await getStripe().accountLinks.create({
       account: accountId,
       refresh_url: `${webUrl}/settings?connect=refresh`,
       return_url: `${webUrl}/settings?connect=success`,
@@ -190,12 +192,12 @@ export async function getSubscriptionStatus(
     let status: string | null = null
 
     if (subscriptionId) {
-      const sub = await stripe.subscriptions.retrieve(subscriptionId)
+      const sub = await getStripe().subscriptions.retrieve(subscriptionId)
       status = sub.status
     } else if (o.stripeCustomerId && plan === 'free') {
       // Read-through: webhook may not have landed yet. Check Stripe directly and
       // sync the DB if Stripe is ahead — webhooks remain the primary update path.
-      const activeSubs = await stripe.subscriptions.list({
+      const activeSubs = await getStripe().subscriptions.list({
         customer: o.stripeCustomerId,
         status: 'active',
         limit: 1,
@@ -241,7 +243,7 @@ export async function cancelOrgSubscription(
 
     const subId = org[0]?.stripeSubscriptionId
     if (subId) {
-      await stripe.subscriptions.cancel(subId)
+      await getStripe().subscriptions.cancel(subId)
     }
 
     await db
@@ -273,7 +275,7 @@ export async function ensureClientStripeCustomer(
       return { success: true, data: { customerId: userRow[0].stripeCustomerId } }
     }
 
-    const customer = await stripe.customers.create({ email })
+    const customer = await getStripe().customers.create({ email })
 
     await db
       .update(users)
@@ -328,7 +330,7 @@ export async function createClientCheckoutSession(params: {
 
     const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000'
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       mode: 'subscription',
       customer: customerResult.data.customerId,
       line_items: [
@@ -381,7 +383,7 @@ export async function createOrgUpgradeSession(
 
     // Ask Stripe directly — the DB may lag behind the webhook by several seconds,
     // so we cannot rely on plan === 'paid' alone to block a second checkout.
-    const activeSubs = await stripe.subscriptions.list({
+    const activeSubs = await getStripe().subscriptions.list({
       customer: customerResult.data.customerId,
       status: 'active',
       limit: 1,
@@ -391,7 +393,7 @@ export async function createOrgUpgradeSession(
     }
 
     const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000'
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       mode: 'subscription',
       customer: customerResult.data.customerId,
       line_items: [{ price: priceId, quantity: 1 }],
@@ -430,7 +432,7 @@ export async function createBillingPortalSession(
     }
 
     const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000'
-    const session = await stripe.billingPortal.sessions.create({
+    const session = await getStripe().billingPortal.sessions.create({
       customer: customerId,
       return_url: `${webUrl}/settings`,
     })
@@ -451,7 +453,7 @@ export async function handleStripeWebhook(params: {
   const { payload, signature } = params
 
   try {
-    const event = await stripe.webhooks.constructEventAsync(
+    const event = await getStripe().webhooks.constructEventAsync(
       payload,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
