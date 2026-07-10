@@ -1,3 +1,6 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 DO $$ BEGIN
  CREATE TYPE "public"."access_tier" AS ENUM('internal', 'external');
 EXCEPTION

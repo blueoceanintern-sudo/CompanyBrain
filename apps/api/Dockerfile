@@ -11,6 +11,7 @@ COPY services/retrieval/package.json ./services/retrieval/
 COPY services/synthesis/package.json ./services/synthesis/
 COPY services/access-control/package.json ./services/access-control/
 COPY services/payments/package.json ./services/payments/
+COPY workers/package.json ./workers/
 COPY apps/api/package.json ./apps/api/
 
 RUN bun install --frozen-lockfile 2>/dev/null || bun install
