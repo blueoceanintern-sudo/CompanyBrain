@@ -39,8 +39,6 @@ bun db:migrate
 Then create required Postgres extensions and apply HNSW and FTS indexes (one-time, after first migration):
 
 ```bash
-# Ensure required extensions (pgvector, pg_trgm) exist before creating indexes
-psql $DATABASE_URL -f db/init.sql
 psql $DATABASE_URL -f db/post-migrate.sql
 ```
 
