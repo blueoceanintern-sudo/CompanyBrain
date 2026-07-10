@@ -3,10 +3,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Database, MessageSquare, Link2, AlertTriangle, TrendingUp, TrendingDown, MoreHorizontal, ExternalLink } from 'lucide-react'
-import {
-  LineChart, Line,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-} from 'recharts'
 import { useAnalyticsOverview, useTopUnanswered } from '@/hooks/use-analytics'
 import { getAuthUser } from '@/lib/auth'
 import { formatDate, formatPercent } from '@/lib/utils'
