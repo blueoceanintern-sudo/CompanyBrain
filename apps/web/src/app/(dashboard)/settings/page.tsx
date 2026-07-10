@@ -4,13 +4,16 @@ import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { CreditCard } from 'lucide-react'
+import { FolderOpen, Plus, Pencil, Trash2, CreditCard, Check, X } from 'lucide-react'
+import { useCompartments, useCreateCompartment, useUpdateCompartment, useDeleteCompartment } from '@/hooks/use-compartments'
+import type { CompartmentSummary } from '@company-brain/shared'
+
 import { useConnectStatus, useStartConnectOnboarding, useExternalPricing, useSetExternalPricing, useStartOrgUpgrade, useOpenBillingPortal } from '@/hooks/use-payments'
 import { getAuthUser } from '@/lib/auth'
 import { getSubscription, cancelSubscription } from '@/lib/api'
 import { hasPermission } from '@company-brain/shared'
 
-type Tab = 'general' | 'subscription' | 'danger'
+type Tab = 'general' | 'compartments' | 'subscription' | 'danger'
 
 function useSubscription(orgId: string) {
   return useQuery({
@@ -119,12 +122,166 @@ function BillingSection({ orgId, plan, inputBase }: { orgId: string; plan: strin
   )
 }
 
+// ─── Compartments (users:manage only for edit/delete) ──────────────────────────
+
+function CompartmentsSection({ orgId, canManage, inputBase }: { orgId: string; canManage: boolean; inputBase: React.CSSProperties }) {
+  const { data: compartments = [], isLoading } = useCompartments(orgId)
+  const createComp = useCreateCompartment(orgId)
+  const updateComp = useUpdateCompartment(orgId)
+  const deleteComp = useDeleteCompartment(orgId)
+
+  const [showCreate, setShowCreate] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [reassignTarget, setReassignTarget] = useState('') // '' = delete documents too
+
+  const createCompartment = () => {
+    const name = newName.trim()
+    if (!name) return
+    createComp.mutate({ name }, { onSuccess: () => { setShowCreate(false); setNewName('') } })
+  }
+
+  const startEdit = (c: CompartmentSummary) => { setEditingId(c.id); setEditName(c.name) }
+  const saveEdit = (cId: string) => {
+    const name = editName.trim()
+    if (!name) return
+    updateComp.mutate({ cId, data: { name } }, { onSuccess: () => setEditingId(null) })
+  }
+  const confirmDelete = (cId: string) => {
+    const vars = reassignTarget ? { cId, targetCompartmentId: reassignTarget } : { cId }
+    deleteComp.mutate(vars, { onSuccess: () => setDeletingId(null) })
+  }
+
+  const iconBtn: React.CSSProperties = { padding: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 6, display: 'flex' }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16 }}>
+        <div>
+          <h2 style={{ fontSize: 20, fontWeight: 600, color: '#0b1c30', margin: '0 0 8px' }}>Data Compartments</h2>
+          <p style={{ fontSize: 14, color: '#434655', margin: 0 }}>Create, rename, or remove logical containers for your knowledge base.</p>
+        </div>
+        {canManage && (
+          <button
+            onClick={() => { setShowCreate(true); setNewName('') }}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 20px', background: '#004ac6', color: '#ffffff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+          >
+            <Plus size={16} /> New Compartment
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {isLoading && Array.from({ length: 3 }).map((_, i) => <Skel key={i} h={64} />)}
+        {!isLoading && compartments.length === 0 && !showCreate && (
+          <p style={{ color: '#585f67', fontSize: 14, textAlign: 'center', padding: 32 }}>No compartments yet. Create one to organise your knowledge.</p>
+        )}
+
+        {showCreate && (
+          <div style={{ padding: 16, border: '1px solid #c3c6d7', borderRadius: 12, background: '#f8f9ff', display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Name</label>
+              <input
+                autoFocus
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') createCompartment(); if (e.key === 'Escape') { setShowCreate(false); setNewName('') } }}
+                style={inputBase}
+                placeholder="e.g. HR Department"
+              />
+            </div>
+            <button
+              onClick={createCompartment}
+              disabled={!newName.trim() || createComp.isPending}
+              style={{ height: 48, padding: '0 16px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: (!newName.trim() || createComp.isPending) ? 'not-allowed' : 'pointer', opacity: (!newName.trim() || createComp.isPending) ? 0.6 : 1, fontFamily: 'inherit' }}
+            >
+              {createComp.isPending ? 'Creating…' : 'Create'}
+            </button>
+            <button onClick={() => { setShowCreate(false); setNewName('') }} style={{ height: 48, padding: '0 16px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>
+              Cancel
+            </button>
+          </div>
+        )}
+        {compartments.map((c) => (
+          <div key={c.id} style={{ border: '1px solid #c3c6d7', borderRadius: 12, background: '#ffffff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, minWidth: 0 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 8, background: '#e5eeff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <FolderOpen size={18} color="#004ac6" />
+                </div>
+                {editingId === c.id ? (
+                  <input
+                    autoFocus
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(c.id); if (e.key === 'Escape') setEditingId(null) }}
+                    style={{ ...inputBase, height: 40 }}
+                  />
+                ) : (
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: 14, fontWeight: 500, color: '#0b1c30', margin: 0 }}>{c.name}</p>
+                    {c.description && <p style={{ fontSize: 12, color: '#585f67', margin: '2px 0 0' }}>{c.description}</p>}
+                  </div>
+                )}
+              </div>
+
+              {canManage && (
+                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                  {editingId === c.id ? (
+                    <>
+                      <button onClick={() => saveEdit(c.id)} disabled={updateComp.isPending || !editName.trim()} aria-label="Save name" style={{ ...iconBtn, color: '#16a34a', cursor: updateComp.isPending ? 'not-allowed' : 'pointer' }}><Check size={18} /></button>
+                      <button onClick={() => setEditingId(null)} aria-label="Cancel rename" style={iconBtn}><X size={18} /></button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => startEdit(c)} aria-label="Rename compartment" style={iconBtn}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#004ac6' }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#585f67' }}
+                      ><Pencil size={18} /></button>
+                      <button onClick={() => { setDeletingId(c.id); setReassignTarget('') }} aria-label="Delete compartment" style={iconBtn}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ba1a1a' }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#585f67' }}
+                      ><Trash2 size={18} /></button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {deletingId === c.id && (
+              <div style={{ borderTop: '1px solid #ffdad6', background: 'rgba(255,218,214,0.08)', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <p style={{ fontSize: 13, color: '#ba1a1a', margin: 0, fontWeight: 500 }}>Delete &ldquo;{c.name}&rdquo;? Choose what happens to its documents.</p>
+                <select value={reassignTarget} onChange={(e) => setReassignTarget(e.target.value)} style={{ ...inputBase, height: 44 }}>
+                  <option value="">Delete all documents in this compartment</option>
+                  {compartments.filter((o) => o.id !== c.id).map((o) => (
+                    <option key={o.id} value={o.id}>Move documents to &ldquo;{o.name}&rdquo;</option>
+                  ))}
+                </select>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                  <button onClick={() => setDeletingId(null)} style={{ height: 40, padding: '0 16px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>Cancel</button>
+                  <button onClick={() => confirmDelete(c.id)} disabled={deleteComp.isPending}
+                    style={{ height: 40, padding: '0 16px', border: 'none', borderRadius: 8, background: '#ba1a1a', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: deleteComp.isPending ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+                  >{deleteComp.isPending ? 'Deleting…' : 'Delete Compartment'}</button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
   const [tab, setTab] = useState<Tab>('general')
+
   const searchParams = useSearchParams()
   const router = useRouter()
   const qc = useQueryClient()
@@ -154,6 +311,7 @@ export default function SettingsPage() {
   const orgUpgrade = useStartOrgUpgrade(orgId)
   const billingPortal = useOpenBillingPortal(orgId)
   const canManageBilling = !!user?.role && hasPermission(user.role, 'billing:manage')
+  const canManageCompartments = !!user?.role && hasPermission(user.role, 'users:manage')
 
   const inputBase: React.CSSProperties = {
     width: '100%', height: 48, padding: '0 16px', border: '1px solid #c3c6d7', borderRadius: 8,
@@ -163,6 +321,7 @@ export default function SettingsPage() {
 
   const TABS: { key: Tab; label: string }[] = [
     { key: 'general', label: 'General' },
+    { key: 'compartments', label: 'Compartments' },
     { key: 'subscription', label: 'Subscription' },
     { key: 'danger', label: 'Danger Zone' },
   ]
@@ -244,6 +403,11 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* ── Compartments ── */}
+          {tab === 'compartments' && (
+            <CompartmentsSection orgId={orgId} canManage={canManageCompartments} inputBase={inputBase} />
           )}
 
           {/* ── Subscription ── */}
