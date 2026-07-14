@@ -5,8 +5,6 @@ services:
       POSTGRES_DB: blueocean
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/00_init.sql
@@ -15,6 +13,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   api:
     build:
