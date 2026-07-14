@@ -4,6 +4,7 @@ WORKDIR /app
 # Copy manifests first for layer cache
 COPY package.json bun.lockb* ./
 COPY tsconfig.base.json ./
+COPY drizzle.config.ts ./
 COPY shared/package.json ./shared/
 COPY db/package.json ./db/
 COPY services/ingestion/package.json ./services/ingestion/
@@ -23,4 +24,4 @@ COPY services/ ./services/
 COPY apps/api/ ./apps/api/
 
 EXPOSE 3002
-CMD ["bun", "run", "apps/api/src/index.ts"]
+CMD ["sh", "-c", "bunx drizzle-kit migrate && bun run apps/api/src/index.ts"]
