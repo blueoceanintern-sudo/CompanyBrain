@@ -75,12 +75,11 @@ authRoute.post('/logout', (c) => {
 })
 
 const setupSchema = z.object({
-  orgName: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(8),
 })
 
-// One-time setup: creates the first org + super_admin. Locked out once any user exists.
+// One-time setup: creates the root super_admin. Locked out once any user exists.
 authRoute.post('/setup', zValidator('json', setupSchema), async (c) => {
   const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(users)
   if (count > 0) {
@@ -90,10 +89,10 @@ authRoute.post('/setup', zValidator('json', setupSchema), async (c) => {
     )
   }
 
-  const { orgName, email, password } = c.req.valid('json')
+  const { email, password } = c.req.valid('json')
   const passwordHash = await Bun.password.hash(password)
 
-  const [org] = await db.insert(orgs).values({ name: orgName }).returning()
+  const [org] = await db.insert(orgs).values({ name: 'Root' }).returning()
   const [user] = await db
     .insert(users)
     .values({ orgId: org.id, email, passwordHash, role: 'super_admin' })
