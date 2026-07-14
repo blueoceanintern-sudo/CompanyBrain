@@ -28,14 +28,16 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN bun run build
 
 FROM oven/bun:1-alpine AS runner
-WORKDIR /app/apps/web
+# Root at the monorepo level so the standalone mirror (apps/web/server.js, etc.) lands correctly
+WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=builder /app/apps/web/.next/standalone ./
-COPY --from=builder /app/apps/web/.next/static ./.next/static
-# COPY --from=builder /app/apps/web/public ./public
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+# COPY --from=builder /app/apps/web/public ./apps/web/public
 
 EXPOSE 3000
+WORKDIR /app/apps/web
 CMD ["bun", "server.js"]
