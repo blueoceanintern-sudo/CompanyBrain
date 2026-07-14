@@ -4,8 +4,8 @@ import { z } from 'zod'
 import { SignJWT } from 'jose'
 import { setCookie, deleteCookie } from 'hono/cookie'
 import { db } from '@company-brain/db'
-import { users } from '@company-brain/db'
-import { eq } from 'drizzle-orm'
+import { users, orgs } from '@company-brain/db'
+import { eq, sql } from 'drizzle-orm'
 
 const authRoute = new Hono()
 
@@ -72,6 +72,37 @@ authRoute.post('/login', zValidator('json', loginSchema), async (c) => {
 authRoute.post('/logout', (c) => {
   deleteCookie(c, COOKIE_NAME, { path: '/' })
   return c.json({ success: true, data: null })
+})
+
+const setupSchema = z.object({
+  orgName: z.string().min(1),
+  email: z.string().email(),
+  password: z.string().min(8),
+})
+
+// One-time setup: creates the first org + super_admin. Locked out once any user exists.
+authRoute.post('/setup', zValidator('json', setupSchema), async (c) => {
+  const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(users)
+  if (count > 0) {
+    return c.json(
+      { success: false, error: { code: 'ALREADY_SETUP', message: 'Setup has already been completed' } },
+      403
+    )
+  }
+
+  const { orgName, email, password } = c.req.valid('json')
+  const passwordHash = await Bun.password.hash(password)
+
+  const [org] = await db.insert(orgs).values({ name: orgName }).returning()
+  const [user] = await db
+    .insert(users)
+    .values({ orgId: org.id, email, passwordHash, role: 'super_admin' })
+    .returning()
+
+  return c.json({
+    success: true,
+    data: { user: { id: user.id, email: user.email, role: user.role, orgId: user.orgId } },
+  })
 })
 
 export default authRoute
