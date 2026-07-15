@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import jwt from 'jsonwebtoken'
+import { signJwt } from '../lib/jwt'
 import { setCookie, deleteCookie } from 'hono/cookie'
 import { db } from '@company-brain/db'
 import { users } from '@company-brain/db'
@@ -42,10 +42,10 @@ authRoute.post('/login', zValidator('json', loginSchema), async (c) => {
     )
   }
 
-  const token = jwt.sign(
+  const token = signJwt(
     { sub: user.id, orgId: user.orgId, role: user.role },
     process.env.JWT_SECRET!,
-    { algorithm: 'HS256', expiresIn: '8h' }
+    8 * 60 * 60
   )
 
   setCookie(c, COOKIE_NAME, token, {
