@@ -24,4 +24,4 @@ COPY services/ ./services/
 COPY apps/api/ ./apps/api/
 
 EXPOSE 3002
-CMD ["sh", "-c", "bunx drizzle-kit migrate && bun db/seed.ts && bun run apps/api/src/index.ts"]
+CMD ["sh", "-c", "bunx drizzle-kit migrate && bun run scripts/setup.ts && bun db/seed.ts && bun run apps/api/src/index.ts"]
