@@ -5,8 +5,7 @@ function b64url(s: string): string {
 }
 
 function fromb64url(s: string): string {
-  const padded = s + '==='.slice((s.length + 3) % 4)
-  return Buffer.from(padded.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()
+  return Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()
 }
 
 export function signJwt(payload: Record<string, unknown>, secret: string, expiresInSeconds: number): string {
