@@ -1,5 +1,5 @@
 import { createMiddleware } from 'hono/factory'
-import { jwtVerify } from 'jose'
+import jwt from 'jsonwebtoken'
 import { getCookie } from 'hono/cookie'
 import type { UserRole } from '@company-brain/shared'
 
@@ -24,12 +24,11 @@ export const authMiddleware = createMiddleware<AuthVars>(async (c, next) => {
   }
 
   try {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET!)
-    const { payload } = await jwtVerify(token, secret)
+    const payload = jwt.verify(token, process.env.JWT_SECRET!) as { sub: string; orgId: string; role: UserRole }
 
-    c.set('userId', payload['sub'] as string)
-    c.set('orgId', payload['orgId'] as string)
-    c.set('role', payload['role'] as UserRole)
+    c.set('userId', payload.sub)
+    c.set('orgId', payload.orgId)
+    c.set('role', payload.role)
 
     await next()
   } catch {
