@@ -29,10 +29,18 @@ export async function POST(request: Request) {
     )
   }
 
-  const data = await apiRes.json()
+  let data: unknown
+  try {
+    data = await apiRes.json()
+  } catch {
+    return NextResponse.json(
+      { success: false, error: { code: 'UPSTREAM_ERROR', message: 'Unexpected response from server.' } },
+      { status: 502 }
+    )
+  }
   const response = NextResponse.json(data, { status: apiRes.status })
 
-  if (data.success) {
+  if (data && typeof data === 'object' && 'success' in data && (data as { success: boolean }).success) {
     // Extract JWT from the API's Set-Cookie and re-set it on the web domain
     // so Next.js middleware can read it on localhost:3000
     const cookieHeader = apiRes.headers.get('set-cookie') ?? ''
