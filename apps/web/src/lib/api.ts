@@ -88,10 +88,11 @@ export interface AuthUser {
 
 export async function login(email: string, password: string) {
   try {
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch(`${API_URL}/api/v1/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
+      credentials: 'include',
     })
     return parseResult<{ user: AuthUser }>(res)
   } catch {
@@ -101,7 +102,10 @@ export async function login(email: string, password: string) {
 
 export async function logout() {
   try {
-    const res = await fetch('/api/auth/logout', { method: 'POST' })
+    const res = await fetch(`${API_URL}/api/v1/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    })
     return parseResult<null>(res)
   } catch {
     return networkError('Could not reach the server.')
