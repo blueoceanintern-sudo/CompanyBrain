@@ -43,6 +43,13 @@
       "when": 1782118266583,
       "tag": "0005_shallow_madelyne_pryor",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784019952919,
+      "tag": "0006_cold_machine_man",
+      "breakpoints": true
     }
   ]
 }

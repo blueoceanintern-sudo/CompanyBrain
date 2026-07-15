@@ -6,6 +6,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Users, Shield, UserCheck, MoreVertical, UserPlus, X } from 'lucide-react'
 import { useUsers, useInviteUser, useUpdateUserRole, useDeleteUser } from '@/hooks/use-users'
+import { useGroups, useSetUserGroups } from '@/hooks/use-groups'
+import type { UserSummary } from '@company-brain/shared'
 import { getAuthUser } from '@/lib/auth'
 import { formatDate } from '@/lib/utils'
 
@@ -88,14 +90,90 @@ function DeleteConfirmDialog({ pending, onConfirm, onCancel, isPending }: { pend
   )
 }
 
+// ─── Manage groups dialog ─────────────────────────────────────────────────────
+
+function ManageGroupsDialog({ orgId, user, onClose }: { orgId: string; user: UserSummary; onClose: () => void }) {
+  const { data: groups = [], isLoading } = useGroups(orgId)
+  const setUserGroupsMut = useSetUserGroups(orgId)
+  // user.groups holds names; group names are unique per org
+  const [selected, setSelected] = useState<Set<string> | null>(null)
+
+  const initialIds = new Set(groups.filter((g) => (user.groups ?? []).includes(g.name)).map((g) => g.id))
+  const current = selected ?? initialIds
+  const dirty = selected !== null && (selected.size !== initialIds.size || [...selected].some((id) => !initialIds.has(id)))
+
+  const toggle = (id: string) => {
+    const next = new Set(current)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelected(next)
+  }
+
+  return (
+    <div role="dialog" onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 16 }}>
+      <div style={{ background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 12, padding: 32, width: 'min(440px, 100%)', boxShadow: '0 10px 30px rgba(0,0,0,0.12)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 600, color: '#0b1c30', margin: '0 0 4px' }}>Groups</h2>
+            <p style={{ fontSize: 13, color: '#585f67', margin: 0 }}>{user.email}</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}><X size={20} /></button>
+        </div>
+
+        {isLoading ? (
+          <Skel h={80} />
+        ) : groups.length === 0 ? (
+          <p style={{ fontSize: 13, color: '#585f67', margin: 0 }}>No groups yet — create them in Settings → Groups.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 280, overflowY: 'auto', border: '1px solid #eff4ff', borderRadius: 8, padding: 4 }}>
+            {groups.map((g) => (
+              <label key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, cursor: 'pointer', background: current.has(g.id) ? '#eff4ff' : 'transparent' }}>
+                <input type="checkbox" checked={current.has(g.id)} onChange={() => toggle(g.id)} style={{ accentColor: '#2563eb' }} />
+                <span style={{ fontSize: 13, color: '#0b1c30' }}>{g.name}</span>
+                <span style={{ fontSize: 11, color: '#585f67' }}>{g.memberCount} member{g.memberCount === 1 ? '' : 's'}</span>
+              </label>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+          <button onClick={onClose} style={{ height: 40, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>Cancel</button>
+          <button
+            disabled={!dirty || setUserGroupsMut.isPending}
+            onClick={() => setUserGroupsMut.mutate({ userId: user.id, groupIds: [...current] }, { onSuccess: onClose })}
+            style={{ height: 40, padding: '0 20px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: (!dirty || setUserGroupsMut.isPending) ? 'not-allowed' : 'pointer', opacity: (!dirty || setUserGroupsMut.isPending) ? 0.6 : 1, fontFamily: 'inherit' }}
+          >
+            {setUserGroupsMut.isPending ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Invite dialog ────────────────────────────────────────────────────────────
 
 function InviteDialog({ orgId, onClose }: { orgId: string; onClose: () => void }) {
   const invite = useInviteUser(orgId)
-  const { register, handleSubmit, formState: { errors } } = useForm<InviteForm>({
+  const { data: groups = [] } = useGroups(orgId)
+  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set())
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<InviteForm>({
     resolver: zodResolver(inviteSchema),
     defaultValues: { role: 'staff' },
   })
+
+  const role = watch('role')
+  const canJoinGroups = role !== 'external_client' && groups.length > 0
+
+  const toggleGroup = (id: string) => {
+    setSelectedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const inputBase: React.CSSProperties = {
     width: '100%', height: 44, padding: '0 16px', border: '1px solid #c3c6d7', borderRadius: 12,
@@ -110,7 +188,20 @@ function InviteDialog({ orgId, onClose }: { orgId: string; onClose: () => void }
           <h3 style={{ fontSize: 20, fontWeight: 600, color: '#0b1c30', margin: 0 }}>Invite User</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}><X size={20} /></button>
         </div>
-        <form onSubmit={handleSubmit((data) => invite.mutate(data, { onSuccess: onClose }))} style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <form
+          onSubmit={handleSubmit((data) =>
+            invite.mutate(
+              {
+                ...data,
+                ...(data.role !== 'external_client' && selectedGroups.size > 0
+                  ? { groupIds: [...selectedGroups] }
+                  : {}),
+              },
+              { onSuccess: onClose }
+            )
+          )}
+          style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}
+        >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <label style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>Email Address</label>
             <input type="email" {...register('email')} placeholder="name@company.com" style={{ ...inputBase, borderColor: errors.email ? '#ba1a1a' : '#c3c6d7' }}
@@ -136,6 +227,20 @@ function InviteDialog({ orgId, onClose }: { orgId: string; onClose: () => void }
             />
             {errors.temporaryPassword && <p style={{ fontSize: 12, color: '#ba1a1a', margin: 0 }}>{errors.temporaryPassword.message}</p>}
           </div>
+          {canJoinGroups && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>Add to Groups <span style={{ fontWeight: 400, color: '#585f67' }}>(optional)</span></label>
+              <div style={{ border: '1px solid #c3c6d7', borderRadius: 12, padding: 8, maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {groups.map((g) => (
+                  <label key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: selectedGroups.has(g.id) ? '#eff4ff' : 'transparent' }}>
+                    <input type="checkbox" checked={selectedGroups.has(g.id)} onChange={() => toggleGroup(g.id)} style={{ accentColor: '#2563eb' }} />
+                    <span style={{ fontSize: 13, color: '#0b1c30' }}>{g.name}</span>
+                    <span style={{ fontSize: 11, color: '#585f67' }}>{g.memberCount} member{g.memberCount === 1 ? '' : 's'}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 12, paddingTop: 4 }}>
             <button type="button" onClick={onClose} style={{ flex: 1, height: 44, border: '1px solid #c3c6d7', borderRadius: 12, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#585f67', fontFamily: 'inherit' }}>Cancel</button>
             <button type="submit" disabled={invite.isPending} style={{ flex: 1, height: 44, border: 'none', borderRadius: 12, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: invite.isPending ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
@@ -157,6 +262,7 @@ export default function UsersPage() {
   const [pendingRole, setPendingRole] = useState<PendingRoleChange | null>(null)
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
+  const [groupsFor, setGroupsFor] = useState<UserSummary | null>(null)
   const [cancelKey, setCancelKey] = useState(0)
   const [page, setPage] = useState(1)
 
@@ -233,17 +339,17 @@ export default function UsersPage() {
             <table aria-label="Users" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, background: '#ffffff' }}>
               <thead style={{ background: '#eff4ff', borderBottom: '1px solid #c3c6d7' }}>
                 <tr>
-                  {['Name', 'Email', 'Role', 'Joined', 'Last Updated', 'Actions'].map((h, i) => (
-                    <th key={h} style={{ padding: '16px 24px', textAlign: i === 5 ? 'right' : 'left', fontSize: 11, fontWeight: 500, color: '#585f67', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                  {['Name', 'Email', 'Role', 'Groups', 'Joined', 'Last Updated', 'Actions'].map((h, i) => (
+                    <th key={h} style={{ padding: '16px 24px', textAlign: i === 6 ? 'right' : 'left', fontSize: 11, fontWeight: 500, color: '#585f67', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {isLoading && Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}><td colSpan={6} style={{ padding: '12px 24px' }}><Skel h={28} /></td></tr>
+                  <tr key={i}><td colSpan={7} style={{ padding: '12px 24px' }}><Skel h={28} /></td></tr>
                 ))}
                 {!isLoading && users.length === 0 && (
-                  <tr><td colSpan={6} style={{ padding: 48, textAlign: 'center' }}>
+                  <tr><td colSpan={7} style={{ padding: 48, textAlign: 'center' }}>
                     <p style={{ fontSize: 18, fontWeight: 500, color: '#0b1c30', margin: '0 0 8px' }}>No users yet</p>
                     <p style={{ fontSize: 14, color: '#585f67', margin: 0 }}>Invite team members to get started.</p>
                   </td></tr>
@@ -270,6 +376,19 @@ export default function UsersPage() {
                         <span style={{ display: 'inline-block', padding: '4px 12px', background: rs.bg, color: rs.color, borderRadius: 9999, fontSize: 12, fontWeight: 500 }}>
                           {rs.label}
                         </span>
+                      </td>
+                      <td style={{ padding: '16px 24px' }}>
+                        {(u.groups ?? []).length === 0 ? (
+                          <span style={{ color: '#c3c6d7' }}>—</span>
+                        ) : (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxWidth: 220 }}>
+                            {u.groups.map((name) => (
+                              <span key={name} style={{ padding: '2px 8px', background: '#e5eeff', color: '#004ac6', borderRadius: 9999, fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap' }}>
+                                {name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: '16px 24px', color: '#585f67' }}>{formatDate(u.createdAt)}</td>
                       <td style={{ padding: '16px 24px', color: '#585f67' }}>{formatDate(u.updatedAt)}</td>
@@ -298,10 +417,11 @@ export default function UsersPage() {
                               <option value="external_client">External Client</option>
                             </select>
                           )}
-                          {!isProtected && (
+                          {(u.role !== 'external_client' || !isProtected) && (
                             <div style={{ position: 'relative' }}>
                               <button
                                 onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === u.id ? null : u.id) }}
+                                aria-label={`Actions for ${u.email}`}
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex', padding: 4, borderRadius: 4 }}
                               >
                                 <MoreVertical size={16} />
@@ -310,14 +430,26 @@ export default function UsersPage() {
                                 <>
                                   <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setMenuOpenId(null)} />
                                   <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', zIndex: 50, minWidth: 160, overflow: 'hidden' }}>
-                                    <button
-                                      onClick={() => { setMenuOpenId(null); setPendingDelete({ userId: u.id, email: u.email }) }}
-                                      style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 14, color: '#ba1a1a', cursor: 'pointer', fontFamily: 'inherit', display: 'block' }}
-                                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#fff1f0' }}
-                                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none' }}
-                                    >
-                                      Remove user
-                                    </button>
+                                    {u.role !== 'external_client' && (
+                                      <button
+                                        onClick={() => { setMenuOpenId(null); setGroupsFor(u) }}
+                                        style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 14, color: '#0b1c30', cursor: 'pointer', fontFamily: 'inherit', display: 'block' }}
+                                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#eff4ff' }}
+                                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none' }}
+                                      >
+                                        Manage groups
+                                      </button>
+                                    )}
+                                    {!isProtected && (
+                                      <button
+                                        onClick={() => { setMenuOpenId(null); setPendingDelete({ userId: u.id, email: u.email }) }}
+                                        style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 14, color: '#ba1a1a', cursor: 'pointer', fontFamily: 'inherit', display: 'block' }}
+                                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#fff1f0' }}
+                                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none' }}
+                                      >
+                                        Remove user
+                                      </button>
+                                    )}
                                   </div>
                                 </>
                               )}
@@ -358,6 +490,7 @@ export default function UsersPage() {
       </div>
 
       {showInvite && <InviteDialog orgId={orgId} onClose={() => setShowInvite(false)} />}
+      {groupsFor && <ManageGroupsDialog orgId={orgId} user={groupsFor} onClose={() => setGroupsFor(null)} />}
       {pendingRole && (
         <RoleConfirmDialog
           pending={pendingRole}

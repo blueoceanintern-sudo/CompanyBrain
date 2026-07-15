@@ -32,8 +32,8 @@ export type Permission =
 // ─── Visibility policy (JSONB) ────────────────────────────────────────────────
 
 export interface VisibilityPolicy {
-  allowedGroups: UserRole[]
-  deniedGroups: UserRole[]
+  allowedRoles: UserRole[]
+  deniedRoles: UserRole[]
   allowedPrincipals: string[]
   classification: VisibilityClass
 }
@@ -112,14 +112,33 @@ export interface CompartmentSummary {
   orgId: string
   name: string
   description: string | null
+  restricted: boolean
+  grantCount: number
   createdAt: string
   updatedAt: string
+}
+
+export interface GroupSummary {
+  id: string
+  orgId: string
+  name: string
+  description: string | null
+  memberCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+// Grant subjects for one restricted compartment
+export interface CompartmentGrantSet {
+  userIds: string[]
+  groupIds: string[]
 }
 
 export interface UserSummary {
   id: string
   email: string
   role: UserRole
+  groups: string[]
   createdAt: string
   updatedAt: string
 }

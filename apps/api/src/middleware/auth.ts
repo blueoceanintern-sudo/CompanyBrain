@@ -40,16 +40,44 @@ export const authMiddleware = createMiddleware<AuthVars>(async (c, next) => {
   }
 })
 
+// Cross-org, the super admin is a platform operator, not a tenant member:
+// org-lifecycle routes only (user management for support/break-glass, read-only
+// subscription state). Tenant content — documents, queries, compartments,
+// groups, grants, analytics — is never accessible across orgs.
+const SUPER_ADMIN_CROSS_ORG = [
+  { pattern: /^\/api\/v1\/orgs\/[^/]+\/users(\/|$)/, methods: ['GET', 'POST', 'PATCH', 'DELETE'] },
+  { pattern: /^\/api\/v1\/orgs\/[^/]+\/subscriptions$/, methods: ['GET'] },
+]
+
+export function isSuperAdminCrossOrgAllowed(method: string, path: string): boolean {
+  return SUPER_ADMIN_CROSS_ORG.some((rule) => rule.pattern.test(path) && rule.methods.includes(method))
+}
+
 export const orgIsolationMiddleware = createMiddleware<AuthVars>(async (c, next) => {
   const requestedOrgId = c.req.param('id')
   const tokenOrgId = c.get('orgId')
   const role = c.get('role')
 
-  if (role !== 'super_admin' && requestedOrgId !== tokenOrgId) {
-    return c.json(
-      { success: false, error: { code: 'FORBIDDEN', message: 'Access denied to this organisation' } },
-      403
-    )
+  if (requestedOrgId !== tokenOrgId) {
+    if (role !== 'super_admin') {
+      return c.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Access denied to this organisation' } },
+        403
+      )
+    }
+
+    if (!isSuperAdminCrossOrgAllowed(c.req.method, c.req.path)) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Platform administrators cannot access organisation content. Join the organisation as an admin for support access.',
+          },
+        },
+        403
+      )
+    }
   }
 
   await next()

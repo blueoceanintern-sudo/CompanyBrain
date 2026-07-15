@@ -19,7 +19,7 @@ export function useCompartments(orgId: string) {
 export function useCreateCompartment(orgId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (data: { name: string; description?: string }) => {
+    mutationFn: async (data: { name: string; description?: string; restricted?: boolean }) => {
       const result = await createCompartment(orgId, data)
       if (!result.success) throw new Error(result.error.message)
       return result.data
@@ -35,7 +35,7 @@ export function useCreateCompartment(orgId: string) {
 export function useUpdateCompartment(orgId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ cId, data }: { cId: string; data: { name?: string; description?: string } }) => {
+    mutationFn: async ({ cId, data }: { cId: string; data: { name?: string; description?: string; restricted?: boolean } }) => {
       const result = await updateCompartment(orgId, cId, data)
       if (!result.success) throw new Error(result.error.message)
       return null

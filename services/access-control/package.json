@@ -4,6 +4,8 @@
   "main": "./index.ts",
   "types": "./index.ts",
   "dependencies": {
-    "@company-brain/shared": "workspace:*"
+    "@company-brain/db": "workspace:*",
+    "@company-brain/shared": "workspace:*",
+    "drizzle-orm": "^0.31.4"
   }
 }

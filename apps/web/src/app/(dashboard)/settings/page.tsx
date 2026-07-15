@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { FolderOpen, Plus, Pencil, Trash2, CreditCard, Check, X } from 'lucide-react'
+import { FolderOpen, Plus, CreditCard, Check, X, Lock, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react'
 import { useCompartments, useCreateCompartment, useUpdateCompartment, useDeleteCompartment } from '@/hooks/use-compartments'
+import { GroupsSection } from '@/components/settings/groups-section'
+import { CompartmentDetails } from '@/components/settings/compartment-access'
 import type { CompartmentSummary } from '@company-brain/shared'
 
 import { useConnectStatus, useStartConnectOnboarding, useExternalPricing, useSetExternalPricing, useStartOrgUpgrade, useOpenBillingPortal } from '@/hooks/use-payments'
@@ -13,7 +15,7 @@ import { getAuthUser } from '@/lib/auth'
 import { getSubscription, cancelSubscription } from '@/lib/api'
 import { hasPermission } from '@company-brain/shared'
 
-type Tab = 'general' | 'compartments' | 'subscription' | 'danger'
+type Tab = 'general' | 'compartments' | 'groups' | 'subscription' | 'danger'
 
 function useSubscription(orgId: string) {
   return useQuery({
@@ -124,7 +126,7 @@ function BillingSection({ orgId, plan, inputBase }: { orgId: string; plan: strin
 
 // ─── Compartments (users:manage only for edit/delete) ──────────────────────────
 
-function CompartmentsSection({ orgId, canManage, inputBase }: { orgId: string; canManage: boolean; inputBase: React.CSSProperties }) {
+function CompartmentsSection({ orgId, canManage, inputBase, autoCreate = false, onAutoCreateHandled }: { orgId: string; canManage: boolean; inputBase: React.CSSProperties; autoCreate?: boolean; onAutoCreateHandled?: () => void }) {
   const { data: compartments = [], isLoading } = useCompartments(orgId)
   const createComp = useCreateCompartment(orgId)
   const updateComp = useUpdateCompartment(orgId)
@@ -132,15 +134,40 @@ function CompartmentsSection({ orgId, canManage, inputBase }: { orgId: string; c
 
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
+  const [newRestricted, setNewRestricted] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState('') // must equal "delete" to enable the button
   const [reassignTarget, setReassignTarget] = useState('') // '' = delete documents too
+  const [panel, setPanel] = useState<{ id: string; edit: boolean } | null>(null) // expanded compartment panel
+
+  // Deep link from the documents page: open the create form on arrival
+  useEffect(() => {
+    if (autoCreate && canManage) {
+      setShowCreate(true)
+      setNewName('')
+      setNewRestricted(false)
+      onAutoCreateHandled?.()
+    }
+  }, [autoCreate, canManage, onAutoCreateHandled])
 
   const createCompartment = () => {
     const name = newName.trim()
     if (!name) return
-    createComp.mutate({ name }, { onSuccess: () => { setShowCreate(false); setNewName('') } })
+    createComp.mutate(
+      { name, restricted: newRestricted },
+      {
+        onSuccess: (created) => {
+          setShowCreate(false)
+          setNewName('')
+          setNewRestricted(false)
+          // A restricted compartment starts with no grants — open the panel in
+          // edit mode immediately so it doesn't end up locked to everyone
+          if (newRestricted && created?.id) setPanel({ id: created.id, edit: true })
+        },
+      }
+    )
   }
 
   const startEdit = (c: CompartmentSummary) => { setEditingId(c.id); setEditName(c.name) }
@@ -161,7 +188,7 @@ function CompartmentsSection({ orgId, canManage, inputBase }: { orgId: string; c
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16 }}>
         <div>
           <h2 style={{ fontSize: 20, fontWeight: 600, color: '#0b1c30', margin: '0 0 8px' }}>Data Compartments</h2>
-          <p style={{ fontSize: 14, color: '#434655', margin: 0 }}>Create, rename, or remove logical containers for your knowledge base.</p>
+          <p style={{ fontSize: 14, color: '#434655', margin: 0 }}>Create, and manage access to logical containers.</p>
         </div>
         {canManage && (
           <button
@@ -176,33 +203,43 @@ function CompartmentsSection({ orgId, canManage, inputBase }: { orgId: string; c
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {isLoading && Array.from({ length: 3 }).map((_, i) => <Skel key={i} h={64} />)}
         {!isLoading && compartments.length === 0 && !showCreate && (
-          <p style={{ color: '#585f67', fontSize: 14, textAlign: 'center', padding: 32 }}>No compartments yet. Create one to organise your knowledge.</p>
+          <p style={{ color: '#585f67', fontSize: 14, textAlign: 'center', padding: 32 }}>Create a compartment to organise your knowledge.</p>
         )}
 
         {showCreate && (
-          <div style={{ padding: 16, border: '1px solid #c3c6d7', borderRadius: 12, background: '#f8f9ff', display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Name</label>
-              <input
-                autoFocus
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') createCompartment(); if (e.key === 'Escape') { setShowCreate(false); setNewName('') } }}
-                style={inputBase}
-                placeholder="e.g. HR Department"
-              />
+          <div style={{ padding: 16, border: '1px solid #c3c6d7', borderRadius: 12, background: '#f8f9ff', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Name</label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') createCompartment(); if (e.key === 'Escape') { setShowCreate(false); setNewName(''); setNewRestricted(false) } }}
+                  style={inputBase}
+                  placeholder="e.g. HR Department"
+                />
+              </div>
+              <button
+                onClick={createCompartment}
+                disabled={!newName.trim() || createComp.isPending}
+                style={{ height: 48, padding: '0 16px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: (!newName.trim() || createComp.isPending) ? 'not-allowed' : 'pointer', opacity: (!newName.trim() || createComp.isPending) ? 0.6 : 1, fontFamily: 'inherit' }}
+              >
+                {createComp.isPending ? 'Creating…' : 'Create'}
+              </button>
+              <button onClick={() => { setShowCreate(false); setNewName(''); setNewRestricted(false) }} style={{ height: 48, padding: '0 16px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>
+                Cancel
+              </button>
             </div>
-            <button
-              onClick={createCompartment}
-              disabled={!newName.trim() || createComp.isPending}
-              style={{ height: 48, padding: '0 16px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: (!newName.trim() || createComp.isPending) ? 'not-allowed' : 'pointer', opacity: (!newName.trim() || createComp.isPending) ? 0.6 : 1, fontFamily: 'inherit' }}
-            >
-              {createComp.isPending ? 'Creating…' : 'Create'}
-            </button>
-            <button onClick={() => { setShowCreate(false); setNewName('') }} style={{ height: 48, padding: '0 16px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>
-              Cancel
-            </button>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '4px 0' }}>
+              <input type="checkbox" checked={newRestricted} onChange={(e) => setNewRestricted(e.target.checked)} style={{ accentColor: '#2563eb' }} />
+              <Lock size={14} color={newRestricted ? '#9a3412' : '#585f67'} />
+              <span style={{ fontSize: 13, color: '#0b1c30' }}>Restricted</span>
+              <span style={{ fontSize: 12, color: '#585f67' }}>
+                — only granted users and groups (plus admins) can see and query it.
+              </span>
+            </label>
           </div>
         )}
         {compartments.map((c) => (
@@ -221,56 +258,109 @@ function CompartmentsSection({ orgId, canManage, inputBase }: { orgId: string; c
                     style={{ ...inputBase, height: 40 }}
                   />
                 ) : (
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 14, fontWeight: 500, color: '#0b1c30', margin: 0 }}>{c.name}</p>
+                  <div
+                    style={{ minWidth: 0 }}
+                    onDoubleClick={() => { if (canManage) startEdit(c) }}
+                    title={canManage ? 'Double-click to rename' : undefined}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <p style={{ fontSize: 14, fontWeight: 500, color: '#0b1c30', margin: 0 }}>{c.name}</p>
+                      {c.restricted && c.grantCount === 0 && (
+                        <button
+                          onClick={() => canManage && setPanel({ id: c.id, edit: true })}
+                          title={canManage ? 'Grant access to users or groups' : undefined}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: 11, fontWeight: 600, borderRadius: 999, cursor: canManage ? 'pointer' : 'default', fontFamily: 'inherit' }}
+                        >
+                          <AlertTriangle size={10} /> No access granted — admins only
+                        </button>
+                      )}
+                    </div>
                     {c.description && <p style={{ fontSize: 12, color: '#585f67', margin: '2px 0 0' }}>{c.description}</p>}
                   </div>
                 )}
               </div>
 
-              {canManage && (
-                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                  {editingId === c.id ? (
-                    <>
-                      <button onClick={() => saveEdit(c.id)} disabled={updateComp.isPending || !editName.trim()} aria-label="Save name" style={{ ...iconBtn, color: '#16a34a', cursor: updateComp.isPending ? 'not-allowed' : 'pointer' }}><Check size={18} /></button>
-                      <button onClick={() => setEditingId(null)} aria-label="Cancel rename" style={iconBtn}><X size={18} /></button>
-                    </>
-                  ) : (
-                    <>
-                      <button onClick={() => startEdit(c)} aria-label="Rename compartment" style={iconBtn}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#004ac6' }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#585f67' }}
-                      ><Pencil size={18} /></button>
-                      <button onClick={() => { setDeletingId(c.id); setReassignTarget('') }} aria-label="Delete compartment" style={iconBtn}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ba1a1a' }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#585f67' }}
-                      ><Trash2 size={18} /></button>
-                    </>
-                  )}
-                </div>
-              )}
+              <div style={{ display: 'flex', gap: 4, flexShrink: 0, alignItems: 'center' }}>
+                {c.restricted && <Lock size={16} color="#9a3412" aria-label="Restricted" />}
+                {canManage && (editingId === c.id ? (
+                  <>
+                    <button onClick={() => saveEdit(c.id)} disabled={updateComp.isPending || !editName.trim()} aria-label="Save name" style={{ ...iconBtn, color: '#16a34a', cursor: updateComp.isPending ? 'not-allowed' : 'pointer' }}><Check size={18} /></button>
+                    <button onClick={() => setEditingId(null)} aria-label="Cancel rename" style={iconBtn}><X size={18} /></button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setPanel(panel?.id === c.id ? null : { id: c.id, edit: false })}
+                    aria-label={panel?.id === c.id ? 'Collapse compartment details' : 'Expand compartment details'}
+                    style={{ ...iconBtn, color: panel?.id === c.id ? '#004ac6' : '#585f67' }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#004ac6' }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = panel?.id === c.id ? '#004ac6' : '#585f67' }}
+                  >{panel?.id === c.id ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</button>
+                ))}
+              </div>
             </div>
 
-            {deletingId === c.id && (
-              <div style={{ borderTop: '1px solid #ffdad6', background: 'rgba(255,218,214,0.08)', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <p style={{ fontSize: 13, color: '#ba1a1a', margin: 0, fontWeight: 500 }}>Delete &ldquo;{c.name}&rdquo;? Choose what happens to its documents.</p>
-                <select value={reassignTarget} onChange={(e) => setReassignTarget(e.target.value)} style={{ ...inputBase, height: 44 }}>
-                  <option value="">Delete all documents in this compartment</option>
-                  {compartments.filter((o) => o.id !== c.id).map((o) => (
-                    <option key={o.id} value={o.id}>Move documents to &ldquo;{o.name}&rdquo;</option>
-                  ))}
-                </select>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                  <button onClick={() => setDeletingId(null)} style={{ height: 40, padding: '0 16px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>Cancel</button>
-                  <button onClick={() => confirmDelete(c.id)} disabled={deleteComp.isPending}
-                    style={{ height: 40, padding: '0 16px', border: 'none', borderRadius: 8, background: '#ba1a1a', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: deleteComp.isPending ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
-                  >{deleteComp.isPending ? 'Deleting…' : 'Delete Compartment'}</button>
-                </div>
+            {panel?.id === c.id && canManage && (
+              <div style={{ borderTop: '1px solid #eff4ff', padding: 16 }}>
+                <CompartmentDetails
+                  key={c.id + (panel.edit ? '-edit' : '')}
+                  orgId={orgId}
+                  compartment={c}
+                  initialEdit={panel.edit}
+                  onRequestDelete={() => { setDeletingId(c.id); setDeleteConfirm(''); setReassignTarget(''); setPanel(null) }}
+                />
               </div>
             )}
+
           </div>
         ))}
       </div>
+
+      {deletingId && (() => {
+        const target = compartments.find((o) => o.id === deletingId)
+        if (!target) return null
+        return (
+          <div role="dialog" onClick={(e) => e.target === e.currentTarget && setDeletingId(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 16 }}>
+            <div style={{ background: '#ffffff', border: '1px solid #ffdad6', borderRadius: 12, padding: 32, width: 'min(440px, 100%)', boxShadow: '0 10px 30px rgba(0,0,0,0.12)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <h2 style={{ fontSize: 20, fontWeight: 600, color: '#ba1a1a', margin: '0 0 8px' }}>Delete &ldquo;{target.name}&rdquo;?</h2>
+                <p style={{ fontSize: 14, color: '#585f67', margin: 0, lineHeight: 1.6 }}>Choose what happens to the documents in this compartment. This cannot be undone.</p>
+              </div>
+              <select value={reassignTarget} onChange={(e) => setReassignTarget(e.target.value)} style={{ ...inputBase, height: 44 }}>
+                <option value="">Delete all documents in this compartment</option>
+                {compartments.filter((o) => o.id !== target.id).map((o) => (
+                  <option key={o.id} value={o.id}>Move documents to &ldquo;{o.name}&rdquo;</option>
+                ))}
+              </select>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#434655', marginBottom: 6 }}>
+                  Type <strong style={{ color: '#ba1a1a' }}>delete</strong> to confirm
+                </label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  placeholder="delete"
+                  style={{ ...inputBase, height: 44 }}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                <button onClick={() => setDeletingId(null)} style={{ height: 40, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>Cancel</button>
+                {(() => {
+                  const confirmed = deleteConfirm.trim().toLowerCase() === 'delete'
+                  const disabled = !confirmed || deleteComp.isPending
+                  return (
+                    <button onClick={() => confirmDelete(target.id)} disabled={disabled}
+                      style={{ height: 40, padding: '0 20px', border: 'none', borderRadius: 8, background: '#ba1a1a', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, fontFamily: 'inherit' }}
+                    >{deleteComp.isPending ? 'Deleting…' : 'Delete Compartment'}</button>
+                  )
+                })()}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -281,6 +371,7 @@ export default function SettingsPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
   const [tab, setTab] = useState<Tab>('general')
+  const [autoCreateCompartment, setAutoCreateCompartment] = useState(false)
 
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -289,6 +380,14 @@ export default function SettingsPage() {
   useEffect(() => {
     const connect = searchParams.get('connect')
     const upgrade = searchParams.get('upgrade')
+    const tabParam = searchParams.get('tab')
+    if (tabParam && ['general', 'compartments', 'groups', 'subscription', 'danger'].includes(tabParam)) {
+      setTab(tabParam as Tab)
+      if (tabParam === 'compartments' && searchParams.get('create') === '1') {
+        setAutoCreateCompartment(true)
+      }
+      router.replace('/settings')
+    }
     if (connect === 'success') {
       toast.success('Stripe onboarding completed')
       router.replace('/settings')
@@ -322,6 +421,7 @@ export default function SettingsPage() {
   const TABS: { key: Tab; label: string }[] = [
     { key: 'general', label: 'General' },
     { key: 'compartments', label: 'Compartments' },
+    { key: 'groups', label: 'Groups' },
     { key: 'subscription', label: 'Subscription' },
     { key: 'danger', label: 'Danger Zone' },
   ]
@@ -407,7 +507,18 @@ export default function SettingsPage() {
 
           {/* ── Compartments ── */}
           {tab === 'compartments' && (
-            <CompartmentsSection orgId={orgId} canManage={canManageCompartments} inputBase={inputBase} />
+            <CompartmentsSection
+              orgId={orgId}
+              canManage={canManageCompartments}
+              inputBase={inputBase}
+              autoCreate={autoCreateCompartment}
+              onAutoCreateHandled={() => setAutoCreateCompartment(false)}
+            />
+          )}
+
+          {/* ── Groups ── */}
+          {tab === 'groups' && (
+            <GroupsSection orgId={orgId} canManage={canManageCompartments} inputBase={inputBase} />
           )}
 
           {/* ── Subscription ── */}
