@@ -6,10 +6,18 @@
  */
 import { db } from '../db/client'
 import { orgs, users } from '../db/schema'
+import { eq } from 'drizzle-orm'
 
 async function main() {
-  const orgName = process.env.SETUP_ORG_NAME ?? 'Equest School Network'
   const adminEmail = process.env.SETUP_ADMIN_EMAIL ?? 'admin@equest.edu.au'
+
+  const existing = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1)
+  if (existing.length > 0) {
+    console.log(`[setup] Admin ${adminEmail} already exists, skipping.`)
+    return
+  }
+
+  const orgName = process.env.SETUP_ORG_NAME ?? 'Equest School Network'
   const adminPassword = process.env.SETUP_ADMIN_PASSWORD ?? 'changeme123'
 
   console.log(`Creating org: ${orgName}`)
