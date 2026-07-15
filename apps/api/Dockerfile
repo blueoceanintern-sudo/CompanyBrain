@@ -14,6 +14,7 @@ COPY services/access-control/package.json ./services/access-control/
 COPY services/payments/package.json ./services/payments/
 COPY workers/package.json ./workers/
 COPY apps/api/package.json ./apps/api/
+COPY scripts/ ./scripts/
 
 RUN bun install --frozen-lockfile 2>/dev/null || bun install
 
