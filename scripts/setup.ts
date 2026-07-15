@@ -6,32 +6,33 @@
  */
 import { db } from '../db/client'
 import { orgs, users } from '../db/schema'
-import { eq } from 'drizzle-orm'
 
 async function main() {
   const adminEmail = process.env.SETUP_ADMIN_EMAIL ?? 'admin@equest.edu.au'
 
-  const existing = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1)
-  if (existing.length > 0) {
-    console.log(`[setup] Admin ${adminEmail} already exists, skipping.`)
-    return
-  }
-
   const orgName = process.env.SETUP_ORG_NAME ?? 'Equest School Network'
   const adminPassword = process.env.SETUP_ADMIN_PASSWORD ?? 'changeme123'
 
-  console.log(`Creating org: ${orgName}`)
-  const [org] = await db.insert(orgs).values({ name: orgName }).returning()
-  if (!org) throw new Error('Failed to create org')
+  try {
+    console.log(`Creating org: ${orgName}`)
+    const [org] = await db.insert(orgs).values({ name: orgName }).returning()
+    if (!org) throw new Error('Failed to create org')
 
-  console.log(`Creating admin: ${adminEmail}`)
-  const passwordHash = await Bun.password.hash(adminPassword)
-  await db.insert(users).values({
-    orgId: org.id,
-    email: adminEmail,
-    passwordHash,
-    role: 'super_admin',
-  })
+    console.log(`Creating admin: ${adminEmail}`)
+    const passwordHash = await Bun.password.hash(adminPassword)
+    await db.insert(users).values({
+      orgId: org.id,
+      email: adminEmail,
+      passwordHash,
+      role: 'super_admin',
+    })
+  } catch (e: unknown) {
+    if (typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '23505') {
+      console.log(`[setup] Admin ${adminEmail} already exists, skipping.`)
+      return
+    }
+    throw e
+  }
 
   console.log(`
 Setup complete!
