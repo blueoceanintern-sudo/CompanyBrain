@@ -2,7 +2,7 @@ FROM oven/bun:1-alpine AS base
 WORKDIR /app
 
 # Copy manifests first for layer cache
-COPY package.json bun.lockb* ./
+COPY package.json bun.lock* bun.lockb* ./
 COPY tsconfig.base.json ./
 COPY drizzle.config.ts ./
 COPY shared/package.json ./shared/
