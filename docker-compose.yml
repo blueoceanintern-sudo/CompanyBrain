@@ -21,6 +21,7 @@ services:
       dockerfile: apps/api/Dockerfile
     environment:
       DATABASE_URL: postgresql://user:password@db:5432/blueocean
+      JWT_SECRET: ${JWT_SECRET}
     ports:
       - "3002:3002"
     depends_on:
