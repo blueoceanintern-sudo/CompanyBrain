@@ -52,7 +52,7 @@ export async function POST(request: Request) {
         sameSite: 'lax',
         path: '/',
         maxAge: COOKIE_MAX_AGE,
-        secure: process.env.NODE_ENV === 'production',
+        secure: false,
       })
     }
   }
