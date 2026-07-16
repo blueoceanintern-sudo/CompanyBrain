@@ -8,6 +8,7 @@ import orgsRoute from './routes/orgs'
 import documentsRoute from './routes/documents'
 import queryRoute from './routes/query'
 import adminRoute from './routes/admin'
+import accessRoute from './routes/access'
 import paymentsRoute from './routes/payments'
 import analyticsRoute from './routes/analytics'
 import stripeWebhookRoute from './routes/stripe-webhook'
@@ -43,6 +44,7 @@ orgApp.use('*', orgIsolationMiddleware)
 orgApp.route('/documents', documentsRoute)
 orgApp.route('/query', queryRoute)
 orgApp.route('/', adminRoute)
+orgApp.route('/', accessRoute)
 orgApp.route('/', paymentsRoute)
 orgApp.route('/analytics', analyticsRoute)
 

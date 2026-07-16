@@ -1,8 +1,8 @@
 import OpenAI from 'openai'
 import { db } from '@company-brain/db'
 import { chunks, documents, compartments } from '@company-brain/db'
-import { eq, and, sql } from 'drizzle-orm'
-import type { RetrieveParams, ServiceResult, ChunkContext, SourceType } from '@company-brain/shared'
+import { eq, and, sql, type SQL } from 'drizzle-orm'
+import type { RetrieveParams, ServiceResult, ChunkContext, SourceType, UserRole } from '@company-brain/shared'
 import {
   EMBEDDING_MODEL,
   EMBEDDING_DIMENSIONS,
@@ -45,6 +45,57 @@ function parseVisibility(raw: unknown): Record<string, unknown> {
   return (raw as Record<string, unknown>) ?? {}
 }
 
+// ─── Restricted-compartment enforcement ───────────────────────────────────────
+// A chunk in a restricted compartment is only searchable when the user holds a
+// grant — directly or via group membership. Access narrows down the hierarchy:
+// a chunk in a sub-compartment also requires access to the parent compartment,
+// so a grant on a sub never bypasses a restricted parent. Admins bypass; the
+// external plane is gated by subscription instead of grants. Enforced in SQL so
+// restricted chunks never leave the database (hard constraint: no path around
+// visibility).
+
+function compartmentGrantFilter(
+  userId: string,
+  userRole: UserRole,
+  accessTier: 'internal' | 'external'
+): SQL {
+  if (accessTier === 'external' || userRole === 'super_admin' || userRole === 'org_admin') {
+    return sql``
+  }
+  return sql` AND EXISTS (
+    SELECT 1 FROM compartments cp
+    LEFT JOIN compartments pp ON pp.id = cp.parent_compartment_id
+    WHERE cp.id = c.compartment_id
+      AND (
+        NOT cp.restricted
+        OR EXISTS (
+          SELECT 1 FROM compartment_grants g
+          WHERE g.compartment_id = cp.id
+            AND (
+              g.user_id = ${userId}
+              OR g.group_id IN (
+                SELECT gm.group_id FROM group_members gm WHERE gm.user_id = ${userId}
+              )
+            )
+        )
+      )
+      AND (
+        pp.id IS NULL
+        OR NOT pp.restricted
+        OR EXISTS (
+          SELECT 1 FROM compartment_grants g
+          WHERE g.compartment_id = pp.id
+            AND (
+              g.user_id = ${userId}
+              OR g.group_id IN (
+                SELECT gm.group_id FROM group_members gm WHERE gm.user_id = ${userId}
+              )
+            )
+        )
+      )
+  )`
+}
+
 // ─── Semantic search via pgvector ─────────────────────────────────────────────
 
 async function semanticSearch(
@@ -52,6 +103,7 @@ async function semanticSearch(
   accessTier: 'internal' | 'external',
   queryEmbedding: number[],
   limit: number,
+  compartmentFilter: SQL,
   sourceTypes?: SourceType[]
 ): Promise<Array<{ id: string; documentId: string; compartmentId: string; content: string; score: number; chunkIndex: number }>> {
   const vectorLiteral = `[${queryEmbedding.join(',')}]`
@@ -73,6 +125,7 @@ async function semanticSearch(
       AND c.access_tier = ${accessTier}
       AND c.status = 'active'
       ${sourceFilter}
+      ${compartmentFilter}
     ORDER BY c.embedding <=> ${vectorLiteral}::vector
     LIMIT ${limit * 3}
   `)
@@ -98,6 +151,7 @@ async function fullTextSearch(
   accessTier: 'internal' | 'external',
   query: string,
   limit: number,
+  compartmentFilter: SQL,
   sourceTypes?: SourceType[]
 ): Promise<Array<{ id: string; documentId: string; compartmentId: string; content: string; rank: number; chunkIndex: number }>> {
   const sourceFilter = sourceTypes && sourceTypes.length > 0
@@ -119,6 +173,7 @@ async function fullTextSearch(
       AND c.status = 'active'
       AND to_tsvector('english', c.content) @@ plainto_tsquery('english', ${query})
       ${sourceFilter}
+      ${compartmentFilter}
     ORDER BY rank DESC
     LIMIT ${limit * 3}
   `)
@@ -181,11 +236,12 @@ export async function retrieveChunks(
 
   try {
     const queryEmbedding = await embedQuery(query)
+    const compartmentFilter = compartmentGrantFilter(userId, userRole, accessTier)
 
     // Run semantic + full-text search in parallel
     const [semanticResults, ftsResults] = await Promise.all([
-      semanticSearch(orgId, accessTier, queryEmbedding, topK, sourceTypes),
-      fullTextSearch(orgId, accessTier, query, topK, sourceTypes),
+      semanticSearch(orgId, accessTier, queryEmbedding, topK, compartmentFilter, sourceTypes),
+      fullTextSearch(orgId, accessTier, query, topK, compartmentFilter, sourceTypes),
     ])
 
     // Merge results into a map keyed by chunk ID
