@@ -21,6 +21,16 @@ services:
       dockerfile: apps/api/Dockerfile
     environment:
       DATABASE_URL: postgresql://user:password@db:5432/blueocean
+      JWT_SECRET: ${JWT_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      STRIPE_ORG_PRICE_ID: ${STRIPE_ORG_PRICE_ID}
+      STRIPE_PLATFORM_FEE_PERCENT: ${STRIPE_PLATFORM_FEE_PERCENT}
+      NODE_ENV: production
+      PORT: 3002
+      NEXT_PUBLIC_WEB_URL: ${NEXT_PUBLIC_WEB_URL}
     ports:
       - "3002:3002"
     depends_on:
@@ -31,8 +41,8 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-    environment:
-      NEXT_PUBLIC_API_URL: http://api:3002
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     ports:
       - "3000:3000"
     depends_on:

@@ -2,7 +2,7 @@ FROM oven/bun:1-alpine AS base
 WORKDIR /app
 
 # Copy manifests first for layer cache
-COPY package.json bun.lockb* ./
+COPY package.json bun.lock* bun.lockb* ./
 COPY tsconfig.base.json ./
 COPY drizzle.config.ts ./
 COPY shared/package.json ./shared/
@@ -20,8 +20,9 @@ RUN bun install --frozen-lockfile 2>/dev/null || bun install
 # Copy source
 COPY shared/ ./shared/
 COPY db/ ./db/
+COPY scripts/ ./scripts/
 COPY services/ ./services/
 COPY apps/api/ ./apps/api/
 
 EXPOSE 3002
-CMD ["sh", "-c", "bunx drizzle-kit migrate && bun db/seed.ts && bun run apps/api/src/index.ts"]
+CMD ["sh", "-c", "bunx drizzle-kit migrate && bun run scripts/setup.ts && bun db/seed.ts && bun run apps/api/src/index.ts"]

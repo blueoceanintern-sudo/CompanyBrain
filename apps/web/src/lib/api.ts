@@ -10,7 +10,7 @@ import type {
   ConversationTurn,
 } from '@company-brain/shared'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002'
+const API_URL = ''
 
 type ApiResult<T> = { success: true; data: T } | { success: false; error: { code: string; message: string } }
 
@@ -94,6 +94,7 @@ export async function login(email: string, password: string) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
+      credentials: 'include',
     })
     return parseResult<{ user: AuthUser }>(res)
   } catch {
@@ -103,7 +104,10 @@ export async function login(email: string, password: string) {
 
 export async function logout() {
   try {
-    const res = await fetch('/api/auth/logout', { method: 'POST' })
+    const res = await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    })
     return parseResult<null>(res)
   } catch {
     return networkError('Could not reach the server.')
@@ -352,7 +356,7 @@ export async function startCheckout(orgId: string) {
 
 export async function exportAuditLog(orgId: string): Promise<Blob> {
   try {
-    const res = await fetch(`${API_URL}/api/v1/orgs/${orgId}/analytics/export`, {
+    const res = await fetch(`/api/v1/orgs/${orgId}/analytics/export`, {
       credentials: 'include',
     })
     if (!res.ok) throw new Error(`Server error: ${res.status}`)
