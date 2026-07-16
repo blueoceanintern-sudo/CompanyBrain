@@ -142,13 +142,13 @@ export function CompartmentDetails({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {parentRestricted && (
           <p style={{ fontSize: 13, color: '#9a3412', margin: 0, padding: '10px 12px', background: '#fff7ed', borderRadius: 8 }}>
-            Only people with access to &ldquo;{parent.name}&rdquo; can see anything here, <br></br>regardless of grants below.
+            Only people with access to &ldquo;{parent.name}&rdquo; have access, regardless of grants below.
           </p>
         )}
         {!compartment.restricted ? (
           <p style={{ fontSize: 13, color: '#585f67', margin: 0 }}>
             {parentRestricted
-              ? <>Open to everyone with access to &ldquo;{parent.name}&rdquo; — access is inherited from the parent compartment.</>
+              ? <>Access is inherited from the parent compartment.</>
               : <>Open — everyone in the organisation can see and query this compartment.</>}
           </p>
         ) : (
@@ -180,7 +180,7 @@ export function CompartmentDetails({
                       <span style={{ fontSize: 13, color: '#0b1c30' }}>{u.email}</span>
                       <span style={{ fontSize: 11, color: '#585f67', textTransform: 'capitalize' }}>{u.role.replace(/_/g, ' ')}</span>
                       {userLacksParentAccess(u) ? (
-                        <span style={parentWarnBadge}>ineffective — no access to &ldquo;{parent?.name}&rdquo;</span>
+                        <span style={parentWarnBadge}>no access to &ldquo;{parent?.name}&rdquo;</span>
                       ) : via.length > 0 ? (
                         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#0f766e' }}>also via {via.join(', ')}</span>
                       ) : null}
@@ -209,8 +209,7 @@ export function CompartmentDetails({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {parentRestricted && (
         <p style={{ fontSize: 13, color: '#9a3412', margin: 0, padding: '10px 12px', background: '#fff7ed', borderRadius: 8 }}>
-          Grants here can only narrow further. Anyone without access to &ldquo;{parent.name}&rdquo; cannot see this compartment, regardless
-          of grants below.
+          Grants here can only narrow further. 
         </p>
       )}
       <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
@@ -219,7 +218,7 @@ export function CompartmentDetails({
         <span style={{ fontSize: 13, color: '#0b1c30', fontWeight: 500 }}>Restricted</span>
         <span style={{ fontSize: 12, color: '#585f67' }}>
           {parent
-            ? <>— only granted users and groups (plus admins) can see and query it; unrestricted, it inherits &ldquo;{parent.name}&rdquo;&rsquo;s audience.</>
+            ? <>— unrestricted, it inherits &ldquo;{parent.name}&rdquo;&rsquo;s audience.</>
             : <>— only granted users and groups (plus admins) can see and query it.</>}
         </span>
       </label>
@@ -256,7 +255,7 @@ export function CompartmentDetails({
                     <span style={{ fontSize: 13, color: '#0b1c30' }}>{u.email}</span>
                     <span style={{ fontSize: 11, color: '#585f67', textTransform: 'capitalize' }}>{u.role.replace(/_/g, ' ')}</span>
                     {userLacksParentAccess(u) && (
-                      <span style={{ ...parentWarnBadge, marginLeft: 8 }}>ineffective — no access to &ldquo;{parent?.name}&rdquo;</span>
+                      <span style={{ ...parentWarnBadge, marginLeft: 8 }}>no access to &ldquo;{parent?.name}&rdquo;</span>
                     )}
                     <button onClick={() => toggleUser(u.id)} aria-label={`Remove ${u.email}`} style={removeBtn}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ba1a1a' }}
@@ -308,7 +307,7 @@ export function CompartmentDetails({
                       <span style={{ fontSize: 13, color: '#0b1c30' }}>{u.email}</span>
                       <span style={{ fontSize: 11, color: '#585f67', textTransform: 'capitalize' }}>{u.role.replace(/_/g, ' ')}</span>
                       {userLacksParentAccess(u) ? (
-                        <span style={parentWarnBadge}>ineffective — no access to &ldquo;{parent?.name}&rdquo;</span>
+                        <span style={parentWarnBadge}>no access to &ldquo;{parent?.name}&rdquo;</span>
                       ) : via.length > 0 ? (
                         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#0f766e', background: '#f0fdfa', border: '1px solid #99f6e4', padding: '1px 8px', borderRadius: 999, whiteSpace: 'nowrap' }}>
                           has access via {via.join(', ')}

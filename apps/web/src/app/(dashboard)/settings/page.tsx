@@ -220,13 +220,13 @@ function CompartmentsSection({ orgId, canManage, inputBase, autoCreate = false, 
     <div style={{ padding: 16, border: '1px solid #c3c6d7', borderRadius: 12, background: '#f8f9ff', display: 'flex', flexDirection: 'column', gap: 12 }}>
       {createParent && (
         <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>
-          New sub-compartment of <strong style={{ color: '#0b1c30' }}>{createParent.name}</strong> — only people
-          with access to &ldquo;{createParent.name}&rdquo; will be able to see it.
+          Sub-compartment of <strong style={{ color: '#0b1c30' }}>{createParent.name}</strong> 
+          <br />
+          Only people with access to &ldquo;{createParent.name}&rdquo; will be able to see it.
         </p>
       )}
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
         <div style={{ flex: 1 }}>
-          <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Name</label>
           <input
             autoFocus
             type="text"
@@ -351,7 +351,7 @@ function CompartmentsSection({ orgId, canManage, inputBase, autoCreate = false, 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16 }}>
         <div>
           <h2 style={{ fontSize: 20, fontWeight: 600, color: '#0b1c30', margin: '0 0 8px' }}>Data Compartments</h2>
-          <p style={{ fontSize: 14, color: '#434655', margin: 0 }}>Create, and manage access to logical containers.</p>
+          <p style={{ fontSize: 14, color: '#434655', margin: 0 }}>Create and manage access to logical containers.</p>
         </div>
         {canManage && (
           <button
