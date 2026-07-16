@@ -323,7 +323,7 @@ export function GroupsSection({ orgId, canManage, inputBase }: { orgId: string; 
       {deletingId && (() => {
         const target = groups.find((o) => o.id === deletingId)
         if (!target) return null
-        const confirmed = deleteConfirm.trim().toLowerCase() === 'delete'
+        const confirmed = deleteConfirm.trim() === 'Delete'
         const disabled = !confirmed || deleteGroup.isPending
         return (
           <div role="dialog" onClick={(e) => e.target === e.currentTarget && setDeletingId(null)}
@@ -337,14 +337,14 @@ export function GroupsSection({ orgId, canManage, inputBase }: { orgId: string; 
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#434655', marginBottom: 6 }}>
-                  Type <strong style={{ color: '#ba1a1a' }}>delete</strong> to confirm
+                  Type <strong style={{ color: '#ba1a1a' }}>Delete</strong> to confirm (case-sensitive)
                 </label>
                 <input
                   autoFocus
                   type="text"
                   value={deleteConfirm}
                   onChange={(e) => setDeleteConfirm(e.target.value)}
-                  placeholder="delete"
+                  placeholder="Delete"
                   style={{ ...inputBase, height: 44 }}
                 />
               </div>

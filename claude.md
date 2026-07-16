@@ -264,7 +264,7 @@ compartment_mode:   autonomous | schema_driven
 chunk_status:       active | processing | error | archived
 org_plan:           free | paid
 source_type:        hr_policy | sop | faq | case_note | compliance | product_doc | other
-ingestion_status:   queued | running | complete | failed
+ingestion_status:   queued | running | complete | failed | archived
 ```
 
 ### Tables

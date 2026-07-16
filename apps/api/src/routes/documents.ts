@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { createHash } from 'crypto'
 import { db } from '@company-brain/db'
-import { documents, ingestionJobs, chunks, orgs, compartments } from '@company-brain/db'
+import { documents, ingestionJobs, chunks, orgs, compartments, auditLogs } from '@company-brain/db'
 import { eq, and, desc, sql } from 'drizzle-orm'
 import { ingestDocument } from '@company-brain/ingestion'
 import { hasPermission } from '@company-brain/shared'
@@ -321,22 +321,120 @@ documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) =
   return c.json({ success: true, data: null })
 })
 
-// DELETE /orgs/:id/documents/:docId (soft delete — archives)
-documentsRoute.delete('/:docId', async (c) => {
+// Verify org ownership before any mutation — acting on a document ID alone
+// would let a cross-org docId mutate another tenant's data.
+async function findOrgDocument(orgId: string, docId: string) {
+  const rows = await db
+    .select({ filename: documents.filename, status: documents.status })
+    .from(documents)
+    .where(and(eq(documents.id, docId), eq(documents.orgId, orgId)))
+    .limit(1)
+  return rows[0]
+}
+
+const NOT_FOUND = { success: false, error: { code: 'NOT_FOUND', message: 'Document not found' } } as const
+
+// POST /orgs/:id/documents/:docId/archive (removes from retrieval, reversible)
+documentsRoute.post('/:docId/archive', async (c) => {
   const orgId = c.req.param('id')
   const docId = c.req.param('docId')
   if (!orgId || !docId) return c.json(BAD_ORG, 400)
+  const userId = c.get('userId')
   const role = c.get('role')
 
   if (!hasPermission(role, 'documents:manage')) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
-  await db.update(chunks).set({ status: 'archived' }).where(eq(chunks.documentId, docId))
+  const doc = await findOrgDocument(orgId, docId)
+  if (!doc) return c.json(NOT_FOUND, 404)
+
+  await db
+    .update(chunks)
+    .set({ status: 'archived' })
+    .where(and(eq(chunks.documentId, docId), eq(chunks.orgId, orgId)))
   await db
     .update(documents)
     .set({ status: 'archived', updatedAt: new Date() })
     .where(and(eq(documents.id, docId), eq(documents.orgId, orgId)))
+
+  await db.insert(auditLogs).values({
+    orgId, userId,
+    action: 'document.archive',
+    resourceType: 'document',
+    resourceId: docId,
+    metadata: { filename: doc.filename, previousStatus: doc.status },
+  })
+
+  return c.json({ success: true, data: null })
+})
+
+// POST /orgs/:id/documents/:docId/unarchive (restores document + chunks to retrieval)
+documentsRoute.post('/:docId/unarchive', async (c) => {
+  const orgId = c.req.param('id')
+  const docId = c.req.param('docId')
+  if (!orgId || !docId) return c.json(BAD_ORG, 400)
+  const userId = c.get('userId')
+  const role = c.get('role')
+
+  if (!hasPermission(role, 'documents:manage')) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
+
+  const doc = await findOrgDocument(orgId, docId)
+  if (!doc) return c.json(NOT_FOUND, 404)
+  if (doc.status !== 'archived') {
+    return c.json({ success: false, error: { code: 'CONFLICT', message: 'Document is not archived' } }, 409)
+  }
+
+  const restored = await db
+    .update(chunks)
+    .set({ status: 'active' })
+    .where(and(eq(chunks.documentId, docId), eq(chunks.orgId, orgId), eq(chunks.status, 'archived')))
+    .returning({ id: chunks.id })
+
+  // A document that never produced chunks (failed ingestion) goes back to
+  // failed rather than pretending to be ingested.
+  await db
+    .update(documents)
+    .set({ status: restored.length > 0 ? 'complete' : 'failed', updatedAt: new Date() })
+    .where(and(eq(documents.id, docId), eq(documents.orgId, orgId)))
+
+  await db.insert(auditLogs).values({
+    orgId, userId,
+    action: 'document.unarchive',
+    resourceType: 'document',
+    resourceId: docId,
+    metadata: { filename: doc.filename, chunksRestored: restored.length },
+  })
+
+  return c.json({ success: true, data: null })
+})
+
+// DELETE /orgs/:id/documents/:docId (hard delete — permanent, cascades chunks + ingestion jobs)
+documentsRoute.delete('/:docId', async (c) => {
+  const orgId = c.req.param('id')
+  const docId = c.req.param('docId')
+  if (!orgId || !docId) return c.json(BAD_ORG, 400)
+  const userId = c.get('userId')
+  const role = c.get('role')
+
+  if (!hasPermission(role, 'documents:manage')) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
+
+  const doc = await findOrgDocument(orgId, docId)
+  if (!doc) return c.json(NOT_FOUND, 404)
+
+  await db.delete(documents).where(and(eq(documents.id, docId), eq(documents.orgId, orgId)))
+
+  await db.insert(auditLogs).values({
+    orgId, userId,
+    action: 'document.delete',
+    resourceType: 'document',
+    resourceId: docId,
+    metadata: { filename: doc.filename, previousStatus: doc.status },
+  })
 
   return c.json({ success: true, data: null })
 })

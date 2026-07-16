@@ -131,6 +131,14 @@ export async function deleteDocument(orgId: string, docId: string) {
   return apiFetch<null>(`/api/v1/orgs/${orgId}/documents/${docId}`, { method: 'DELETE' })
 }
 
+export async function archiveDocument(orgId: string, docId: string) {
+  return apiFetch<null>(`/api/v1/orgs/${orgId}/documents/${docId}/archive`, { method: 'POST' })
+}
+
+export async function unarchiveDocument(orgId: string, docId: string) {
+  return apiFetch<null>(`/api/v1/orgs/${orgId}/documents/${docId}/unarchive`, { method: 'POST' })
+}
+
 // ─── Query ────────────────────────────────────────────────────────────────────
 
 export async function submitQuery(

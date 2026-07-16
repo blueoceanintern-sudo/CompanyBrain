@@ -408,21 +408,21 @@ function CompartmentsSection({ orgId, canManage, inputBase, autoCreate = false, 
               </select>
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#434655', marginBottom: 6 }}>
-                  Type <strong style={{ color: '#ba1a1a' }}>delete</strong> to confirm
+                  Type <strong style={{ color: '#ba1a1a' }}>Delete</strong> to confirm (case-sensitive)
                 </label>
                 <input
                   autoFocus
                   type="text"
                   value={deleteConfirm}
                   onChange={(e) => setDeleteConfirm(e.target.value)}
-                  placeholder="delete"
+                  placeholder="Delete"
                   style={{ ...inputBase, height: 44 }}
                 />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
                 <button onClick={() => setDeletingId(null)} style={{ height: 40, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>Cancel</button>
                 {(() => {
-                  const confirmed = deleteConfirm.trim().toLowerCase() === 'delete'
+                  const confirmed = deleteConfirm.trim() === 'Delete'
                   const disabled = !confirmed || deleteComp.isPending
                   return (
                     <button onClick={() => confirmDelete(target.id)} disabled={disabled}

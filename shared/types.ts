@@ -12,7 +12,7 @@ export type SourceType =
   | 'compliance'
   | 'product_doc'
   | 'other'
-export type IngestionStatus = 'queued' | 'running' | 'complete' | 'failed'
+export type IngestionStatus = 'queued' | 'running' | 'complete' | 'failed' | 'archived'
 export type UserRole =
   | 'super_admin'
   | 'org_admin'

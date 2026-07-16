@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { getDocuments, uploadDocument, deleteDocument } from '@/lib/api'
+import { getDocuments, uploadDocument, deleteDocument, archiveDocument, unarchiveDocument } from '@/lib/api'
 
 export function useDocuments(orgId: string) {
   return useQuery({
@@ -41,9 +41,41 @@ export function useDeleteDocument(orgId: string) {
         return null
       }),
     onSuccess: () => {
+      toast('Document permanently deleted')
+      qc.invalidateQueries({ queryKey: ['documents', orgId] })
+    },
+    onError: () => toast.error('Delete failed'),
+  })
+}
+
+export function useArchiveDocument(orgId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (docId: string) =>
+      archiveDocument(orgId, docId).then((r) => {
+        if (!r.success) throw new Error(r.error.message)
+        return null
+      }),
+    onSuccess: () => {
       toast('Document archived')
       qc.invalidateQueries({ queryKey: ['documents', orgId] })
     },
     onError: () => toast.error('Archive failed'),
+  })
+}
+
+export function useUnarchiveDocument(orgId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (docId: string) =>
+      unarchiveDocument(orgId, docId).then((r) => {
+        if (!r.success) throw new Error(r.error.message)
+        return null
+      }),
+    onSuccess: () => {
+      toast('Document restored')
+      qc.invalidateQueries({ queryKey: ['documents', orgId] })
+    },
+    onError: () => toast.error('Restore failed'),
   })
 }

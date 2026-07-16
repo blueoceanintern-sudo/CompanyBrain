@@ -4,8 +4,8 @@ import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Search, Upload, Paperclip, X, FileText, Table2, Link, File, FolderPlus } from 'lucide-react'
-import { useDocuments, useUploadDocument, useDeleteDocument } from '@/hooks/use-documents'
+import { Search, Upload, Paperclip, X, FileText, Table2, Link, File, FolderPlus, Trash2, Archive, ArchiveRestore, MoreHorizontal } from 'lucide-react'
+import { useDocuments, useUploadDocument, useDeleteDocument, useArchiveDocument, useUnarchiveDocument } from '@/hooks/use-documents'
 import { useRouter } from 'next/navigation'
 import { useCompartments } from '@/hooks/use-compartments'
 import { getAuthUser } from '@/lib/auth'
@@ -61,6 +61,7 @@ function StatusBadge({ status }: { status: string }) {
     running:    { bg: '#dbeafe', color: '#1e40af', dot: '#2563eb' },
     queued:     { bg: '#f1f5f9', color: '#475569', dot: '#94a3b8' },
     failed:     { bg: '#fee2e2', color: '#991b1b', dot: '#dc2626' },
+    archived:   { bg: '#f4f4f5', color: '#52525b', dot: '#a1a1aa' },
   }
   const s = styles[status] ?? styles['queued']!
   const label = status === 'complete' ? 'Ingested' : status === 'running' ? 'Processing' : status.charAt(0).toUpperCase() + status.slice(1)
@@ -170,7 +171,7 @@ function DetailPanel({ doc, compartmentName, onClose, onDelete }: {
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
           >Audit Trail</button>
           <button
-            onClick={() => { if (confirm('Delete this document?')) onDelete(doc.id) }}
+            onClick={() => onDelete(doc.id)}
             style={{ flex: 1, padding: '10px 0', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', background: '#fef2f2', color: '#dc2626', border: 'none', fontFamily: 'inherit' }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#fee2e2' }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#fef2f2' }}
@@ -178,6 +179,138 @@ function DetailPanel({ doc, compartmentName, onClose, onDelete }: {
         </div>
       )}
     </div>
+  )
+}
+
+// ─── Delete confirmation dialog ───────────────────────────────────────────────
+
+function DeleteDocumentDialog({ doc, isPending, onCancel, onConfirm }: {
+  doc: { filename: string; status: string }
+  isPending: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const [confirmText, setConfirmText] = useState('')
+  const canDelete = confirmText.trim() === 'Delete' && !isPending
+
+  return (
+    <div role="dialog" onClick={(e) => e.target === e.currentTarget && !isPending && onCancel()}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+      <div style={{ background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 16, padding: 32, width: 'min(440px, 90vw)', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <Trash2 size={18} color="#dc2626" />
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: '#0b1c30' }}>Delete document</h2>
+        </div>
+        <p style={{ fontSize: 14, color: '#434655', margin: '0 0 8px', lineHeight: 1.5 }}>
+          You are about to permanently delete <strong style={{ color: '#0b1c30', wordBreak: 'break-all' }}>{doc.filename}</strong>.
+        </p>
+        <p style={{ fontSize: 13, color: '#585f67', margin: '0 0 20px', lineHeight: 1.5 }}>
+          {doc.status === 'failed'
+            ? 'This ingestion failed, so no content is searchable. Deleting removes it permanently; you can re-upload the file afterwards.'
+            : 'The document and all its content will be permanently removed from the knowledge base. This cannot be undone — use Archive instead if you may need it back.'}
+        </p>
+        <form onSubmit={(e) => { e.preventDefault(); if (canDelete) onConfirm() }}>
+          <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>
+            Type <strong style={{ color: '#dc2626' }}>Delete</strong> to confirm (case-sensitive)
+          </label>
+          <input
+            autoFocus
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="Delete"
+            disabled={isPending}
+            style={{ width: '100%', height: 44, padding: '0 12px', border: '1px solid #c3c6d7', borderRadius: 8, background: '#ffffff', color: '#0b1c30', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
+            <button type="button" onClick={onCancel} disabled={isPending}
+              style={{ height: 44, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>
+              Cancel
+            </button>
+            <button type="submit" disabled={!canDelete}
+              style={{ height: 44, padding: '0 20px', border: 'none', borderRadius: 8, background: '#dc2626', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: canDelete ? 'pointer' : 'not-allowed', opacity: canDelete ? 1 : 0.5, fontFamily: 'inherit' }}>
+              {isPending ? 'Deleting…' : 'Delete document'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── Archive confirmation dialog ──────────────────────────────────────────────
+
+function ArchiveDocumentDialog({ doc, isPending, onCancel, onConfirm }: {
+  doc: { filename: string }
+  isPending: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div role="dialog" onClick={(e) => e.target === e.currentTarget && !isPending && onCancel()}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+      <div style={{ background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 16, padding: 32, width: 'min(440px, 90vw)', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <Archive size={18} color="#004ac6" />
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: '#0b1c30' }}>Archive document</h2>
+        </div>
+        <p style={{ fontSize: 14, color: '#434655', margin: '0 0 20px', lineHeight: 1.5 }}>
+          <strong style={{ color: '#0b1c30', wordBreak: 'break-all' }}>{doc.filename}</strong> will be removed
+          from search and chat answers. You can unarchive it at any time to restore it.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+          <button type="button" onClick={onCancel} disabled={isPending}
+            style={{ height: 44, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>
+            Cancel
+          </button>
+          <button type="button" onClick={onConfirm} disabled={isPending}
+            style={{ height: 44, padding: '0 20px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: isPending ? 'not-allowed' : 'pointer', opacity: isPending ? 0.5 : 1, fontFamily: 'inherit' }}>
+            {isPending ? 'Archiving…' : 'Archive document'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Row actions menu (…) ─────────────────────────────────────────────────────
+
+function RowActionsMenu({ isArchived, onArchive, onUnarchive, onDelete, onClose }: {
+  isArchived: boolean
+  onArchive: () => void
+  onUnarchive: () => void
+  onDelete: () => void
+  onClose: () => void
+}) {
+  const itemStyle: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+    padding: '10px 14px', border: 'none', background: 'none',
+    fontSize: 14, color: '#0b1c30', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+  }
+  return (
+    <>
+      {/* Transparent overlay: clicking anywhere else closes the menu */}
+      <div onClick={(e) => { e.stopPropagation(); onClose() }} style={{ position: 'fixed', inset: 0, zIndex: 55 }} />
+      <div style={{ position: 'absolute', right: 16, top: '70%', zIndex: 56, background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 10, boxShadow: '0 10px 30px rgba(0,0,0,0.12)', minWidth: 170, overflow: 'hidden', padding: '4px 0' }}>
+        {isArchived ? (
+          <button style={itemStyle} onClick={(e) => { e.stopPropagation(); onUnarchive() }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#eff4ff' }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none' }}>
+            <ArchiveRestore size={15} color="#004ac6" /> Unarchive
+          </button>
+        ) : (
+          <button style={itemStyle} onClick={(e) => { e.stopPropagation(); onArchive() }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#eff4ff' }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none' }}>
+            <Archive size={15} color="#585f67" /> Archive
+          </button>
+        )}
+        <button style={{ ...itemStyle, color: '#dc2626' }} onClick={(e) => { e.stopPropagation(); onDelete() }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#fef2f2' }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none' }}>
+          <Trash2 size={15} /> Delete
+        </button>
+      </div>
+    </>
   )
 }
 
@@ -295,6 +428,9 @@ export default function DocumentsPage() {
   const router = useRouter()
   const [showUpload, setShowUpload] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<DocItem | null>(null)
+  const [docToDelete, setDocToDelete] = useState<DocItem | null>(null)
+  const [docToArchive, setDocToArchive] = useState<DocItem | null>(null)
+  const [menuDocId, setMenuDocId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [sourceTypeFilter, setSourceTypeFilter] = useState('')
   const [accessTierFilter, setAccessTierFilter] = useState('')
@@ -303,6 +439,8 @@ export default function DocumentsPage() {
   const { data: docs = [], isLoading } = useDocuments(orgId)
   const { data: compartments = [] } = useCompartments(orgId)
   const deleteDoc = useDeleteDocument(orgId)
+  const archiveDoc = useArchiveDocument(orgId)
+  const unarchiveDoc = useUnarchiveDocument(orgId)
 
   // Sub-compartments show their full path, e.g. "HR / Payroll"
   const getCompartmentName = (compartmentId: string) => {
@@ -384,6 +522,7 @@ export default function DocumentsPage() {
             <option value="running">Processing</option>
             <option value="queued">Queued</option>
             <option value="failed">Failed</option>
+            <option value="archived">Archived</option>
           </select>
         </div>
 
@@ -437,13 +576,25 @@ export default function DocumentsPage() {
                     <td style={{ padding: '16px 24px' }}><TierBadge tier={doc.accessTier} /></td>
                     <td style={{ padding: '16px 24px' }}><StatusBadge status={doc.status} /></td>
                     <td style={{ padding: '16px 24px', color: '#585f67' }}>{formatDate(doc.createdAt)}</td>
-                    <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                    <td style={{ padding: '16px 24px', textAlign: 'right', position: 'relative' }}>
                       <button
-                        onClick={(e) => { e.stopPropagation(); if (confirm('Delete?')) deleteDoc.mutate(doc.id) }}
+                        title="Document actions"
+                        onClick={(e) => { e.stopPropagation(); setMenuDocId(menuDocId === doc.id ? null : doc.id) }}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', padding: 4, display: 'flex', alignItems: 'center' }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#0b1c30' }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#585f67' }}
                       >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+                        <MoreHorizontal size={18} />
                       </button>
+                      {menuDocId === doc.id && (
+                        <RowActionsMenu
+                          isArchived={doc.status === 'archived'}
+                          onArchive={() => { setMenuDocId(null); setDocToArchive(doc) }}
+                          onUnarchive={() => { setMenuDocId(null); unarchiveDoc.mutate(doc.id) }}
+                          onDelete={() => { setMenuDocId(null); setDocToDelete(doc) }}
+                          onClose={() => setMenuDocId(null)}
+                        />
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -466,12 +617,42 @@ export default function DocumentsPage() {
           doc={selectedDoc}
           compartmentName={selectedDoc ? getCompartmentName((selectedDoc as { compartmentId?: string }).compartmentId ?? '') : '—'}
           onClose={() => setSelectedDoc(null)}
-          onDelete={(id) => { deleteDoc.mutate(id); setSelectedDoc(null) }}
+          onDelete={() => { if (selectedDoc) setDocToDelete(selectedDoc) }}
         />
       </div>
 
       <style>{`@keyframes cb-skel { 0%,100%{opacity:.5}50%{opacity:1} }`}</style>
       {showUpload && <UploadDialog orgId={orgId} onClose={() => setShowUpload(false)} />}
+      {docToDelete && (
+        <DeleteDocumentDialog
+          doc={docToDelete}
+          isPending={deleteDoc.isPending}
+          onCancel={() => setDocToDelete(null)}
+          onConfirm={() =>
+            deleteDoc.mutate(docToDelete.id, {
+              onSuccess: () => {
+                setDocToDelete(null)
+                if (selectedDoc?.id === docToDelete.id) setSelectedDoc(null)
+              },
+            })
+          }
+        />
+      )}
+      {docToArchive && (
+        <ArchiveDocumentDialog
+          doc={docToArchive}
+          isPending={archiveDoc.isPending}
+          onCancel={() => setDocToArchive(null)}
+          onConfirm={() =>
+            archiveDoc.mutate(docToArchive.id, {
+              onSuccess: () => {
+                setDocToArchive(null)
+                if (selectedDoc?.id === docToArchive.id) setSelectedDoc(null)
+              },
+            })
+          }
+        />
+      )}
     </div>
   )
 }
