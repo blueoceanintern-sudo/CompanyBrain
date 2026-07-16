@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { signJwt } from '../lib/jwt'
 import { setCookie, deleteCookie } from 'hono/cookie'
 import { db } from '@company-brain/db'
-import { users } from '@company-brain/db'
+import { users, orgs } from '@company-brain/db'
 import { eq } from 'drizzle-orm'
 
 const authRoute = new Hono()
@@ -56,10 +56,22 @@ authRoute.post('/login', zValidator('json', loginSchema), async (c) => {
     secure: process.env.NODE_ENV === 'production',
   })
 
+  const orgRows = await db
+    .select({ name: orgs.name })
+    .from(orgs)
+    .where(eq(orgs.id, user.orgId))
+    .limit(1)
+
   return c.json({
     success: true,
     data: {
-      user: { id: user.id, email: user.email, role: user.role, orgId: user.orgId },
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        orgId: user.orgId,
+        orgName: orgRows[0]?.name ?? '',
+      },
     },
   })
 })

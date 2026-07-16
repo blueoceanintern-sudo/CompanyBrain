@@ -86,6 +86,8 @@ export interface AuthUser {
   email: string
   role: UserRole
   orgId: string
+  // Optional: sessions cached before org names were returned at login lack it
+  orgName?: string
 }
 
 export async function login(email: string, password: string) {

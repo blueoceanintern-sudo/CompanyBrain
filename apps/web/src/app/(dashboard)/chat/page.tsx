@@ -105,7 +105,7 @@ function EmptyState({
         <div style={{ width: '100%', maxWidth: 640, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32 }}>
           <div style={{ textAlign: 'center' }}>
             <h1 style={{ fontSize: 32, fontWeight: 700, color: '#0b1c30', margin: '0 0 8px' }}>{greeting}, {name.charAt(0).toUpperCase() + name.slice(1)}</h1>
-            <p style={{ fontSize: 16, color: '#434655', margin: 0 }}>Ask anything from BlueOcean&apos;s knowledge base</p>
+            <p style={{ fontSize: 16, color: '#434655', margin: 0 }}>Ask anything from {user?.orgName || 'your organisation'}&apos;s knowledge base</p>
           </div>
           <div style={{ width: '100%', background: '#ffffff', borderRadius: 24, border: '1px solid #c3c6d7', padding: 8, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 10px 30px -10px rgba(0,0,0,0.08)' }}>
             <div style={{ paddingLeft: 12, color: '#737686', display: 'flex', alignItems: 'center' }}>
