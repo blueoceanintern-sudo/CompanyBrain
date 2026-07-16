@@ -12,9 +12,13 @@ export function hasPermission(role: UserRole, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role]?.includes(permission) ?? false
 }
 
-export const CONFIDENCE_GATE_THRESHOLD = 0.38
-export const SEMANTIC_WEIGHT = 0.7
-export const BM25_WEIGHT = 0.3
+// Confidence = best cosine similarity among top-k candidates. On
+// text-embedding-3-large, on-topic paraphrases score ~0.28–0.55 and clearly
+// off-topic queries < 0.25. Borderline queries pass through to synthesis,
+// which is RAG-only and refuses when the chunks lack the answer.
+export const CONFIDENCE_GATE_THRESHOLD = 0.25
+// Reciprocal Rank Fusion constant (standard value from the RRF paper).
+export const RRF_K = 60
 export const TOP_K_CHUNKS = 5
 export const CHUNK_SIZE_CHARS = 2000
 export const CHUNK_OVERLAP_CHARS = 200

@@ -84,7 +84,37 @@ bun run dev --filter apps/api    # API only
 bun run dev --filter apps/web    # Web only
 bun run workers                  # Start cron jobs
 bun test                         # Run tests
+bun scripts/eval-retrieval.ts    # Retrieval quality eval (needs local DB + OPENAI_API_KEY)
 ```
+
+## How a question gets answered
+
+```
+question → embed → pgvector cosine search ┐
+         → tsvector full-text search      ┴→ RRF fusion → access-control filter
+         → confidence gate → Claude Haiku synthesis (RAG-only) → answer + citations
+```
+
+1. **Hybrid retrieval.** The question is embedded and searched two ways in parallel:
+   semantic (pgvector cosine) and full-text (`websearch_to_tsquery` with terms OR-ed,
+   so natural questions match on partial word overlap).
+2. **Reciprocal Rank Fusion.** The two ranked lists are fused by rank (k = 60), not by
+   raw score, so a chunk found by only one search can still win. Deterministic — no LLM
+   reranking.
+3. **Confidence gate.** `confidence` = best cosine similarity among the top-k chunks.
+   Below 0.25 the API returns "I don't know" without calling the model. Borderline
+   queries pass through to synthesis, which answers only from the retrieved chunks and
+   refuses when they don't contain the answer — so there are two layers of protection
+   against made-up answers.
+4. **Follow-ups.** In a conversation, the question is first rewritten into a standalone
+   search query (e.g. "summarise that" → the original topic) before retrieval, and the
+   gate is skipped so conversational requests reach the model.
+5. **Citations.** Every answer cites its source chunks; uncited answers are not permitted.
+
+Retrieval quality is measured against a golden set of real questions
+(`scripts/golden-set.json`). Run `bun scripts/eval-retrieval.ts` before and after any
+change to chunking, scoring, or thresholds — the scoring rules live in `CLAUDE.md`
+("Retrieval scoring") and must not change without updating that section.
 
 ## Access control model
 

@@ -1,0 +1,106 @@
+{
+  "org": "Equest School Network",
+  "userEmail": "wellspring0fhope77@gmail.com",
+  "questions": [
+    {
+      "id": "hr-working-hours",
+      "query": "What time does the workday start and end?",
+      "expect": { "filename": "HR FAQ.pdf", "contains": ["9:00 AM"] }
+    },
+    {
+      "id": "hr-remote-work",
+      "query": "Am I allowed to work from home?",
+      "expect": { "filename": "HR FAQ.pdf", "contains": ["hybrid work"] }
+    },
+    {
+      "id": "hr-annual-leave",
+      "query": "How do I take vacation days?",
+      "expect": { "filename": "HR FAQ.pdf", "contains": ["Leave requests should be submitted"] }
+    },
+    {
+      "id": "hr-sick-leave",
+      "query": "What happens if I'm out sick for several days?",
+      "expect": { "filename": "HR FAQ.pdf", "contains": ["medical documentation"] }
+    },
+    {
+      "id": "hr-learning-budget",
+      "query": "Will the company pay for courses or certifications?",
+      "expect": { "filename": "HR FAQ.pdf", "contains": ["Professional development reimbursement", "certification programs"] }
+    },
+    {
+      "id": "hr-performance-reviews",
+      "query": "How often do performance reviews happen?",
+      "expect": { "filename": "HR FAQ.pdf", "contains": ["Formal reviews occur annually"] }
+    },
+    {
+      "id": "hr-dress-code",
+      "query": "What's the dress code?",
+      "expect": { "filename": "HR FAQ.pdf", "contains": ["business casual"] }
+    },
+    {
+      "id": "hr-misconduct",
+      "query": "Who do I talk to if a colleague is harassing me?",
+      "expect": { "filename": "HR FAQ.pdf", "contains": ["Ethics reporting channel"] }
+    },
+    {
+      "id": "hr-phishing",
+      "query": "I think I received a phishing email — what should I do?",
+      "expect": { "filename": "HR FAQ.pdf", "contains": ["IT Service Desk"] }
+    },
+    {
+      "id": "hr-software-install",
+      "query": "Can I install new apps on my work laptop?",
+      "expect": { "filename": "HR FAQ.pdf", "contains": ["Only approved software"] }
+    },
+    {
+      "id": "legal-litigation-hold",
+      "query": "What steps do we take when a litigation hold is issued?",
+      "expect": { "filename": "Confidential Legal Memorandum.pdf", "contains": ["Suspend normal document deletion"] }
+    },
+    {
+      "id": "legal-privilege",
+      "query": "When is an email considered legally privileged?",
+      "expect": { "filename": "Confidential Legal Memorandum.pdf", "contains": ["Seek legal advice from counsel", "legally privileged"] }
+    },
+    {
+      "id": "legal-contract-review",
+      "query": "Which contracts have to go through legal review?",
+      "expect": { "filename": "Confidential Legal Memorandum.pdf", "contains": ["Vendor agreements involving sensitive data", "delegated approval threshold"] }
+    },
+    {
+      "id": "legal-social-media",
+      "query": "Can employees post about ongoing lawsuits on social media?",
+      "expect": { "filename": "Confidential Legal Memorandum.pdf", "contains": ["social media"] }
+    },
+    {
+      "id": "legal-ip-infringement",
+      "query": "What should I do if I discover a competitor copying our branding?",
+      "expect": { "filename": "Confidential Legal Memorandum.pdf", "contains": ["notify Legal immediately"] }
+    },
+    {
+      "id": "legal-regulatory-inquiry",
+      "query": "How fast must a regulatory inquiry be escalated?",
+      "expect": { "filename": "Confidential Legal Memorandum.pdf", "contains": ["one business day"] }
+    },
+    {
+      "id": "ood-revenue",
+      "query": "What is the company's revenue target for 2026?",
+      "outOfKb": true
+    },
+    {
+      "id": "ood-printer",
+      "query": "How do I set up the office wifi printer?",
+      "outOfKb": true
+    },
+    {
+      "id": "ood-parental-leave",
+      "query": "What is the parental leave allowance in Singapore?",
+      "outOfKb": true
+    },
+    {
+      "id": "ood-ping-pong",
+      "query": "Who won the office ping pong tournament?",
+      "outOfKb": true
+    }
+  ]
+}

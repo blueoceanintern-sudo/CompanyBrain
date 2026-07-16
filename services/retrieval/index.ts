@@ -6,9 +6,8 @@ import type { RetrieveParams, ServiceResult, ChunkContext, SourceType, UserRole 
 import {
   EMBEDDING_MODEL,
   EMBEDDING_DIMENSIONS,
-  SEMANTIC_WEIGHT,
-  BM25_WEIGHT,
   CONFIDENCE_GATE_THRESHOLD,
+  RRF_K,
   TOP_K_CHUNKS,
 } from '@company-brain/shared'
 import { canAccessChunk } from '@company-brain/access-control'
@@ -145,6 +144,12 @@ async function semanticSearch(
 }
 
 // ─── Full-text search via tsvector ────────────────────────────────────────────
+// websearch_to_tsquery sanitises arbitrary user input but ANDs plain words,
+// which fails natural-language questions ("what are the standard working
+// hours?" requires ALL words to appear). OR-ing the terms lets ts_rank reward
+// chunks matching more of them instead of excluding partial matches. An
+// all-stopword query yields an empty tsquery; nullif turns it into NULL so the
+// @@ match is simply false rather than a syntax error.
 
 async function fullTextSearch(
   orgId: string,
@@ -166,12 +171,18 @@ async function fullTextSearch(
       c.content,
       c.chunk_index,
       c.visibility,
-      ts_rank(to_tsvector('english', c.content), plainto_tsquery('english', ${query})) AS rank
-    FROM chunks c
+      ts_rank(to_tsvector('english', c.content), q.tsq) AS rank
+    FROM chunks c,
+      LATERAL (
+        SELECT to_tsquery(
+          'english',
+          nullif(replace(websearch_to_tsquery('english', ${query})::text, ' & ', ' | '), '')
+        ) AS tsq
+      ) q
     WHERE c.org_id = ${orgId}
       AND c.access_tier = ${accessTier}
       AND c.status = 'active'
-      AND to_tsvector('english', c.content) @@ plainto_tsquery('english', ${query})
+      AND to_tsvector('english', c.content) @@ q.tsq
       ${sourceFilter}
       ${compartmentFilter}
     ORDER BY rank DESC
@@ -244,13 +255,15 @@ export async function retrieveChunks(
       fullTextSearch(orgId, accessTier, query, topK, compartmentFilter, sourceTypes),
     ])
 
-    // Merge results into a map keyed by chunk ID
+    // Fuse the two ranked lists with Reciprocal Rank Fusion. RRF works on
+    // ranks, not raw scores, so cosine similarity and ts_rank never need to be
+    // put on a common scale — a chunk found by only one search can still win.
     const merged = new Map<
       string,
-      { id: string; documentId: string; compartmentId: string; content: string; chunkIndex: number; semanticScore: number; bm25Score: number; visibility: unknown }
+      { id: string; documentId: string; compartmentId: string; content: string; chunkIndex: number; semanticScore: number; bm25Score: number; rrfScore: number; visibility: unknown }
     >()
 
-    for (const r of semanticResults) {
+    semanticResults.forEach((r, rank) => {
       merged.set(r.id, {
         id: r.id,
         documentId: r.documentId,
@@ -259,14 +272,17 @@ export async function retrieveChunks(
         chunkIndex: r.chunkIndex,
         semanticScore: r.score,
         bm25Score: 0,
+        rrfScore: 1 / (RRF_K + rank + 1),
         visibility: (r as Record<string, unknown>)['visibility'],
       })
-    }
+    })
 
-    for (const r of ftsResults) {
+    ftsResults.forEach((r, rank) => {
+      const contribution = 1 / (RRF_K + rank + 1)
       const existing = merged.get(r.id)
       if (existing) {
         existing.bm25Score = r.rank
+        existing.rrfScore += contribution
       } else {
         merged.set(r.id, {
           id: r.id,
@@ -276,21 +292,15 @@ export async function retrieveChunks(
           chunkIndex: r.chunkIndex,
           semanticScore: 0,
           bm25Score: r.rank,
+          rrfScore: contribution,
           visibility: (r as Record<string, unknown>)['visibility'],
         })
       }
-    }
+    })
 
-    // Normalise BM25 scores to [0,1]
-    const bm25Scores = Array.from(merged.values()).map((v) => v.bm25Score)
-    const maxBm25 = Math.max(...bm25Scores, 1)
-
-    // Score, filter by access control, take top K
+    // Filter by access control, rank by fused score, take top K
     const scored: ChunkContext[] = []
     for (const item of merged.values()) {
-      const normalisedBm25 = item.bm25Score / maxBm25
-      const finalScore = SEMANTIC_WEIGHT * item.semanticScore + BM25_WEIGHT * normalisedBm25
-
       const canAccess = canAccessChunk({
         visibility: item.visibility as Parameters<typeof canAccessChunk>[0]['visibility'],
         userRole,
@@ -305,8 +315,8 @@ export async function retrieveChunks(
         filename: '',
         content: item.content,
         semanticScore: item.semanticScore,
-        bm25Score: normalisedBm25,
-        finalScore,
+        bm25Score: item.bm25Score,
+        finalScore: item.rrfScore,
         chunkIndex: item.chunkIndex,
       })
     }
@@ -314,7 +324,10 @@ export async function retrieveChunks(
     scored.sort((a, b) => b.finalScore - a.finalScore)
     const topChunks = scored.slice(0, topK)
 
-    const confidence = topChunks[0]?.finalScore ?? 0
+    // Confidence gate on the best cosine similarity among the candidates. RRF
+    // scores are rank-based and identical across queries, so they carry no
+    // signal about whether anything was actually relevant — cosine does.
+    const confidence = topChunks.reduce((max, c) => Math.max(max, c.semanticScore), 0)
 
     if (confidence < CONFIDENCE_GATE_THRESHOLD || topChunks.length === 0) {
       return { success: true, data: { chunks: [], confidence } }

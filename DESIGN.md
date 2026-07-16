@@ -405,11 +405,18 @@ Full-height flex column. No fixed inner heights — everything flows.
 
 **Confidence states**
 
+`confidence` is the best cosine similarity among retrieved chunks (text-embedding-3-large).
+Observed range on the golden set: strong answers ~0.35–0.55, weaker-but-correct answers
+~0.25–0.35, off-topic < 0.25 (the API gates these and returns "I don't know").
+
 | `confidence` value | Rendered as |
 |---|---|
-| ≥ 0.7 | Answer bubble, no badge |
-| 0.5–0.69 | Answer bubble + `warning-subtle` badge: "Low confidence" |
-| < 0.5 | No bubble — muted italic text: "No answer found in the knowledge base." |
+| ≥ 0.35 | Answer bubble, no badge |
+| 0.25–0.34 | Answer bubble + `warning-subtle` badge: "Low confidence" |
+| < 0.25 | No bubble — muted italic text: "No answer found in the knowledge base." (API already gates these) |
+
+Thresholds are calibrated to the retrieval eval (`bun scripts/eval-retrieval.ts`); re-check them
+if the embedding model or the confidence definition in `services/retrieval` changes.
 
 **Loading:** three-dot pulse in answer area; no `Skeleton`
 

@@ -124,6 +124,7 @@ bun run workers                      # start all cron jobs
 bun test
 bun test --watch
 bun test services/retrieval
+bun scripts/eval-retrieval.ts        # retrieval quality eval vs scripts/golden-set.json (needs local DB + OPENAI_API_KEY)
 ```
 
 ---
@@ -221,7 +222,7 @@ apps/web/src/
 3. Embed        OpenAI text-embedding-3-large (1536d) → HNSW index
 4. Store        Immutable chunk in Postgres + content hash dedup
 5. Retrieve     pgvector + tsvector in parallel
-6. Rerank       Deterministic weighted score + confidence gate → "I don't know" if low
+6. Rerank       Deterministic RRF fusion + confidence gate → "I don't know" if low
 7. Synthesise   Agent → grounded answer + citations only
 ```
 
@@ -231,18 +232,22 @@ apps/web/src/
 
 ### Retrieval scoring
 
-Reranking is deterministic — no LLM reranking in v1:
+Reranking is deterministic — no LLM reranking in v1. The two ranked lists
+(pgvector cosine, tsvector `ts_rank`) are fused with Reciprocal Rank Fusion:
 
 ```
-final_score = 0.7 * semantic_similarity + 0.3 * bm25_score
+final_score = Σ over lists containing the chunk of  1 / (60 + rank)
 ```
 
-- `semantic_similarity`: cosine similarity from pgvector
-- `bm25_score`: normalised tsvector rank from PostgreSQL `ts_rank`
-- Confidence gate threshold: `final_score < 0.5` → return `"I don't know"`, skip synthesis
+- RRF fuses by rank, not raw score, so cosine similarity and `ts_rank` never need a common scale
+- Full-text side uses `websearch_to_tsquery` with terms OR-ed, so natural-language questions match on partial term overlap and `ts_rank` rewards chunks matching more terms
+- Confidence = best cosine similarity among the top-k candidates (RRF scores are rank-based and carry no relevance signal across queries)
+- Confidence gate threshold: `confidence < 0.25` → return `"I don't know"`, skip synthesis. On text-embedding-3-large, on-topic paraphrases score ~0.28–0.55; clearly off-topic queries < 0.25. Borderline queries pass through to synthesis, which is RAG-only and refuses when the chunks lack the answer
 - Results merged and deduplicated before scoring; top-k = 5 chunks passed to synthesis
 
-Do not change this formula without updating this doc.
+Do not change this formula without updating this doc. Measure changes against
+the golden set first: `bun scripts/eval-retrieval.ts` (requires local DB +
+`OPENAI_API_KEY`; golden set in `scripts/golden-set.json`).
 
 ---
 
@@ -444,7 +449,7 @@ Non-negotiable:
 
 - **Query synthesis:** Claude Haiku 4.5 — called only after confidence gate passes, not on every query
 - **Anti-hallucination:** RAG only; synthesise from retrieved chunks exclusively; no freeform generation
-- **Confidence gate:** `final_score < 0.5` → return `{ answer: "I don't know, not in the knowledge base" }` — do not call synthesis
+- **Confidence gate:** best cosine similarity `< 0.25` → return `{ answer: "I don't know, not in the knowledge base" }` — do not call synthesis
 - **Small-to-big context:** always expand matched chunk to parent section before synthesis call
 - **Citations:** every answer must cite source chunks; unsourced answers are not permitted
 - **No LLM reranking in v1** — reranking is deterministic (see retrieval scoring formula above)
@@ -464,9 +469,9 @@ db: chunks table (content, embedding, visibility JSONB, access_tier, content_has
         ↓
 User submits plain-language query
         ↓
-services/retrieval (pgvector + tsvector parallel → deterministic rerank)
+services/retrieval (pgvector + tsvector parallel → deterministic RRF fusion)
         ↓
-Confidence gate: final_score < 0.5 → "I don't know"
+Confidence gate: best cosine similarity < 0.25 → "I don't know"
         ↓
 services/retrieval (small-to-big: expand to parent chunks)
         ↓
@@ -482,7 +487,7 @@ Response: { answer, citations, confidence, missing }
 | `apps/api` | HTTP routes (`/api/v1/*`); validates input with Zod; enforces `org_id` scoping; orchestrates services; no inline AI or direct vector calls |
 | `apps/web` | Chat interface, document manager, analytics dashboard; talks to API via `NEXT_PUBLIC_API_URL` |
 | `services/ingestion` | Parse PDF/Word → chunk → tag with org_id, compartment, access_tier, visibility → embed via OpenAI → store |
-| `services/retrieval` | pgvector semantic + tsvector full-text in parallel; deterministic weighted rerank; confidence gate; small-to-big expansion |
+| `services/retrieval` | pgvector semantic + tsvector full-text in parallel; deterministic RRF fusion; confidence gate; small-to-big expansion |
 | `services/synthesis` | Claude Haiku RAG generation; citation assembly; enforces no-freeform rule |
 | `services/access-control` | Visibility JSONB evaluation; role-to-chunk permission resolution at query time |
 | `services/payments` | Stripe Connect subscription management; platform fee routing |
