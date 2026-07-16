@@ -113,6 +113,7 @@ export interface CompartmentSummary {
   name: string
   description: string | null
   restricted: boolean
+  parentCompartmentId: string | null
   grantCount: number
   createdAt: string
   updatedAt: string

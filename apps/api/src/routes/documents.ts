@@ -31,25 +31,42 @@ documentsRoute.get('/', async (c) => {
   const role = c.get('role')
 
   // Non-admins only see documents in unrestricted compartments or ones they
-  // hold a grant for (directly or via a group)
+  // hold a grant for (directly or via a group). Sub-compartments also require
+  // access to the parent — access only narrows down the hierarchy.
   const isAdmin = role === 'super_admin' || role === 'org_admin'
   const grantFilter = isAdmin
     ? undefined
-    : sql`(
-        NOT EXISTS (
-          SELECT 1 FROM compartments cp
-          WHERE cp.id = ${documents.compartmentId} AND cp.restricted
-        )
-        OR EXISTS (
-          SELECT 1 FROM compartment_grants g
-          WHERE g.compartment_id = ${documents.compartmentId}
-            AND (
-              g.user_id = ${userId}
-              OR g.group_id IN (
-                SELECT gm.group_id FROM group_members gm WHERE gm.user_id = ${userId}
-              )
+    : sql`EXISTS (
+        SELECT 1 FROM compartments cp
+        LEFT JOIN compartments pp ON pp.id = cp.parent_compartment_id
+        WHERE cp.id = ${documents.compartmentId}
+          AND (
+            NOT cp.restricted
+            OR EXISTS (
+              SELECT 1 FROM compartment_grants g
+              WHERE g.compartment_id = cp.id
+                AND (
+                  g.user_id = ${userId}
+                  OR g.group_id IN (
+                    SELECT gm.group_id FROM group_members gm WHERE gm.user_id = ${userId}
+                  )
+                )
             )
-        )
+          )
+          AND (
+            pp.id IS NULL
+            OR NOT pp.restricted
+            OR EXISTS (
+              SELECT 1 FROM compartment_grants g
+              WHERE g.compartment_id = pp.id
+                AND (
+                  g.user_id = ${userId}
+                  OR g.group_id IN (
+                    SELECT gm.group_id FROM group_members gm WHERE gm.user_id = ${userId}
+                  )
+                )
+            )
+          )
       )`
 
   const rows = await db

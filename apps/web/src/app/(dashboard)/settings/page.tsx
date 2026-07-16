@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { FolderOpen, Plus, CreditCard, Check, X, Lock, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react'
+import { FolderOpen, Plus, CreditCard, Check, X, Lock, AlertTriangle, ChevronDown, ChevronRight, CornerDownRight } from 'lucide-react'
 import { useCompartments, useCreateCompartment, useUpdateCompartment, useDeleteCompartment } from '@/hooks/use-compartments'
 import { GroupsSection } from '@/components/settings/groups-section'
 import { CompartmentDetails } from '@/components/settings/compartment-access'
@@ -133,6 +133,7 @@ function CompartmentsSection({ orgId, canManage, inputBase, autoCreate = false, 
   const deleteComp = useDeleteCompartment(orgId)
 
   const [showCreate, setShowCreate] = useState(false)
+  const [createParent, setCreateParent] = useState<CompartmentSummary | null>(null) // non-null = creating a sub-compartment
   const [newName, setNewName] = useState('')
   const [newRestricted, setNewRestricted] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -142,32 +143,64 @@ function CompartmentsSection({ orgId, canManage, inputBase, autoCreate = false, 
   const [reassignTarget, setReassignTarget] = useState('') // '' = delete documents too
   const [panel, setPanel] = useState<{ id: string; edit: boolean } | null>(null) // expanded compartment panel
 
+  // One level of nesting: sub-compartments render under their parent, and
+  // access only narrows down the tree (a sub is unreachable without parent access)
+  const topLevel = compartments.filter((c) => !c.parentCompartmentId)
+  const subsOf = (parentId: string) => compartments.filter((c) => c.parentCompartmentId === parentId)
+  const compartmentLabel = (c: CompartmentSummary) => {
+    const parent = compartments.find((p) => p.id === c.parentCompartmentId)
+    return parent ? `${parent.name} / ${c.name}` : c.name
+  }
+
   // Deep link from the documents page: open the create form on arrival
   useEffect(() => {
     if (autoCreate && canManage) {
       setShowCreate(true)
+      setCreateParent(null)
       setNewName('')
       setNewRestricted(false)
       onAutoCreateHandled?.()
     }
   }, [autoCreate, canManage, onAutoCreateHandled])
 
+  const openCreate = (parent: CompartmentSummary | null) => {
+    setShowCreate(true)
+    setCreateParent(parent)
+    setNewName('')
+    setNewRestricted(false)
+  }
+  const closeCreate = () => {
+    setShowCreate(false)
+    setCreateParent(null)
+    setNewName('')
+    setNewRestricted(false)
+  }
+
   const createCompartment = () => {
     const name = newName.trim()
     if (!name) return
     createComp.mutate(
-      { name, restricted: newRestricted },
+      { name, restricted: newRestricted, ...(createParent ? { parentId: createParent.id } : {}) },
       {
         onSuccess: (created) => {
-          setShowCreate(false)
-          setNewName('')
-          setNewRestricted(false)
+          closeCreate()
           // A restricted compartment starts with no grants — open the panel in
           // edit mode immediately so it doesn't end up locked to everyone
           if (newRestricted && created?.id) setPanel({ id: created.id, edit: true })
         },
       }
     )
+  }
+
+  const requestDelete = (c: CompartmentSummary) => {
+    if (subsOf(c.id).length > 0) {
+      toast.error(`Delete the sub-compartments of "${c.name}" first`)
+      return
+    }
+    setDeletingId(c.id)
+    setDeleteConfirm('')
+    setReassignTarget('')
+    setPanel(null)
   }
 
   const startEdit = (c: CompartmentSummary) => { setEditingId(c.id); setEditName(c.name) }
@@ -183,6 +216,136 @@ function CompartmentsSection({ orgId, canManage, inputBase, autoCreate = false, 
 
   const iconBtn: React.CSSProperties = { padding: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 6, display: 'flex' }
 
+  const renderCreateForm = () => (
+    <div style={{ padding: 16, border: '1px solid #c3c6d7', borderRadius: 12, background: '#f8f9ff', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {createParent && (
+        <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>
+          New sub-compartment of <strong style={{ color: '#0b1c30' }}>{createParent.name}</strong> — only people
+          with access to &ldquo;{createParent.name}&rdquo; will be able to see it.
+        </p>
+      )}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Name</label>
+          <input
+            autoFocus
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') createCompartment(); if (e.key === 'Escape') closeCreate() }}
+            style={inputBase}
+            placeholder={createParent ? 'e.g. Payroll' : 'e.g. HR Department'}
+          />
+        </div>
+        <button
+          onClick={createCompartment}
+          disabled={!newName.trim() || createComp.isPending}
+          style={{ height: 48, padding: '0 16px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: (!newName.trim() || createComp.isPending) ? 'not-allowed' : 'pointer', opacity: (!newName.trim() || createComp.isPending) ? 0.6 : 1, fontFamily: 'inherit' }}
+        >
+          {createComp.isPending ? 'Creating…' : 'Create'}
+        </button>
+        <button onClick={closeCreate} style={{ height: 48, padding: '0 16px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>
+          Cancel
+        </button>
+      </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '4px 0' }}>
+        <input type="checkbox" checked={newRestricted} onChange={(e) => setNewRestricted(e.target.checked)} style={{ accentColor: '#2563eb' }} />
+        <Lock size={14} color={newRestricted ? '#9a3412' : '#585f67'} />
+        <span style={{ fontSize: 13, color: '#0b1c30' }}>Restricted</span>
+        <span style={{ fontSize: 12, color: '#585f67' }}>
+          {createParent
+            ? <>— narrows access further.</>
+            : <>— only granted users and groups (plus admins) can see and query it.</>}
+        </span>
+      </label>
+    </div>
+  )
+
+  const renderCard = (c: CompartmentSummary, parent: CompartmentSummary | null) => (
+    <div style={{ border: '1px solid #c3c6d7', borderRadius: 12, background: '#ffffff' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, minWidth: 0 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 8, background: '#e5eeff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <FolderOpen size={18} color="#004ac6" />
+          </div>
+          {editingId === c.id ? (
+            <input
+              autoFocus
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(c.id); if (e.key === 'Escape') setEditingId(null) }}
+              style={{ ...inputBase, height: 40 }}
+            />
+          ) : (
+            <div
+              style={{ minWidth: 0 }}
+              onDoubleClick={() => { if (canManage) startEdit(c) }}
+              title={canManage ? 'Double-click to rename' : undefined}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <p style={{ fontSize: 14, fontWeight: 500, color: '#0b1c30', margin: 0 }}>{c.name}</p>
+                {c.restricted && c.grantCount === 0 && (
+                  <button
+                    onClick={() => canManage && setPanel({ id: c.id, edit: true })}
+                    title={canManage ? 'Grant access to users or groups' : undefined}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: 11, fontWeight: 600, borderRadius: 999, cursor: canManage ? 'pointer' : 'default', fontFamily: 'inherit' }}
+                  >
+                    <AlertTriangle size={10} /> No access granted — admins only
+                  </button>
+                )}
+              </div>
+              {c.description && <p style={{ fontSize: 12, color: '#585f67', margin: '2px 0 0' }}>{c.description}</p>}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0, alignItems: 'center' }}>
+          {c.restricted && <Lock size={16} color="#9a3412" aria-label="Restricted" />}
+          {canManage && (editingId === c.id ? (
+            <>
+              <button onClick={() => saveEdit(c.id)} disabled={updateComp.isPending || !editName.trim()} aria-label="Save name" style={{ ...iconBtn, color: '#16a34a', cursor: updateComp.isPending ? 'not-allowed' : 'pointer' }}><Check size={18} /></button>
+              <button onClick={() => setEditingId(null)} aria-label="Cancel rename" style={iconBtn}><X size={18} /></button>
+            </>
+          ) : (
+            <>
+              {!c.parentCompartmentId && (
+                <button
+                  onClick={() => openCreate(c)}
+                  aria-label={`New sub-compartment in ${c.name}`}
+                  title="New sub-compartment"
+                  style={iconBtn}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#004ac6' }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#585f67' }}
+                ><Plus size={18} /></button>
+              )}
+              <button
+                onClick={() => setPanel(panel?.id === c.id ? null : { id: c.id, edit: false })}
+                aria-label={panel?.id === c.id ? 'Collapse compartment details' : 'Expand compartment details'}
+                style={{ ...iconBtn, color: panel?.id === c.id ? '#004ac6' : '#585f67' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#004ac6' }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = panel?.id === c.id ? '#004ac6' : '#585f67' }}
+              >{panel?.id === c.id ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</button>
+            </>
+          ))}
+        </div>
+      </div>
+
+      {panel?.id === c.id && canManage && (
+        <div style={{ borderTop: '1px solid #eff4ff', padding: 16 }}>
+          <CompartmentDetails
+            key={c.id + (panel.edit ? '-edit' : '')}
+            orgId={orgId}
+            compartment={c}
+            parent={parent}
+            initialEdit={panel.edit}
+            onRequestDelete={() => requestDelete(c)}
+          />
+        </div>
+      )}
+
+    </div>
+  )
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16 }}>
@@ -192,7 +355,7 @@ function CompartmentsSection({ orgId, canManage, inputBase, autoCreate = false, 
         </div>
         {canManage && (
           <button
-            onClick={() => { setShowCreate(true); setNewName('') }}
+            onClick={() => openCreate(null)}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 20px', background: '#004ac6', color: '#ffffff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
           >
             <Plus size={16} /> New Compartment
@@ -206,111 +369,22 @@ function CompartmentsSection({ orgId, canManage, inputBase, autoCreate = false, 
           <p style={{ color: '#585f67', fontSize: 14, textAlign: 'center', padding: 32 }}>Create a compartment to organise your knowledge.</p>
         )}
 
-        {showCreate && (
-          <div style={{ padding: 16, border: '1px solid #c3c6d7', borderRadius: 12, background: '#f8f9ff', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Name</label>
-                <input
-                  autoFocus
-                  type="text"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') createCompartment(); if (e.key === 'Escape') { setShowCreate(false); setNewName(''); setNewRestricted(false) } }}
-                  style={inputBase}
-                  placeholder="e.g. HR Department"
-                />
+        {showCreate && !createParent && renderCreateForm()}
+        {topLevel.map((c) => (
+          <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {renderCard(c, null)}
+            {subsOf(c.id).map((s) => (
+              <div key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <CornerDownRight size={16} color="#c3c6d7" style={{ marginTop: 26, marginLeft: 10, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>{renderCard(s, c)}</div>
               </div>
-              <button
-                onClick={createCompartment}
-                disabled={!newName.trim() || createComp.isPending}
-                style={{ height: 48, padding: '0 16px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: (!newName.trim() || createComp.isPending) ? 'not-allowed' : 'pointer', opacity: (!newName.trim() || createComp.isPending) ? 0.6 : 1, fontFamily: 'inherit' }}
-              >
-                {createComp.isPending ? 'Creating…' : 'Create'}
-              </button>
-              <button onClick={() => { setShowCreate(false); setNewName(''); setNewRestricted(false) }} style={{ height: 48, padding: '0 16px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>
-                Cancel
-              </button>
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '4px 0' }}>
-              <input type="checkbox" checked={newRestricted} onChange={(e) => setNewRestricted(e.target.checked)} style={{ accentColor: '#2563eb' }} />
-              <Lock size={14} color={newRestricted ? '#9a3412' : '#585f67'} />
-              <span style={{ fontSize: 13, color: '#0b1c30' }}>Restricted</span>
-              <span style={{ fontSize: 12, color: '#585f67' }}>
-                — only granted users and groups (plus admins) can see and query it.
-              </span>
-            </label>
-          </div>
-        )}
-        {compartments.map((c) => (
-          <div key={c.id} style={{ border: '1px solid #c3c6d7', borderRadius: 12, background: '#ffffff' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, minWidth: 0 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 8, background: '#e5eeff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <FolderOpen size={18} color="#004ac6" />
-                </div>
-                {editingId === c.id ? (
-                  <input
-                    autoFocus
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(c.id); if (e.key === 'Escape') setEditingId(null) }}
-                    style={{ ...inputBase, height: 40 }}
-                  />
-                ) : (
-                  <div
-                    style={{ minWidth: 0 }}
-                    onDoubleClick={() => { if (canManage) startEdit(c) }}
-                    title={canManage ? 'Double-click to rename' : undefined}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <p style={{ fontSize: 14, fontWeight: 500, color: '#0b1c30', margin: 0 }}>{c.name}</p>
-                      {c.restricted && c.grantCount === 0 && (
-                        <button
-                          onClick={() => canManage && setPanel({ id: c.id, edit: true })}
-                          title={canManage ? 'Grant access to users or groups' : undefined}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: 11, fontWeight: 600, borderRadius: 999, cursor: canManage ? 'pointer' : 'default', fontFamily: 'inherit' }}
-                        >
-                          <AlertTriangle size={10} /> No access granted — admins only
-                        </button>
-                      )}
-                    </div>
-                    {c.description && <p style={{ fontSize: 12, color: '#585f67', margin: '2px 0 0' }}>{c.description}</p>}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', gap: 4, flexShrink: 0, alignItems: 'center' }}>
-                {c.restricted && <Lock size={16} color="#9a3412" aria-label="Restricted" />}
-                {canManage && (editingId === c.id ? (
-                  <>
-                    <button onClick={() => saveEdit(c.id)} disabled={updateComp.isPending || !editName.trim()} aria-label="Save name" style={{ ...iconBtn, color: '#16a34a', cursor: updateComp.isPending ? 'not-allowed' : 'pointer' }}><Check size={18} /></button>
-                    <button onClick={() => setEditingId(null)} aria-label="Cancel rename" style={iconBtn}><X size={18} /></button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => setPanel(panel?.id === c.id ? null : { id: c.id, edit: false })}
-                    aria-label={panel?.id === c.id ? 'Collapse compartment details' : 'Expand compartment details'}
-                    style={{ ...iconBtn, color: panel?.id === c.id ? '#004ac6' : '#585f67' }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#004ac6' }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = panel?.id === c.id ? '#004ac6' : '#585f67' }}
-                  >{panel?.id === c.id ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</button>
-                ))}
-              </div>
-            </div>
-
-            {panel?.id === c.id && canManage && (
-              <div style={{ borderTop: '1px solid #eff4ff', padding: 16 }}>
-                <CompartmentDetails
-                  key={c.id + (panel.edit ? '-edit' : '')}
-                  orgId={orgId}
-                  compartment={c}
-                  initialEdit={panel.edit}
-                  onRequestDelete={() => { setDeletingId(c.id); setDeleteConfirm(''); setReassignTarget(''); setPanel(null) }}
-                />
+            ))}
+            {showCreate && createParent?.id === c.id && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <CornerDownRight size={16} color="#c3c6d7" style={{ marginTop: 26, marginLeft: 10, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>{renderCreateForm()}</div>
               </div>
             )}
-
           </div>
         ))}
       </div>
@@ -329,7 +403,7 @@ function CompartmentsSection({ orgId, canManage, inputBase, autoCreate = false, 
               <select value={reassignTarget} onChange={(e) => setReassignTarget(e.target.value)} style={{ ...inputBase, height: 44 }}>
                 <option value="">Delete all documents in this compartment</option>
                 {compartments.filter((o) => o.id !== target.id).map((o) => (
-                  <option key={o.id} value={o.id}>Move documents to &ldquo;{o.name}&rdquo;</option>
+                  <option key={o.id} value={o.id}>Move documents to &ldquo;{compartmentLabel(o)}&rdquo;</option>
                 ))}
               </select>
               <div>

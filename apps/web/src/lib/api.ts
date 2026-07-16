@@ -151,7 +151,10 @@ export async function getCompartments(orgId: string) {
   return apiFetch<CompartmentSummary[]>(`/api/v1/orgs/${orgId}/compartments`)
 }
 
-export async function createCompartment(orgId: string, data: { name: string; description?: string; restricted?: boolean }) {
+export async function createCompartment(
+  orgId: string,
+  data: { name: string; description?: string; restricted?: boolean; parentId?: string }
+) {
   return apiFetch<CompartmentSummary>(`/api/v1/orgs/${orgId}/compartments`, {
     method: 'POST',
     body: JSON.stringify(data),

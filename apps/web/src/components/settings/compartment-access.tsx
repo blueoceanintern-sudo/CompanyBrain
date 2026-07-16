@@ -10,20 +10,28 @@ import type { CompartmentSummary } from '@company-brain/shared'
 // Expandable panel for one compartment. View mode summarises restriction and
 // who has access; Edit mode stages restrict/unrestrict + grant changes behind
 // one Save, and hosts the delete action. Admins always have access.
+//
+// Access narrows down the hierarchy: a sub-compartment is only reachable by
+// people who can also access its parent, so grants here are inert for anyone
+// locked out of a restricted parent — flagged inline so admins can see why.
 export function CompartmentDetails({
   orgId,
   compartment,
+  parent = null,
   initialEdit = false,
   onRequestDelete,
 }: {
   orgId: string
   compartment: CompartmentSummary
+  parent?: CompartmentSummary | null
   initialEdit?: boolean
   onRequestDelete: () => void
 }) {
   const { data: groups = [], isLoading: groupsLoading } = useGroups(orgId)
   const { data: allUsers = [], isLoading: usersLoading } = useUsers(orgId)
   const { data: grants, isLoading: grantsLoading } = useCompartmentGrants(orgId, compartment.id)
+  const parentRestricted = !!parent?.restricted
+  const { data: parentGrants } = useCompartmentGrants(orgId, parentRestricted ? parent.id : null)
   const setGrants = useSetCompartmentGrants(orgId)
   const updateComp = useUpdateCompartment(orgId)
 
@@ -63,6 +71,20 @@ export function CompartmentDetails({
   const grantedGroupNames = new Set(grantedGroups.map((g) => g.name))
   const accessViaGroups = (u: { groups?: string[] }) =>
     (u.groups ?? []).filter((name) => grantedGroupNames.has(name))
+
+  // Grants are inert for subjects who cannot access a restricted parent
+  const parentUserIds = new Set(parentGrants?.userIds ?? [])
+  const parentGroupIds = new Set(parentGrants?.groupIds ?? [])
+  const parentGroupNames = new Set(groups.filter((g) => parentGroupIds.has(g.id)).map((g) => g.name))
+  const userLacksParentAccess = (u: { id: string; groups?: string[] }) =>
+    parentRestricted && !!parentGrants && !parentUserIds.has(u.id) && !(u.groups ?? []).some((n) => parentGroupNames.has(n))
+  const groupLacksParentAccess = (g: { id: string }) =>
+    parentRestricted && !!parentGrants && !parentGroupIds.has(g.id)
+
+  const parentWarnBadge: React.CSSProperties = {
+    marginLeft: 'auto', fontSize: 11, color: '#9a3412', background: '#fff7ed',
+    border: '1px solid #fed7aa', padding: '1px 8px', borderRadius: 999, whiteSpace: 'nowrap',
+  }
 
   const toggleGroup = (id: string) => {
     const next = new Set(currentGroups)
@@ -118,9 +140,16 @@ export function CompartmentDetails({
   if (!editing) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {parentRestricted && (
+          <p style={{ fontSize: 13, color: '#9a3412', margin: 0, padding: '10px 12px', background: '#fff7ed', borderRadius: 8 }}>
+            Only people with access to &ldquo;{parent.name}&rdquo; can see anything here, <br></br>regardless of grants below.
+          </p>
+        )}
         {!compartment.restricted ? (
           <p style={{ fontSize: 13, color: '#585f67', margin: 0 }}>
-            Open — everyone in the organisation can see and query this compartment.
+            {parentRestricted
+              ? <>Open to everyone with access to &ldquo;{parent.name}&rdquo; — access is inherited from the parent compartment.</>
+              : <>Open — everyone in the organisation can see and query this compartment.</>}
           </p>
         ) : (
           <>
@@ -138,6 +167,9 @@ export function CompartmentDetails({
                     <Users size={14} color="#004ac6" style={{ flexShrink: 0 }} />
                     <span style={{ fontSize: 13, color: '#0b1c30' }}>{g.name}</span>
                     <span style={{ fontSize: 11, color: '#585f67' }}>{g.memberCount} member{g.memberCount === 1 ? '' : 's'}</span>
+                    {groupLacksParentAccess(g) && (
+                      <span style={parentWarnBadge}>only members with access to &ldquo;{parent?.name}&rdquo;</span>
+                    )}
                   </div>
                 ))}
                 {grantedUsers.map((u) => {
@@ -147,9 +179,11 @@ export function CompartmentDetails({
                       <User size={14} color="#004ac6" style={{ flexShrink: 0 }} />
                       <span style={{ fontSize: 13, color: '#0b1c30' }}>{u.email}</span>
                       <span style={{ fontSize: 11, color: '#585f67', textTransform: 'capitalize' }}>{u.role.replace(/_/g, ' ')}</span>
-                      {via.length > 0 && (
+                      {userLacksParentAccess(u) ? (
+                        <span style={parentWarnBadge}>ineffective — no access to &ldquo;{parent?.name}&rdquo;</span>
+                      ) : via.length > 0 ? (
                         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#0f766e' }}>also via {via.join(', ')}</span>
-                      )}
+                      ) : null}
                     </div>
                   )
                 })}
@@ -173,12 +207,20 @@ export function CompartmentDetails({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {parentRestricted && (
+        <p style={{ fontSize: 13, color: '#9a3412', margin: 0, padding: '10px 12px', background: '#fff7ed', borderRadius: 8 }}>
+          Grants here can only narrow further. Anyone without access to &ldquo;{parent.name}&rdquo; cannot see this compartment, regardless
+          of grants below.
+        </p>
+      )}
       <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
         <input type="checkbox" checked={localRestricted} onChange={(e) => setLocalRestricted(e.target.checked)} style={{ accentColor: '#2563eb' }} />
         <Lock size={14} color={localRestricted ? '#9a3412' : '#585f67'} />
         <span style={{ fontSize: 13, color: '#0b1c30', fontWeight: 500 }}>Restricted</span>
         <span style={{ fontSize: 12, color: '#585f67' }}>
-          — only granted users and groups (plus admins) can see and query it.
+          {parent
+            ? <>— only granted users and groups (plus admins) can see and query it; unrestricted, it inherits &ldquo;{parent.name}&rdquo;&rsquo;s audience.</>
+            : <>— only granted users and groups (plus admins) can see and query it.</>}
         </span>
       </label>
 
@@ -199,6 +241,9 @@ export function CompartmentDetails({
                     <Users size={14} color="#004ac6" style={{ flexShrink: 0 }} />
                     <span style={{ fontSize: 13, color: '#0b1c30' }}>{g.name}</span>
                     <span style={{ fontSize: 11, color: '#585f67' }}>{g.memberCount} member{g.memberCount === 1 ? '' : 's'}</span>
+                    {groupLacksParentAccess(g) && (
+                      <span style={{ ...parentWarnBadge, marginLeft: 8 }}>only members with access to &ldquo;{parent?.name}&rdquo;</span>
+                    )}
                     <button onClick={() => toggleGroup(g.id)} aria-label={`Remove ${g.name}`} style={removeBtn}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ba1a1a' }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#585f67' }}
@@ -210,6 +255,9 @@ export function CompartmentDetails({
                     <User size={14} color="#004ac6" style={{ flexShrink: 0 }} />
                     <span style={{ fontSize: 13, color: '#0b1c30' }}>{u.email}</span>
                     <span style={{ fontSize: 11, color: '#585f67', textTransform: 'capitalize' }}>{u.role.replace(/_/g, ' ')}</span>
+                    {userLacksParentAccess(u) && (
+                      <span style={{ ...parentWarnBadge, marginLeft: 8 }}>ineffective — no access to &ldquo;{parent?.name}&rdquo;</span>
+                    )}
                     <button onClick={() => toggleUser(u.id)} aria-label={`Remove ${u.email}`} style={removeBtn}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ba1a1a' }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#585f67' }}
@@ -246,6 +294,9 @@ export function CompartmentDetails({
                     <Users size={14} color="#585f67" style={{ flexShrink: 0 }} />
                     <span style={{ fontSize: 13, color: '#0b1c30' }}>{g.name}</span>
                     <span style={{ fontSize: 11, color: '#585f67' }}>{g.memberCount} member{g.memberCount === 1 ? '' : 's'}</span>
+                    {groupLacksParentAccess(g) && (
+                      <span style={parentWarnBadge}>only members with access to &ldquo;{parent?.name}&rdquo;</span>
+                    )}
                   </label>
                 ))}
                 {addableUsers.map((u) => {
@@ -256,11 +307,13 @@ export function CompartmentDetails({
                       <User size={14} color="#585f67" style={{ flexShrink: 0 }} />
                       <span style={{ fontSize: 13, color: '#0b1c30' }}>{u.email}</span>
                       <span style={{ fontSize: 11, color: '#585f67', textTransform: 'capitalize' }}>{u.role.replace(/_/g, ' ')}</span>
-                      {via.length > 0 && (
+                      {userLacksParentAccess(u) ? (
+                        <span style={parentWarnBadge}>ineffective — no access to &ldquo;{parent?.name}&rdquo;</span>
+                      ) : via.length > 0 ? (
                         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#0f766e', background: '#f0fdfa', border: '1px solid #99f6e4', padding: '1px 8px', borderRadius: 999, whiteSpace: 'nowrap' }}>
                           has access via {via.join(', ')}
                         </span>
-                      )}
+                      ) : null}
                     </label>
                   )
                 })}

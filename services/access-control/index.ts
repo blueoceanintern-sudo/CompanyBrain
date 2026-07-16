@@ -32,6 +32,10 @@ interface CompartmentAccessParams {
 // A restricted compartment is usable only with a grant — held directly or via
 // group membership. Unrestricted compartments are open to all internal roles;
 // org_admin and super_admin bypass grants entirely.
+//
+// Access narrows down the hierarchy: a sub-compartment is usable only by users
+// who can also use its parent. A grant on a sub never bypasses the parent, so
+// revoking parent access cuts off the whole subtree.
 export async function canUseCompartment({
   orgId,
   compartmentId,
@@ -43,6 +47,7 @@ export async function canUseCompartment({
   const rows = await db.execute(sql`
     SELECT 1
     FROM compartments cp
+    LEFT JOIN compartments pp ON pp.id = cp.parent_compartment_id
     WHERE cp.id = ${compartmentId}
       AND cp.org_id = ${orgId}
       AND (
@@ -50,6 +55,20 @@ export async function canUseCompartment({
         OR EXISTS (
           SELECT 1 FROM compartment_grants g
           WHERE g.compartment_id = cp.id
+            AND (
+              g.user_id = ${userId}
+              OR g.group_id IN (
+                SELECT gm.group_id FROM group_members gm WHERE gm.user_id = ${userId}
+              )
+            )
+        )
+      )
+      AND (
+        pp.id IS NULL
+        OR NOT pp.restricted
+        OR EXISTS (
+          SELECT 1 FROM compartment_grants g
+          WHERE g.compartment_id = pp.id
             AND (
               g.user_id = ${userId}
               OR g.group_id IN (

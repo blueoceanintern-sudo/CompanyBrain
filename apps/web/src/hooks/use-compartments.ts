@@ -19,7 +19,7 @@ export function useCompartments(orgId: string) {
 export function useCreateCompartment(orgId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (data: { name: string; description?: string; restricted?: boolean }) => {
+    mutationFn: async (data: { name: string; description?: string; restricted?: boolean; parentId?: string }) => {
       const result = await createCompartment(orgId, data)
       if (!result.success) throw new Error(result.error.message)
       return result.data

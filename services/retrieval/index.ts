@@ -47,9 +47,12 @@ function parseVisibility(raw: unknown): Record<string, unknown> {
 
 // ─── Restricted-compartment enforcement ───────────────────────────────────────
 // A chunk in a restricted compartment is only searchable when the user holds a
-// grant — directly or via group membership. Admins bypass; the external plane
-// is gated by subscription instead of grants. Enforced in SQL so restricted
-// chunks never leave the database (hard constraint: no path around visibility).
+// grant — directly or via group membership. Access narrows down the hierarchy:
+// a chunk in a sub-compartment also requires access to the parent compartment,
+// so a grant on a sub never bypasses a restricted parent. Admins bypass; the
+// external plane is gated by subscription instead of grants. Enforced in SQL so
+// restricted chunks never leave the database (hard constraint: no path around
+// visibility).
 
 function compartmentGrantFilter(
   userId: string,
@@ -59,21 +62,37 @@ function compartmentGrantFilter(
   if (accessTier === 'external' || userRole === 'super_admin' || userRole === 'org_admin') {
     return sql``
   }
-  return sql` AND (
-    NOT EXISTS (
-      SELECT 1 FROM compartments cp
-      WHERE cp.id = c.compartment_id AND cp.restricted
-    )
-    OR EXISTS (
-      SELECT 1 FROM compartment_grants g
-      WHERE g.compartment_id = c.compartment_id
-        AND (
-          g.user_id = ${userId}
-          OR g.group_id IN (
-            SELECT gm.group_id FROM group_members gm WHERE gm.user_id = ${userId}
-          )
+  return sql` AND EXISTS (
+    SELECT 1 FROM compartments cp
+    LEFT JOIN compartments pp ON pp.id = cp.parent_compartment_id
+    WHERE cp.id = c.compartment_id
+      AND (
+        NOT cp.restricted
+        OR EXISTS (
+          SELECT 1 FROM compartment_grants g
+          WHERE g.compartment_id = cp.id
+            AND (
+              g.user_id = ${userId}
+              OR g.group_id IN (
+                SELECT gm.group_id FROM group_members gm WHERE gm.user_id = ${userId}
+              )
+            )
         )
-    )
+      )
+      AND (
+        pp.id IS NULL
+        OR NOT pp.restricted
+        OR EXISTS (
+          SELECT 1 FROM compartment_grants g
+          WHERE g.compartment_id = pp.id
+            AND (
+              g.user_id = ${userId}
+              OR g.group_id IN (
+                SELECT gm.group_id FROM group_members gm WHERE gm.user_id = ${userId}
+              )
+            )
+        )
+      )
   )`
 }
 

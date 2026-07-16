@@ -16,7 +16,11 @@ const compartmentCreateSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().optional(),
   restricted: z.boolean().optional(),
+  // One level of nesting; the parent is fixed at creation (no re-parenting)
+  parentId: z.string().uuid().optional(),
 })
+
+const compartmentUpdateSchema = compartmentCreateSchema.omit({ parentId: true }).partial()
 
 const BAD_ORG = { success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } } as const
 
@@ -30,6 +34,7 @@ adminRoute.get('/compartments', async (c) => {
       name: compartments.name,
       description: compartments.description,
       restricted: compartments.restricted,
+      parentCompartmentId: compartments.parentCompartmentId,
       grantCount: count(compartmentGrants.id),
       createdAt: compartments.createdAt,
       updatedAt: compartments.updatedAt,
@@ -53,6 +58,24 @@ adminRoute.post('/compartments', zValidator('json', compartmentCreateSchema), as
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
+  if (body.parentId) {
+    const [parent] = await db
+      .select({ id: compartments.id, parentCompartmentId: compartments.parentCompartmentId })
+      .from(compartments)
+      .where(and(eq(compartments.id, body.parentId), eq(compartments.orgId, orgId)))
+      .limit(1)
+
+    if (!parent) {
+      return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Parent compartment not found' } }, 404)
+    }
+    if (parent.parentCompartmentId) {
+      return c.json(
+        { success: false, error: { code: 'MAX_DEPTH', message: 'Sub-compartments cannot have their own sub-compartments' } },
+        400
+      )
+    }
+  }
+
   const [compartment] = await db
     .insert(compartments)
     .values({
@@ -60,6 +83,7 @@ adminRoute.post('/compartments', zValidator('json', compartmentCreateSchema), as
       name: body.name,
       ...(body.description !== undefined ? { description: body.description } : {}),
       ...(body.restricted !== undefined ? { restricted: body.restricted } : {}),
+      ...(body.parentId !== undefined ? { parentCompartmentId: body.parentId } : {}),
     })
     .returning()
 
@@ -68,13 +92,13 @@ adminRoute.post('/compartments', zValidator('json', compartmentCreateSchema), as
     action: 'compartment.create',
     resourceType: 'compartment',
     resourceId: compartment?.id ?? null,
-    metadata: { name: body.name },
+    metadata: { name: body.name, ...(body.parentId ? { parentCompartmentId: body.parentId } : {}) },
   })
 
   return c.json({ success: true, data: compartment }, 201)
 })
 
-adminRoute.patch('/compartments/:cId', zValidator('json', compartmentCreateSchema.partial()), async (c) => {
+adminRoute.patch('/compartments/:cId', zValidator('json', compartmentUpdateSchema), async (c) => {
   const orgId = c.req.param('id')
   const cId = c.req.param('cId')
   if (!orgId || !cId) return c.json(BAD_ORG, 400)
@@ -125,6 +149,26 @@ adminRoute.delete('/compartments/:cId', zValidator('json', deleteCompartmentSche
 
   if (!hasPermission(role, 'users:manage')) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
+
+  // A parent cannot be deleted while sub-compartments exist — the admin must
+  // delete (or empty) each sub first. The RESTRICT FK backs this up in the DB.
+  const [subRow] = await db
+    .select({ subCount: count() })
+    .from(compartments)
+    .where(and(eq(compartments.parentCompartmentId, cId), eq(compartments.orgId, orgId)))
+
+  if ((subRow?.subCount ?? 0) > 0) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'HAS_SUBCOMPARTMENTS',
+          message: 'This compartment has sub-compartments. Delete them first.',
+        },
+      },
+      400
+    )
   }
 
   if (targetCompartmentId) {

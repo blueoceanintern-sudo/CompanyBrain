@@ -253,7 +253,12 @@ function UploadForm({ orgId, compartments, onClose }: { orgId: string; compartme
           <div>
             <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Compartment</label>
             <select {...register('compartmentId')} disabled={noCompartments} style={{ ...inputStyle, opacity: noCompartments ? 0.5 : 1 }}>
-              {compartments.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {compartments
+                .filter((c) => !c.parentCompartmentId)
+                .flatMap((c) => [c, ...compartments.filter((s) => s.parentCompartmentId === c.id)])
+                .map((c) => (
+                  <option key={c.id} value={c.id}>{c.parentCompartmentId ? `— ${c.name}` : c.name}</option>
+                ))}
             </select>
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
@@ -299,8 +304,13 @@ export default function DocumentsPage() {
   const { data: compartments = [] } = useCompartments(orgId)
   const deleteDoc = useDeleteDocument(orgId)
 
-  const getCompartmentName = (compartmentId: string) =>
-    compartments.find((c) => c.id === compartmentId)?.name ?? '—'
+  // Sub-compartments show their full path, e.g. "HR / Payroll"
+  const getCompartmentName = (compartmentId: string) => {
+    const comp = compartments.find((c) => c.id === compartmentId)
+    if (!comp) return '—'
+    const parent = compartments.find((c) => c.id === comp.parentCompartmentId)
+    return parent ? `${parent.name} / ${comp.name}` : comp.name
+  }
 
   const filtered = docs.filter((d) => {
     if (search && !d.filename.toLowerCase().includes(search.toLowerCase())) return false
