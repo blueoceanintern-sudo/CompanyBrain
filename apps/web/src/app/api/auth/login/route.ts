@@ -34,8 +34,10 @@ export async function POST(request: Request) {
   try {
     data = await apiRes.json()
   } catch {
+    const raw = await apiRes.text().catch(() => '<unreadable>')
+    console.error('[login proxy] non-JSON from API', apiRes.status, raw.slice(0, 500))
     return NextResponse.json(
-      { success: false, error: { code: 'UPSTREAM_ERROR', message: 'Unexpected response from server.' } },
+      { success: false, error: { code: 'UPSTREAM_ERROR', message: `API returned non-JSON (${apiRes.status}): ${raw.slice(0, 200)}` } },
       { status: 502 }
     )
   }
