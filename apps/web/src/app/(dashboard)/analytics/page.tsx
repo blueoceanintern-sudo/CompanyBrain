@@ -60,6 +60,92 @@ function Skel({ h }: { h: number }) {
   return <div style={{ height: h, background: '#eff4ff', borderRadius: 8, animation: 'cb-skel 1.5s ease-in-out infinite' }} />
 }
 
+// ─── Query volume chart ───────────────────────────────────────────────────────
+
+const CHART = { w: 600, h: 220, padLeft: 36, padRight: 10, padTop: 10, padBottom: 26 }
+
+function niceCeil(n: number): number {
+  if (n <= 5) return Math.max(n, 1)
+  const mag = Math.pow(10, Math.floor(Math.log10(n)))
+  return Math.ceil(n / mag) * mag
+}
+
+function QueryVolumeChart({ data }: { data: Array<{ date: string; count: number }> }) {
+  const [hover, setHover] = useState<number | null>(null)
+
+  const { w, h, padLeft, padRight, padTop, padBottom } = CHART
+  const plotW = w - padLeft - padRight
+  const plotH = h - padTop - padBottom
+
+  const yMax = niceCeil(Math.max(...data.map((d) => d.count)))
+  const x = (i: number) => padLeft + (data.length > 1 ? (i / (data.length - 1)) * plotW : plotW / 2)
+  const y = (count: number) => padTop + plotH - (count / yMax) * plotH
+
+  const linePath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(d.count).toFixed(1)}`).join(' ')
+  const areaPath = `${linePath} L${x(data.length - 1).toFixed(1)},${padTop + plotH} L${x(0).toFixed(1)},${padTop + plotH} Z`
+
+  const yTicks = [...new Set([0, Math.round(yMax / 2), yMax])]
+  const xTickCount = Math.min(6, data.length)
+  const xTicks = Array.from({ length: xTickCount }, (_, i) => Math.round((i / (xTickCount - 1 || 1)) * (data.length - 1)))
+
+  const fmtDay = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const relX = ((e.clientX - rect.left) / rect.width) * w
+    const i = Math.round(((relX - padLeft) / plotW) * (data.length - 1))
+    setHover(Math.max(0, Math.min(data.length - 1, i)))
+  }
+
+  return (
+    <div style={{ position: 'relative', flex: 1, display: 'flex' }}>
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        style={{ width: '100%', height: 'auto', display: 'block', cursor: 'crosshair' }}
+        onMouseMove={onMove}
+        onMouseLeave={() => setHover(null)}
+        role="img"
+        aria-label="Queries per day"
+      >
+        {yTicks.map((t) => (
+          <g key={t}>
+            <line x1={padLeft} x2={w - padRight} y1={y(t)} y2={y(t)} stroke="#f1f5f9" strokeWidth={1} />
+            <text x={padLeft - 8} y={y(t) + 3.5} textAnchor="end" fontSize={11} fill="#737686">{t}</text>
+          </g>
+        ))}
+        {xTicks.map((i) => (
+          <text key={i} x={x(i)} y={h - 8} textAnchor="middle" fontSize={11} fill="#737686">
+            {data[i] ? fmtDay(data[i].date) : ''}
+          </text>
+        ))}
+        <path d={areaPath} fill="rgba(37,99,235,0.08)" />
+        <path d={linePath} fill="none" stroke="#2563eb" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        {hover !== null && data[hover] && (
+          <g>
+            <line x1={x(hover)} x2={x(hover)} y1={padTop} y2={padTop + plotH} stroke="#c3c6d7" strokeWidth={1} strokeDasharray="3 3" />
+            <circle cx={x(hover)} cy={y(data[hover].count)} r={4} fill="#2563eb" stroke="#ffffff" strokeWidth={2} />
+          </g>
+        )}
+      </svg>
+      {hover !== null && data[hover] && (
+        <div style={{
+          position: 'absolute',
+          left: `${(x(hover) / w) * 100}%`,
+          top: `${(y(data[hover].count) / h) * 100}%`,
+          transform: `translate(${hover > data.length / 2 ? 'calc(-100% - 12px)' : '12px'}, -50%)`,
+          background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 8, padding: '6px 10px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)', pointerEvents: 'none', whiteSpace: 'nowrap',
+        }}>
+          <p style={{ fontSize: 11, color: '#737686', margin: 0 }}>{fmtDay(data[hover].date)}</p>
+          <p style={{ fontSize: 13, fontWeight: 600, color: '#0b1c30', margin: 0 }}>
+            {data[hover].count} {data[hover].count === 1 ? 'query' : 'queries'}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AnalyticsPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
@@ -106,15 +192,21 @@ export default function AnalyticsPage() {
           {/* Charts */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
 
-            {/* Line chart — no data yet, shows empty state */}
+            {/* Query volume line chart */}
             <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 24, minHeight: 320, display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                 <h3 style={{ fontSize: 18, fontWeight: 600, color: '#0b1c30', margin: 0 }}>Query Volume Over Time</h3>
                 <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}><MoreHorizontal size={18} /></button>
               </div>
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <p style={{ fontSize: 14, color: '#737686', margin: 0 }}>No query data for this period.</p>
-              </div>
+              {overviewLoading ? (
+                <Skel h={220} />
+              ) : !overview || overview.queryVolumeByDay.every((d) => d.count === 0) ? (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ fontSize: 14, color: '#737686', margin: 0 }}>No query data for this period.</p>
+                </div>
+              ) : (
+                <QueryVolumeChart data={overview.queryVolumeByDay} />
+              )}
             </div>
 
             {/* Top unanswered — progress bars */}

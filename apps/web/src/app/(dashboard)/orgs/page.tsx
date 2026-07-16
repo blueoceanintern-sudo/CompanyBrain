@@ -138,17 +138,17 @@ export default function OrgsPage() {
             <table aria-label="Organisations" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, background: '#ffffff' }}>
               <thead style={{ background: '#eff4ff', borderBottom: '1px solid #c3c6d7' }}>
                 <tr>
-                  {['Organisation', 'Plan', 'Created'].map((h) => (
+                  {['Organisation', 'Plan', 'Users', 'Documents', 'Queries (30d)', 'Created'].map((h) => (
                     <th key={h} style={{ padding: '16px 24px', textAlign: 'left', fontSize: 11, fontWeight: 500, color: '#585f67', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {isLoading && Array.from({ length: 4 }).map((_, i) => (
-                  <tr key={i}><td colSpan={3} style={{ padding: '12px 24px' }}><Skel h={28} /></td></tr>
+                  <tr key={i}><td colSpan={6} style={{ padding: '12px 24px' }}><Skel h={28} /></td></tr>
                 ))}
                 {!isLoading && orgs.length === 0 && (
-                  <tr><td colSpan={3} style={{ padding: 48, textAlign: 'center' }}>
+                  <tr><td colSpan={6} style={{ padding: 48, textAlign: 'center' }}>
                     <p style={{ fontSize: 18, fontWeight: 500, color: '#0b1c30', margin: '0 0 8px' }}>No organisations yet</p>
                     <p style={{ fontSize: 14, color: '#585f67', margin: 0 }}>Create the first one to get started.</p>
                   </td></tr>
@@ -170,6 +170,9 @@ export default function OrgsPage() {
                           {org.plan}
                         </span>
                       </td>
+                      <td style={{ padding: '16px 24px', color: '#585f67' }}>{org.userCount}</td>
+                      <td style={{ padding: '16px 24px', color: '#585f67' }}>{org.documentCount}</td>
+                      <td style={{ padding: '16px 24px', color: '#585f67' }}>{org.queryCount30d}</td>
                       <td style={{ padding: '16px 24px', color: '#585f67' }}>{formatDate(org.createdAt)}</td>
                     </tr>
                   )

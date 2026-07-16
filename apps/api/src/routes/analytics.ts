@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { db } from '@company-brain/db'
 import { queries, auditLogs, users, orgs, documents } from '@company-brain/db'
-import { eq, and, gte, ne, sql, count } from 'drizzle-orm'
+import { eq, and, gte, ne, desc, sql, count } from 'drizzle-orm'
 import type { SourceType } from '@company-brain/shared'
 import { hasPermission, CONFIDENCE_GATE_THRESHOLD } from '@company-brain/shared'
 import type { AuthVars } from '../middleware/auth'
@@ -29,7 +29,7 @@ analyticsRoute.get('/overview', async (c) => {
 
   const since = daysAgoDate(days)
 
-  const [totalResult, answeredResult, citedResult, docsBySourceType] = await Promise.all([
+  const [totalResult, answeredResult, citedResult, docsBySourceType, volumeByDay] = await Promise.all([
     db
       .select({ total: count() })
       .from(queries)
@@ -51,7 +51,7 @@ analyticsRoute.get('/overview', async (c) => {
         and(
           eq(queries.orgId, orgId),
           gte(queries.createdAt, since),
-          sql`jsonb_array_length(citations) > 0`
+          sql`jsonb_typeof(citations) = 'array' AND jsonb_array_length(citations) > 0`
         )
       ),
     db
@@ -59,6 +59,16 @@ analyticsRoute.get('/overview', async (c) => {
       .from(documents)
       .where(and(eq(documents.orgId, orgId), ne(documents.status, 'archived')))
       .groupBy(documents.sourceType),
+    db.execute(sql`
+      SELECT d::date::text AS day, count(q.id)::int AS count
+      FROM generate_series(date_trunc('day', ${since.toISOString()}::timestamptz), date_trunc('day', now()), interval '1 day') AS d
+      LEFT JOIN queries q
+        ON q.org_id = ${orgId}
+       AND q.created_at >= d
+       AND q.created_at < d + interval '1 day'
+      GROUP BY d
+      ORDER BY d
+    `),
   ])
 
   const total = totalResult[0]?.total ?? 0
@@ -81,6 +91,10 @@ analyticsRoute.get('/overview', async (c) => {
       citationHitRate: answered > 0 ? Math.round((cited / answered) * 100) : 0,
       iDontKnowRate: total > 0 ? Math.round(((total - answered) / total) * 100) : 0,
       documentsBySourceType,
+      queryVolumeByDay: (volumeByDay as unknown[]).map((r: unknown) => {
+        const row = r as Record<string, unknown>
+        return { date: row['day'] as string, count: Number(row['count']) }
+      }),
     },
   })
 })
@@ -105,7 +119,7 @@ analyticsRoute.get('/queries', async (c) => {
       MAX(created_at) AS last_asked
     FROM queries
     WHERE org_id = ${orgId}
-      AND created_at >= ${since}
+      AND created_at >= ${since.toISOString()}
       AND confidence < ${CONFIDENCE_GATE_THRESHOLD}
     GROUP BY query_text
     ORDER BY count DESC
@@ -125,9 +139,10 @@ analyticsRoute.get('/queries', async (c) => {
   })
 })
 
-// GET /orgs/:id/analytics/export (audit log CSV)
-// super_admin receives all orgs; everyone else is scoped to their org
-analyticsRoute.get('/export', async (c) => {
+// GET /orgs/:id/analytics/audit-logs (paginated JSON)
+// Scoped to the requesting org for every role — audit metadata is tenant
+// content, so even super_admin only sees their own org's trail.
+analyticsRoute.get('/audit-logs', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
@@ -136,7 +151,57 @@ analyticsRoute.get('/export', async (c) => {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
-  const isSuperAdmin = role === 'super_admin'
+  const num = (v: string | undefined, fallback: number) => {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : fallback
+  }
+  const days = num(c.req.query('days'), 0) // 0 = all time
+  const limit = Math.min(Math.max(num(c.req.query('limit'), 100), 1), 500)
+  const offset = Math.max(num(c.req.query('offset'), 0), 0)
+
+  const where = and(
+    eq(auditLogs.orgId, orgId),
+    days > 0 ? gte(auditLogs.createdAt, daysAgoDate(days)) : undefined
+  )
+
+  const [entries, totalResult] = await Promise.all([
+    db
+      .select({
+        id: auditLogs.id,
+        orgId: auditLogs.orgId,
+        userId: auditLogs.userId,
+        action: auditLogs.action,
+        resourceType: auditLogs.resourceType,
+        resourceId: auditLogs.resourceId,
+        metadata: auditLogs.metadata,
+        createdAt: auditLogs.createdAt,
+        actorEmail: users.email,
+        orgName: orgs.name,
+      })
+      .from(auditLogs)
+      .leftJoin(users, eq(auditLogs.userId, users.id))
+      .leftJoin(orgs, eq(auditLogs.orgId, orgs.id))
+      .where(where)
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db.select({ total: count() }).from(auditLogs).where(where),
+  ])
+
+  return c.json({ success: true, data: { entries, total: totalResult[0]?.total ?? 0 } })
+})
+
+// GET /orgs/:id/analytics/export (audit log CSV)
+// Scoped to the requesting org for every role — audit metadata is tenant
+// content, so even super_admin only exports their own org's trail.
+analyticsRoute.get('/export', async (c) => {
+  const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
+  const role = c.get('role')
+
+  if (!hasPermission(role, 'analytics:view')) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
 
   const rows = await db
     .select({
@@ -153,7 +218,7 @@ analyticsRoute.get('/export', async (c) => {
     .from(auditLogs)
     .leftJoin(users, eq(auditLogs.userId, users.id))
     .leftJoin(orgs, eq(auditLogs.orgId, orgs.id))
-    .where(isSuperAdmin ? undefined : eq(auditLogs.orgId, orgId))
+    .where(eq(auditLogs.orgId, orgId))
     .orderBy(auditLogs.createdAt)
 
   const f = (v: string | null | undefined) => {
@@ -169,7 +234,7 @@ analyticsRoute.get('/export', async (c) => {
     )
     .join('\n')
 
-  const filename = isSuperAdmin ? 'audit-all-orgs.csv' : `audit-${orgId}.csv`
+  const filename = `audit-${orgId}.csv`
   c.header('Content-Type', 'text/csv')
   c.header('Content-Disposition', `attachment; filename="${filename}"`)
   return c.body(header + body)

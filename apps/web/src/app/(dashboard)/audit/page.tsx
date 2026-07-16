@@ -3,70 +3,29 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Download, Search, X, Key, User, ExternalLink } from 'lucide-react'
+import { Download, Search, X } from 'lucide-react'
 import { getAuthUser } from '@/lib/auth'
-import { exportAuditLog } from '@/lib/api'
+import { exportAuditLog, listAuditLogs, unwrap } from '@/lib/api'
+import type { AuditLogEntry } from '@/lib/api'
 import { formatDateTime } from '@/lib/utils'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002'
+const DATE_RANGES = [
+  { value: '24h', label: 'Last 24h', days: 1 },
+  { value: '7d', label: 'Last 7 Days', days: 7 },
+  { value: '30d', label: 'Last 30 Days', days: 30 },
+  { value: 'all', label: 'All Time', days: 0 },
+] as const
+type DateRange = (typeof DATE_RANGES)[number]['value']
 
-interface AuditEntry {
-  id: string
-  userId: string | null
-  actorEmail: string | null
-  action: string
-  resourceType: string
-  resourceId: string | null
-  orgId: string | null
-  orgName: string | null
-  createdAt: string
-}
+const PAGE_SIZE = 50
 
-function parseCSVLine(line: string): string[] {
-  const fields: string[] = []
-  let current = ''
-  let inQuotes = false
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i]
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
-      else inQuotes = !inQuotes
-    } else if (ch === ',' && !inQuotes) {
-      fields.push(current); current = ''
-    } else {
-      current += ch
-    }
-  }
-  fields.push(current)
-  return fields
-}
-
-function useAuditLogs(orgId: string) {
+function useAuditLogs(orgId: string, days: number, page: number) {
   return useQuery({
-    queryKey: ['audit-logs', orgId],
-    queryFn: async () => {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
-      const res = await fetch(`${API_URL}/api/v1/orgs/${orgId}/analytics/export`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-      if (!res.ok) throw new Error('Failed to fetch audit log')
-      const text = await res.text()
-      return text.trim().split('\n').slice(1).filter(Boolean).map((line): AuditEntry => {
-        const [createdAt, userId, actorEmail, action, resourceType, resourceId, orgId, orgName] = parseCSVLine(line)
-        return {
-          id: crypto.randomUUID(),
-          userId: userId || null,
-          actorEmail: actorEmail || null,
-          action: action ?? '',
-          resourceType: resourceType ?? '',
-          resourceId: resourceId || null,
-          orgId: orgId || null,
-          orgName: orgName || null,
-          createdAt: createdAt ?? '',
-        }
-      })
-    },
+    queryKey: ['audit-logs', orgId, days, page],
+    queryFn: async () =>
+      unwrap(await listAuditLogs(orgId, { days, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE })),
     enabled: !!orgId,
+    placeholderData: (prev) => prev,
   })
 }
 
@@ -96,7 +55,19 @@ function initials(str: string) {
 
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 
-function DetailPanel({ entry, onClose }: { entry: AuditEntry; onClose: () => void }) {
+function DetailPanel({ entry, onClose }: { entry: AuditLogEntry; onClose: () => void }) {
+  const downloadJson = () => {
+    const blob = new Blob([JSON.stringify(entry, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `audit-event-${entry.id}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex' }}
@@ -134,42 +105,22 @@ function DetailPanel({ entry, onClose }: { entry: AuditEntry; onClose: () => voi
               ))}
             </div>
           </div>
-          {/* Payload Diff */}
+          {/* Metadata */}
           <div>
-            <h4 style={{ fontSize: 11, fontWeight: 500, color: '#585f67', textTransform: 'uppercase', letterSpacing: '0.12em', margin: '0 0 16px' }}>Payload Diff</h4>
-            <div style={{ background: '#eff4ff', border: '1px solid #c3c6d7', borderRadius: 8, padding: 16, fontFamily: 'JetBrains Mono, monospace', fontSize: 12, lineHeight: 1.7 }}>
-              <div style={{ display: 'flex', gap: 8 }}><span style={{ color: '#dc2626', opacity: 0.7 }}>-</span><span style={{ color: '#434655' }}>&quot;status&quot;: &quot;active&quot;,</span></div>
-              <div style={{ display: 'flex', gap: 8 }}><span style={{ color: '#004ac6' }}>+</span><span style={{ color: '#0b1c30' }}>&quot;status&quot;: &quot;revoked&quot;,</span></div>
-              <div style={{ display: 'flex', gap: 8 }}><span style={{ color: '#004ac6' }}>+</span><span style={{ color: '#0b1c30' }}>&quot;revoked_at&quot;: &quot;{entry.createdAt}&quot;,</span></div>
-              <div style={{ display: 'flex', gap: 8 }}><span style={{ color: '#004ac6' }}>+</span><span style={{ color: '#0b1c30' }}>&quot;action&quot;: &quot;{entry.action}&quot;</span></div>
-            </div>
-          </div>
-          {/* Linked Resources */}
-          <div>
-            <h4 style={{ fontSize: 11, fontWeight: 500, color: '#585f67', textTransform: 'uppercase', letterSpacing: '0.12em', margin: '0 0 16px' }}>Linked Resources</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[
-                { icon: Key, label: entry.resourceType || 'Production API Key Cluster' },
-                { icon: User, label: entry.userId || 'System Actor' },
-              ].map(({ icon: Icon, label }) => (
-                <a key={label} href="#" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 12, border: '1px solid #c3c6d7', borderRadius: 8, textDecoration: 'none', color: '#0b1c30', background: '#ffffff' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#eff4ff'; (e.currentTarget as HTMLElement).style.borderColor = '#2563eb' }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#ffffff'; (e.currentTarget as HTMLElement).style.borderColor = '#c3c6d7' }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <Icon size={18} color="#737686" />
-                    <span style={{ fontSize: 14 }}>{label}</span>
-                  </div>
-                  <ExternalLink size={14} color="#737686" />
-                </a>
-              ))}
-            </div>
+            <h4 style={{ fontSize: 11, fontWeight: 500, color: '#585f67', textTransform: 'uppercase', letterSpacing: '0.12em', margin: '0 0 16px' }}>Metadata</h4>
+            {entry.metadata && Object.keys(entry.metadata).length > 0 ? (
+              <pre style={{ background: '#eff4ff', border: '1px solid #c3c6d7', borderRadius: 8, padding: 16, fontFamily: 'JetBrains Mono, monospace', fontSize: 12, lineHeight: 1.7, color: '#0b1c30', margin: 0, overflowX: 'auto' }}>
+                {JSON.stringify(entry.metadata, null, 2)}
+              </pre>
+            ) : (
+              <p style={{ fontSize: 13, color: '#737686', margin: 0 }}>No metadata recorded for this event.</p>
+            )}
           </div>
         </div>
         {/* Footer */}
         <div style={{ padding: 24, borderTop: '1px solid #c3c6d7', flexShrink: 0 }}>
           <button
-            onClick={() => toast.success('Event JSON downloaded')}
+            onClick={downloadJson}
             style={{ width: '100%', padding: '12px 0', background: '#0b1c30', color: '#ffffff', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
           >
             Download Event JSON
@@ -185,15 +136,26 @@ function DetailPanel({ entry, onClose }: { entry: AuditEntry; onClose: () => voi
 export default function AuditPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
-  const isSuperAdmin = user?.role === 'super_admin'
-  const { data: logs = [], isLoading } = useAuditLogs(orgId)
   const [search, setSearch] = useState('')
   const [actionFilter, setActionFilter] = useState('all')
-  const [dateFilter, setDateFilter] = useState('24h')
-  const [selected, setSelected] = useState<AuditEntry | null>(null)
+  const [dateFilter, setDateFilter] = useState<DateRange>('30d')
+  const [page, setPage] = useState(1)
+  const [selected, setSelected] = useState<AuditLogEntry | null>(null)
+
+  const days = DATE_RANGES.find((r) => r.value === dateFilter)?.days ?? 0
+  const { data, isLoading } = useAuditLogs(orgId, days, page)
+  const logs = data?.entries ?? []
+  const total = data?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  const actionOptions = [...new Set(logs.map((l) => l.action))].sort()
 
   const filtered = logs.filter((l) => {
-    if (search && !l.action.includes(search) && !(l.userId ?? '').toLowerCase().includes(search.toLowerCase())) return false
+    if (search) {
+      const q = search.toLowerCase()
+      const haystack = [l.action, l.actorEmail ?? '', l.resourceType, l.resourceId ?? ''].join(' ').toLowerCase()
+      if (!haystack.includes(q)) return false
+    }
     if (actionFilter !== 'all' && l.action !== actionFilter) return false
     return true
   })
@@ -259,20 +221,18 @@ export default function AuditPage() {
                 style={{ appearance: 'none' as const, background: '#ffffff', border: '1px solid #c3c6d7', padding: '8px 16px', borderRadius: 12, fontSize: 14, color: '#0b1c30', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}
               >
                 <option value="all">Action Type: All</option>
-                <option value="auth.login">auth.login</option>
-                <option value="document.create">document.create</option>
-                <option value="user.update">user.update</option>
-                <option value="system.reboot">system.reboot</option>
+                {actionOptions.map((a) => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
               </select>
               <select
                 value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
+                onChange={(e) => { setDateFilter(e.target.value as DateRange); setPage(1) }}
                 style={{ appearance: 'none' as const, background: '#ffffff', border: '1px solid #c3c6d7', padding: '8px 16px', borderRadius: 12, fontSize: 14, color: '#0b1c30', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}
               >
-                <option value="24h">Date Range: Last 24h</option>
-                <option value="7d">Last 7 Days</option>
-                <option value="30d">Last 30 Days</option>
-                <option value="custom">Custom Range</option>
+                {DATE_RANGES.map((r) => (
+                  <option key={r.value} value={r.value}>{r.value === dateFilter ? `Date Range: ${r.label}` : r.label}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -282,17 +242,17 @@ export default function AuditPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
               <thead style={{ background: '#eff4ff', borderBottom: '1px solid #c3c6d7' }}>
                 <tr>
-                  {['Timestamp', 'Actor', 'Action', 'Resource', ...(isSuperAdmin ? ['Org'] : []), 'Details'].map((h, i, arr) => (
+                  {['Timestamp', 'Actor', 'Action', 'Resource', 'Details'].map((h, i, arr) => (
                     <th key={h} style={{ padding: '12px 16px', textAlign: i === arr.length - 1 ? 'right' : 'left', fontSize: 11, fontWeight: 500, color: '#585f67', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody style={{ borderBottom: '1px solid #c3c6d7' }}>
                 {isLoading && Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={i}><td colSpan={isSuperAdmin ? 6 : 5} style={{ padding: '8px 16px' }}><Skel h={24} /></td></tr>
+                  <tr key={i}><td colSpan={5} style={{ padding: '8px 16px' }}><Skel h={24} /></td></tr>
                 ))}
                 {!isLoading && filtered.length === 0 && (
-                  <tr><td colSpan={isSuperAdmin ? 6 : 5} style={{ padding: 48, textAlign: 'center', color: '#585f67' }}>No audit log entries</td></tr>
+                  <tr><td colSpan={5} style={{ padding: 48, textAlign: 'center', color: '#585f67' }}>No audit log entries</td></tr>
                 )}
                 {filtered.map((log) => {
                   const isError = log.action.includes('fail') || log.action.includes('error') || log.action.includes('spike')
@@ -318,9 +278,6 @@ export default function AuditPage() {
                         {log.action}
                       </td>
                       <td style={{ padding: '12px 16px', fontSize: 14, color: '#434655' }}>{log.resourceType || log.resourceId || '—'}</td>
-                      {isSuperAdmin && (
-                        <td style={{ padding: '12px 16px', fontSize: 14, color: '#0b1c30' }}>{log.orgName || '—'}</td>
-                      )}
                       <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                         <button onClick={(e) => { e.stopPropagation(); setSelected(log) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#004ac6', fontSize: 14, fontWeight: 500, fontFamily: 'inherit' }}>View</button>
                       </td>
@@ -329,11 +286,30 @@ export default function AuditPage() {
                 })}
               </tbody>
             </table>
-            {/* Loading footer */}
-            {isLoading && (
-              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: '#fafbff', borderTop: '1px solid #c3c6d7' }}>
-                <div style={{ width: 20, height: 20, border: '2px solid #2563eb', borderTopColor: 'transparent', borderRadius: '50%', animation: 'cb-spin 0.8s linear infinite' }} />
-                <p style={{ fontSize: 12, fontWeight: 500, color: '#585f67', margin: 0 }}>Loading older events...</p>
+            {/* Pagination */}
+            {total > 0 && (
+              <div style={{ padding: '12px 16px', background: '#f8f9ff', borderTop: '1px solid #c3c6d7', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>
+                  Showing <strong style={{ color: '#0b1c30' }}>{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}</strong> of <strong style={{ color: '#0b1c30' }}>{total}</strong> events
+                  {(search || actionFilter !== 'all') && filtered.length !== logs.length && ` (${filtered.length} matching filters on this page)`}
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #c3c6d7', background: '#ffffff', color: page <= 1 ? '#c3c6d7' : '#434655', fontSize: 13, cursor: page <= 1 ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+                  >
+                    Previous
+                  </button>
+                  <span style={{ fontSize: 12, color: '#585f67' }}>Page {page} of {totalPages}</span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #c3c6d7', background: '#ffffff', color: page >= totalPages ? '#c3c6d7' : '#434655', fontSize: 13, cursor: page >= totalPages ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -345,7 +321,6 @@ export default function AuditPage() {
 
       <style>{`
         @keyframes cb-skel { 0%,100%{opacity:.5}50%{opacity:1} }
-        @keyframes cb-spin { to{transform:rotate(360deg)} }
         @keyframes cb-slide-in { from{transform:translateX(100%)}to{transform:translateX(0)} }
       `}</style>
     </div>

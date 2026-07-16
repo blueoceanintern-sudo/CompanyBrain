@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation'
 import { useCompartments } from '@/hooks/use-compartments'
 import { getAuthUser } from '@/lib/auth'
 import { formatDate } from '@/lib/utils'
+import { DocumentPreview } from '@/components/document-preview'
 import type { CompartmentSummary } from '@company-brain/shared'
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
@@ -75,11 +76,12 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── Detail panel ─────────────────────────────────────────────────────────────
 
-function DetailPanel({ doc, compartmentName, onClose, onDelete }: {
+function DetailPanel({ doc, compartmentName, onClose, onDelete, onPreview }: {
   doc: { id: string; filename: string; accessTier: string; status: string; sourceType: string; createdAt: string } | null
   compartmentName: string
   onClose: () => void
   onDelete: (id: string) => void
+  onPreview: (id: string) => void
 }) {
   return (
     <div style={{ position: 'absolute', right: 0, top: 0, height: '100%', width: 420, background: '#ffffff', borderLeft: '1px solid #c3c6d7', boxShadow: '-10px 0 30px -5px rgba(0,0,0,0.05)', transform: doc ? 'translateX(0)' : 'translateX(100%)', transition: 'transform 0.3s ease', display: 'flex', flexDirection: 'column', zIndex: 50 }}>
@@ -103,7 +105,7 @@ function DetailPanel({ doc, compartmentName, onClose, onDelete }: {
           <div style={{ aspectRatio: '4/3', width: '100%', background: '#eff4ff', borderRadius: 12, border: '1px solid #c3c6d7', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
             <FileText size={48} color="#c3c6d7" />
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <button style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid #c3c6d7', borderRadius: 8, padding: '8px 16px', fontSize: 14, fontWeight: 700, color: '#004ac6', cursor: 'pointer' }}>Full Preview</button>
+              <button onClick={() => onPreview(doc!.id)} style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid #c3c6d7', borderRadius: 8, padding: '8px 16px', fontSize: 14, fontWeight: 700, color: '#004ac6', cursor: 'pointer', fontFamily: 'inherit' }}>Full Preview</button>
             </div>
           </div>
 
@@ -431,6 +433,7 @@ export default function DocumentsPage() {
   const [docToDelete, setDocToDelete] = useState<DocItem | null>(null)
   const [docToArchive, setDocToArchive] = useState<DocItem | null>(null)
   const [menuDocId, setMenuDocId] = useState<string | null>(null)
+  const [previewDocId, setPreviewDocId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [sourceTypeFilter, setSourceTypeFilter] = useState('')
   const [accessTierFilter, setAccessTierFilter] = useState('')
@@ -618,8 +621,13 @@ export default function DocumentsPage() {
           compartmentName={selectedDoc ? getCompartmentName((selectedDoc as { compartmentId?: string }).compartmentId ?? '') : '—'}
           onClose={() => setSelectedDoc(null)}
           onDelete={() => { if (selectedDoc) setDocToDelete(selectedDoc) }}
+          onPreview={setPreviewDocId}
         />
       </div>
+
+      {previewDocId && (
+        <DocumentPreview orgId={orgId} docId={previewDocId} onClose={() => setPreviewDocId(null)} />
+      )}
 
       <style>{`@keyframes cb-skel { 0%,100%{opacity:.5}50%{opacity:1} }`}</style>
       {showUpload && <UploadDialog orgId={orgId} onClose={() => setShowUpload(false)} />}

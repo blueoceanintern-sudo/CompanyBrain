@@ -12,6 +12,7 @@ import { submitQuery as apiSubmitQuery } from '@/lib/api'
 import { useExternalPricing, useStartCheckout } from '@/hooks/use-payments'
 import { getAuthUser } from '@/lib/auth'
 import { useChatHistory } from '@/lib/chat-history-context'
+import { DocumentPreview } from '@/components/document-preview'
 import type { ConversationTurn } from '@company-brain/shared'
 import type { HistoryEntry } from '@/lib/chat-history-context'
 
@@ -115,7 +116,7 @@ function EmptyState({
               ref={textareaRef as unknown as React.RefObject<HTMLInputElement>}
               value={input}
               onChange={(e) => onChange(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit() } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); onSubmit() } }}
               placeholder="Ask about policies, processes, documents…"
               style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 16, color: '#0b1c30', padding: '12px 0', fontFamily: 'inherit' }}
             />
@@ -174,14 +175,20 @@ function EmptyState({
 
 // ─── Source pill ──────────────────────────────────────────────────────────────
 
-function SourcePill({ filename, tier }: { filename: string; tier: string }) {
+function SourcePill({ filename, tier, onClick }: { filename: string; tier: string; onClick?: () => void }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#eff4ff', padding: '6px 12px', borderRadius: 9999, border: '1px solid #d3e4fe', cursor: 'pointer' }}>
+    <button
+      onClick={onClick}
+      title="Preview document"
+      style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#eff4ff', padding: '6px 12px', borderRadius: 9999, border: '1px solid #d3e4fe', cursor: 'pointer', fontFamily: 'inherit' }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#e5eeff'; (e.currentTarget as HTMLElement).style.borderColor = '#2563eb' }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#eff4ff'; (e.currentTarget as HTMLElement).style.borderColor = '#d3e4fe' }}
+    >
       <FileText size={12} color="#004ac6" />
       <span style={{ fontSize: 12, color: '#434655' }}>{filename}</span>
       <span style={{ width: 1, height: 12, background: '#c3c6d7' }} />
       <span style={{ fontSize: 12, color: '#737686' }}>{tier}</span>
-    </div>
+    </button>
   )
 }
 
@@ -189,7 +196,7 @@ function SourcePill({ filename, tier }: { filename: string; tier: string }) {
 
 function ActiveChat({
   history, input, onChange, onSubmit, disabled, textareaRef,
-  onToggle, onRetry, onNew,
+  onToggle, onRetry, onNew, onPreviewDoc,
 }: {
   history: HistoryEntry[]
   input: string
@@ -200,6 +207,7 @@ function ActiveChat({
   onToggle: (id: string) => void
   onRetry: (id: string, q: string) => void
   onNew: () => void
+  onPreviewDoc: (docId: string) => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -268,7 +276,7 @@ function ActiveChat({
                       <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#737686', marginBottom: 12 }}>Sources</p>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                         {entry.response.citations.map((c) => (
-                          <SourcePill key={c.chunkId} filename={c.filename ?? c.chunkId} tier="Internal" />
+                          <SourcePill key={c.chunkId} filename={c.filename ?? c.chunkId} tier="Internal" onClick={() => onPreviewDoc(c.documentId)} />
                         ))}
                       </div>
                     </div>
@@ -306,7 +314,7 @@ function ActiveChat({
               ref={textareaRef}
               value={input}
               onChange={(e) => { onChange(e.target.value); autoResize() }}
-              onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onSubmit() } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); onSubmit() } }}
               placeholder="Ask your data anything…"
               rows={1}
               style={{ width: '100%', padding: '16px', background: 'transparent', border: 'none', outline: 'none', fontSize: 14, color: '#0b1c30', resize: 'none', minHeight: 56, maxHeight: 160, fontFamily: 'inherit', lineHeight: 1.5 }}
@@ -376,6 +384,7 @@ export default function ChatPage() {
   const { history, setHistory, recentQueries, setRecentQueries, saveCurrentAsSession, pendingSession, clearPendingSession } = useChatHistory()
   const [input, setInput] = useState('')
   const [isPending, setIsPending] = useState(false)
+  const [previewDocId, setPreviewDocId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // On mount: restore a clicked session, otherwise start fresh
@@ -498,7 +507,11 @@ export default function ChatPage() {
             submitQuery(q, id, priorHistory)
           }}
           onNew={handleNewChat}
+          onPreviewDoc={setPreviewDocId}
         />
+      )}
+      {previewDocId && (
+        <DocumentPreview orgId={orgId} docId={previewDocId} onClose={() => setPreviewDocId(null)} />
       )}
     </div>
   )

@@ -65,6 +65,34 @@ function chunkText(text: string): string[] {
   return result
 }
 
+// ─── Stitching (inverse of chunkText, for document preview) ───────────────────
+
+// Consecutive chunks share up to CHUNK_OVERLAP_CHARS of text (plus the '\n\n'
+// joiner), but trimming during chunking can shave its edges — so find the
+// longest suffix of the stitched text that prefixes the next chunk instead of
+// assuming a fixed width. Below 20 chars a match is likely coincidence; fall
+// back to a paragraph join, which at worst duplicates a short overlap.
+export function stitchChunks(contents: string[]): string {
+  let doc = ''
+  for (const chunk of contents) {
+    if (!doc) {
+      doc = chunk
+      continue
+    }
+    let merged = false
+    const maxOverlap = Math.min(CHUNK_OVERLAP_CHARS + 2, doc.length, chunk.length)
+    for (let k = maxOverlap; k >= 20; k--) {
+      if (doc.endsWith(chunk.slice(0, k))) {
+        doc += chunk.slice(k)
+        merged = true
+        break
+      }
+    }
+    if (!merged) doc += '\n\n' + chunk
+  }
+  return doc
+}
+
 // ─── Embedding ────────────────────────────────────────────────────────────────
 
 async function embedBatch(texts: string[]): Promise<number[][]> {

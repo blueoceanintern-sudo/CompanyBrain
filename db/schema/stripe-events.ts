@@ -1,5 +1,5 @@
 import { pgTable, text, uuid, timestamp, unique } from 'drizzle-orm/pg-core'
-import { jsonb } from 'drizzle-orm/pg-core'
+import { jsonb } from './jsonb'
 import { orgs } from './orgs'
 
 export const stripeEvents = pgTable(

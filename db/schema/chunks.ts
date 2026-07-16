@@ -1,5 +1,5 @@
 import { pgTable, text, uuid, timestamp, integer, customType } from 'drizzle-orm/pg-core'
-import { jsonb } from 'drizzle-orm/pg-core'
+import { jsonb } from './jsonb'
 import { accessTierEnum, sourceTypeEnum, chunkStatusEnum } from './enums'
 import { orgs } from './orgs'
 import { documents } from './documents'

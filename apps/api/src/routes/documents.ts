@@ -5,10 +5,10 @@ import { createHash } from 'crypto'
 import { db } from '@company-brain/db'
 import { documents, ingestionJobs, chunks, orgs, compartments, auditLogs } from '@company-brain/db'
 import { eq, and, desc, sql } from 'drizzle-orm'
-import { ingestDocument } from '@company-brain/ingestion'
+import { ingestDocument, stitchChunks } from '@company-brain/ingestion'
 import { hasPermission } from '@company-brain/shared'
 import type { VisibilityPolicy } from '@company-brain/shared'
-import { canPublishExternal, canUseCompartment } from '@company-brain/access-control'
+import { canAccessChunk, canPublishExternal, canUseCompartment } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
 
 const documentsRoute = new Hono<AuthVars>()
@@ -246,6 +246,79 @@ documentsRoute.post('/', async (c) => {
     .where(eq(ingestionJobs.documentId, doc.id))
 
   return c.json({ success: true, data: { documentId: doc.id, chunksCreated: result.data.chunksCreated } }, 201)
+})
+
+// GET /orgs/:id/documents/:docId/content — stitched full text for preview.
+// Any org member may call it (chat citations link here), so access is enforced
+// per document and per chunk, mirroring the retrieval pipeline: external
+// clients only reach the external tier, restricted compartments need a grant,
+// and each chunk's visibility policy is evaluated for the requesting user.
+documentsRoute.get('/:docId/content', async (c) => {
+  const orgId = c.req.param('id')
+  const docId = c.req.param('docId')
+  if (!orgId || !docId) return c.json(BAD_ORG, 400)
+  const userId = c.get('userId')
+  const role = c.get('role')
+
+  const docRows = await db
+    .select({
+      id: documents.id,
+      filename: documents.filename,
+      accessTier: documents.accessTier,
+      sourceType: documents.sourceType,
+      compartmentId: documents.compartmentId,
+    })
+    .from(documents)
+    .where(and(eq(documents.id, docId), eq(documents.orgId, orgId)))
+    .limit(1)
+
+  const doc = docRows[0]
+  if (!doc) {
+    return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Document not found' } }, 404)
+  }
+
+  if (role === 'external_client' && doc.accessTier !== 'external') {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied to this document' } }, 403)
+  }
+
+  const compartmentOk = await canUseCompartment({ orgId, compartmentId: doc.compartmentId, userId, userRole: role })
+  if (!compartmentOk) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied to this document' } }, 403)
+  }
+
+  const chunkRows = await db
+    .select({
+      content: chunks.content,
+      chunkIndex: chunks.chunkIndex,
+      visibility: chunks.visibility,
+      accessTier: chunks.accessTier,
+    })
+    .from(chunks)
+    .where(and(eq(chunks.documentId, docId), eq(chunks.orgId, orgId), sql`${chunks.status} != 'error'`))
+    .orderBy(chunks.chunkIndex)
+
+  const accessible = chunkRows.filter(
+    (ch) =>
+      (role !== 'external_client' || ch.accessTier === 'external') &&
+      canAccessChunk({ visibility: ch.visibility as VisibilityPolicy, userRole: role, userId })
+  )
+
+  if (chunkRows.length > 0 && accessible.length === 0) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied to this document' } }, 403)
+  }
+
+  return c.json({
+    success: true,
+    data: {
+      documentId: doc.id,
+      filename: doc.filename,
+      accessTier: doc.accessTier,
+      sourceType: doc.sourceType,
+      content: stitchChunks(accessible.map((ch) => ch.content)),
+      totalChunks: chunkRows.length,
+      accessibleChunks: accessible.length,
+    },
+  })
 })
 
 // PATCH /orgs/:id/documents/:docId

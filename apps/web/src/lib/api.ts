@@ -137,6 +137,20 @@ export async function archiveDocument(orgId: string, docId: string) {
   return apiFetch<null>(`/api/v1/orgs/${orgId}/documents/${docId}/archive`, { method: 'POST' })
 }
 
+export interface DocumentContent {
+  documentId: string
+  filename: string
+  accessTier: string
+  sourceType: string
+  content: string
+  totalChunks: number
+  accessibleChunks: number
+}
+
+export async function getDocumentContent(orgId: string, docId: string) {
+  return apiFetch<DocumentContent>(`/api/v1/orgs/${orgId}/documents/${docId}/content`)
+}
+
 export async function unarchiveDocument(orgId: string, docId: string) {
   return apiFetch<null>(`/api/v1/orgs/${orgId}/documents/${docId}/unarchive`, { method: 'POST' })
 }
@@ -281,6 +295,7 @@ export async function getAnalyticsOverview(orgId: string, days: number = 30) {
     queryVolume: number
     citationHitRate: number
     iDontKnowRate: number
+    queryVolumeByDay: Array<{ date: string; count: number }>
   }>(`/api/v1/orgs/${orgId}/analytics/overview?days=${days}`)
 }
 
@@ -312,6 +327,9 @@ export interface OrgSummary {
   name: string
   plan: string
   createdAt: string
+  userCount: number
+  documentCount: number
+  queryCount30d: number
 }
 
 export async function listOrgs() {
@@ -362,6 +380,33 @@ export async function openBillingPortal(orgId: string) {
 
 export async function startCheckout(orgId: string) {
   return apiFetch<{ url: string }>(`/api/v1/orgs/${orgId}/checkout`, { method: 'POST' })
+}
+
+export interface AuditLogEntry {
+  id: string
+  orgId: string | null
+  userId: string | null
+  action: string
+  resourceType: string
+  resourceId: string | null
+  metadata: Record<string, unknown> | null
+  createdAt: string
+  actorEmail: string | null
+  orgName: string | null
+}
+
+export async function listAuditLogs(
+  orgId: string,
+  params: { days?: number; limit?: number; offset?: number } = {}
+) {
+  const qs = new URLSearchParams()
+  if (params.days !== undefined) qs.set('days', String(params.days))
+  if (params.limit !== undefined) qs.set('limit', String(params.limit))
+  if (params.offset !== undefined) qs.set('offset', String(params.offset))
+  const suffix = qs.size > 0 ? `?${qs}` : ''
+  return apiFetch<{ entries: AuditLogEntry[]; total: number }>(
+    `/api/v1/orgs/${orgId}/analytics/audit-logs${suffix}`
+  )
 }
 
 export async function exportAuditLog(orgId: string): Promise<Blob> {

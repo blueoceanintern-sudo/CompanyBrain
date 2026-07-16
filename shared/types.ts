@@ -200,6 +200,12 @@ export interface AnalyticsOverview {
   citationHitRate: number
   iDontKnowRate: number
   documentsBySourceType: Partial<Record<SourceType, number>>
+  queryVolumeByDay: QueryVolumePoint[]
+}
+
+export interface QueryVolumePoint {
+  date: string
+  count: number
 }
 
 export interface UnansweredQuery {
