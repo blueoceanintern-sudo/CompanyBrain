@@ -19,7 +19,7 @@ export function useUsers(orgId: string) {
 export function useInviteUser(orgId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (data: { email: string; role: string; temporaryPassword: string }) => {
+    mutationFn: async (data: { email: string; role: string; temporaryPassword: string; groupIds?: string[] }) => {
       const result = await inviteUser(orgId, data)
       if (!result.success) throw new Error(result.error.message)
       return result.data
@@ -27,6 +27,10 @@ export function useInviteUser(orgId: string) {
     onSuccess: (_data, variables) => {
       toast.success(`Invite sent to ${variables.email}`)
       qc.invalidateQueries({ queryKey: ['users', orgId] })
+      if (variables.groupIds?.length) {
+        qc.invalidateQueries({ queryKey: ['groups', orgId] })
+        qc.invalidateQueries({ queryKey: ['group-members', orgId] })
+      }
     },
     onError: (err: Error) => toast.error(err.message),
   })

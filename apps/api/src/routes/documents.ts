@@ -4,11 +4,11 @@ import { z } from 'zod'
 import { createHash } from 'crypto'
 import { db } from '@company-brain/db'
 import { documents, ingestionJobs, chunks, orgs, compartments } from '@company-brain/db'
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, and, desc, sql } from 'drizzle-orm'
 import { ingestDocument } from '@company-brain/ingestion'
 import { hasPermission } from '@company-brain/shared'
 import type { VisibilityPolicy } from '@company-brain/shared'
-import { canPublishExternal } from '@company-brain/access-control'
+import { canPublishExternal, canUseCompartment } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
 
 const documentsRoute = new Hono<AuthVars>()
@@ -27,11 +27,52 @@ const BAD_ORG = { success: false, error: { code: 'BAD_REQUEST', message: 'Missin
 documentsRoute.get('/', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
+  const userId = c.get('userId')
+  const role = c.get('role')
+
+  // Non-admins only see documents in unrestricted compartments or ones they
+  // hold a grant for (directly or via a group). Sub-compartments also require
+  // access to the parent — access only narrows down the hierarchy.
+  const isAdmin = role === 'super_admin' || role === 'org_admin'
+  const grantFilter = isAdmin
+    ? undefined
+    : sql`EXISTS (
+        SELECT 1 FROM compartments cp
+        LEFT JOIN compartments pp ON pp.id = cp.parent_compartment_id
+        WHERE cp.id = ${documents.compartmentId}
+          AND (
+            NOT cp.restricted
+            OR EXISTS (
+              SELECT 1 FROM compartment_grants g
+              WHERE g.compartment_id = cp.id
+                AND (
+                  g.user_id = ${userId}
+                  OR g.group_id IN (
+                    SELECT gm.group_id FROM group_members gm WHERE gm.user_id = ${userId}
+                  )
+                )
+            )
+          )
+          AND (
+            pp.id IS NULL
+            OR NOT pp.restricted
+            OR EXISTS (
+              SELECT 1 FROM compartment_grants g
+              WHERE g.compartment_id = pp.id
+                AND (
+                  g.user_id = ${userId}
+                  OR g.group_id IN (
+                    SELECT gm.group_id FROM group_members gm WHERE gm.user_id = ${userId}
+                  )
+                )
+            )
+          )
+      )`
 
   const rows = await db
     .select()
     .from(documents)
-    .where(eq(documents.orgId, orgId))
+    .where(and(eq(documents.orgId, orgId), grantFilter))
     .orderBy(desc(documents.createdAt))
 
   return c.json({ success: true, data: rows })
@@ -87,6 +128,13 @@ documentsRoute.post('/', async (c) => {
     )
   }
 
+  if (!(await canUseCompartment({ orgId, compartmentId, userId, userRole: role }))) {
+    return c.json(
+      { success: false, error: { code: 'FORBIDDEN', message: 'You do not have access to this compartment' } },
+      403
+    )
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer())
   const contentHash = createHash('sha256').update(buffer).digest('hex')
 
@@ -120,14 +168,14 @@ documentsRoute.post('/', async (c) => {
 
   const visibilityPolicy: VisibilityPolicy = accessTier === 'external'
     ? {
-        allowedGroups: ['super_admin', 'org_admin', 'dept_admin', 'staff', 'external_client'],
-        deniedGroups: [],
+        allowedRoles: ['super_admin', 'org_admin', 'dept_admin', 'staff', 'external_client'],
+        deniedRoles: [],
         allowedPrincipals: [],
         classification: 'public',
       }
     : {
-        allowedGroups: ['super_admin', 'org_admin', 'dept_admin', 'staff'],
-        deniedGroups: [],
+        allowedRoles: ['super_admin', 'org_admin', 'dept_admin', 'staff'],
+        deniedRoles: [],
         allowedPrincipals: [],
         classification: 'restricted',
       }
@@ -222,6 +270,22 @@ documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) =
     }
   }
 
+  if (updates.compartmentId !== undefined) {
+    const userId = c.get('userId')
+    const allowed = await canUseCompartment({
+      orgId,
+      compartmentId: updates.compartmentId,
+      userId,
+      userRole: role,
+    })
+    if (!allowed) {
+      return c.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'You do not have access to the target compartment' } },
+        403
+      )
+    }
+  }
+
   await db
     .update(documents)
     .set({
@@ -236,14 +300,14 @@ documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) =
   if (updates.accessTier !== undefined) {
     const updatedVisibility: VisibilityPolicy = updates.accessTier === 'external'
       ? {
-          allowedGroups: ['super_admin', 'org_admin', 'dept_admin', 'staff', 'external_client'],
-          deniedGroups: [],
+          allowedRoles: ['super_admin', 'org_admin', 'dept_admin', 'staff', 'external_client'],
+          deniedRoles: [],
           allowedPrincipals: [],
           classification: 'public',
         }
       : {
-          allowedGroups: ['super_admin', 'org_admin', 'dept_admin', 'staff'],
-          deniedGroups: [],
+          allowedRoles: ['super_admin', 'org_admin', 'dept_admin', 'staff'],
+          deniedRoles: [],
           allowedPrincipals: [],
           classification: 'restricted',
         }

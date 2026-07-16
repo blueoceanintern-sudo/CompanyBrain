@@ -91,7 +91,9 @@
     "services/access-control": {
       "name": "@company-brain/access-control",
       "dependencies": {
+        "@company-brain/db": "workspace:*",
         "@company-brain/shared": "workspace:*",
+        "drizzle-orm": "^0.31.4",
       },
     },
     "services/ingestion": {

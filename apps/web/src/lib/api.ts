@@ -2,6 +2,8 @@ import type {
   QueryResponse,
   DocumentSummary,
   CompartmentSummary,
+  GroupSummary,
+  CompartmentGrantSet,
   UserSummary,
   QueryHistoryItem,
   UserRole,
@@ -153,17 +155,79 @@ export async function getCompartments(orgId: string) {
   return apiFetch<CompartmentSummary[]>(`/api/v1/orgs/${orgId}/compartments`)
 }
 
-export async function createCompartment(orgId: string, data: { name: string; description?: string }) {
+export async function createCompartment(
+  orgId: string,
+  data: { name: string; description?: string; restricted?: boolean; parentId?: string }
+) {
   return apiFetch<CompartmentSummary>(`/api/v1/orgs/${orgId}/compartments`, {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
-export async function updateCompartment(orgId: string, cId: string, data: { name?: string; description?: string }) {
+export async function updateCompartment(
+  orgId: string,
+  cId: string,
+  data: { name?: string; description?: string; restricted?: boolean }
+) {
   return apiFetch<null>(`/api/v1/orgs/${orgId}/compartments/${cId}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
+  })
+}
+
+export async function getCompartmentGrants(orgId: string, cId: string) {
+  return apiFetch<CompartmentGrantSet>(`/api/v1/orgs/${orgId}/compartments/${cId}/grants`)
+}
+
+export async function setCompartmentGrants(orgId: string, cId: string, grants: CompartmentGrantSet) {
+  return apiFetch<null>(`/api/v1/orgs/${orgId}/compartments/${cId}/grants`, {
+    method: 'PUT',
+    body: JSON.stringify(grants),
+  })
+}
+
+// ─── Groups ───────────────────────────────────────────────────────────────────
+
+export async function getGroups(orgId: string) {
+  return apiFetch<GroupSummary[]>(`/api/v1/orgs/${orgId}/groups`)
+}
+
+export async function createGroup(orgId: string, data: { name: string; description?: string }) {
+  return apiFetch<{ id: string }>(`/api/v1/orgs/${orgId}/groups`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateGroup(orgId: string, gId: string, data: { name?: string; description?: string }) {
+  return apiFetch<null>(`/api/v1/orgs/${orgId}/groups/${gId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteGroup(orgId: string, gId: string) {
+  return apiFetch<null>(`/api/v1/orgs/${orgId}/groups/${gId}`, { method: 'DELETE' })
+}
+
+export async function getGroupMembers(orgId: string, gId: string) {
+  return apiFetch<Array<{ id: string; email: string; role: UserRole }>>(
+    `/api/v1/orgs/${orgId}/groups/${gId}/members`
+  )
+}
+
+export async function setGroupMembers(orgId: string, gId: string, userIds: string[]) {
+  return apiFetch<null>(`/api/v1/orgs/${orgId}/groups/${gId}/members`, {
+    method: 'PUT',
+    body: JSON.stringify({ userIds }),
+  })
+}
+
+export async function setUserGroups(orgId: string, userId: string, groupIds: string[]) {
+  return apiFetch<null>(`/api/v1/orgs/${orgId}/users/${userId}/groups`, {
+    method: 'PUT',
+    body: JSON.stringify({ groupIds }),
   })
 }
 
@@ -178,7 +242,10 @@ export async function getUsers(orgId: string) {
   return apiFetch<UserSummary[]>(`/api/v1/orgs/${orgId}/users`)
 }
 
-export async function inviteUser(orgId: string, data: { email: string; role: string; temporaryPassword: string }) {
+export async function inviteUser(
+  orgId: string,
+  data: { email: string; role: string; temporaryPassword: string; groupIds?: string[] }
+) {
   return apiFetch<{ id: string; email: string; role: UserRole }>(`/api/v1/orgs/${orgId}/users`, {
     method: 'POST',
     body: JSON.stringify(data),

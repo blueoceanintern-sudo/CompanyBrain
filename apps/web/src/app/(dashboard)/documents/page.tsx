@@ -6,7 +6,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Search, Upload, Paperclip, X, FileText, Table2, Link, File, FolderPlus } from 'lucide-react'
 import { useDocuments, useUploadDocument, useDeleteDocument } from '@/hooks/use-documents'
-import { useCompartments, useCreateCompartment } from '@/hooks/use-compartments'
+import { useRouter } from 'next/navigation'
+import { useCompartments } from '@/hooks/use-compartments'
 import { getAuthUser } from '@/lib/auth'
 import { formatDate } from '@/lib/utils'
 import type { CompartmentSummary } from '@company-brain/shared'
@@ -252,7 +253,12 @@ function UploadForm({ orgId, compartments, onClose }: { orgId: string; compartme
           <div>
             <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Compartment</label>
             <select {...register('compartmentId')} disabled={noCompartments} style={{ ...inputStyle, opacity: noCompartments ? 0.5 : 1 }}>
-              {compartments.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {compartments
+                .filter((c) => !c.parentCompartmentId)
+                .flatMap((c) => [c, ...compartments.filter((s) => s.parentCompartmentId === c.id)])
+                .map((c) => (
+                  <option key={c.id} value={c.id}>{c.parentCompartmentId ? `— ${c.name}` : c.name}</option>
+                ))}
             </select>
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
@@ -279,56 +285,6 @@ function UploadForm({ orgId, compartments, onClose }: { orgId: string; compartme
   )
 }
 
-// ─── Create compartment dialog ────────────────────────────────────────────────
-
-function CreateCompartmentDialog({ orgId, onClose }: { orgId: string; onClose: () => void }) {
-  const [name, setName] = useState('')
-  const create = useCreateCompartment(orgId)
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%', height: 44, padding: '0 12px',
-    border: '1px solid #c3c6d7', borderRadius: 8,
-    background: '#ffffff', color: '#0b1c30', fontSize: 14, fontFamily: 'inherit',
-  }
-
-  return (
-    <div role="dialog" onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-      <div style={{ background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 16, padding: 32, width: 'min(400px, 90vw)', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 24px', color: '#0b1c30' }}>New Compartment</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Name</label>
-            <input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && name.trim()) create.mutate({ name: name.trim() }, { onSuccess: onClose })
-                if (e.key === 'Escape') onClose()
-              }}
-              placeholder="e.g. HR Department"
-              style={inputStyle}
-            />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-            <button type="button" onClick={onClose}
-              style={{ height: 44, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>
-              Cancel
-            </button>
-            <button
-              disabled={!name.trim() || create.isPending}
-              onClick={() => create.mutate({ name: name.trim() }, { onSuccess: onClose })}
-              style={{ height: 44, padding: '0 20px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: (!name.trim() || create.isPending) ? 'not-allowed' : 'pointer', opacity: !name.trim() ? 0.5 : 1, fontFamily: 'inherit' }}>
-              {create.isPending ? 'Creating…' : 'Create'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 type DocItem = Awaited<ReturnType<typeof useDocuments>>['data'] extends Array<infer T> | undefined ? T : never
@@ -336,8 +292,8 @@ type DocItem = Awaited<ReturnType<typeof useDocuments>>['data'] extends Array<in
 export default function DocumentsPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
+  const router = useRouter()
   const [showUpload, setShowUpload] = useState(false)
-  const [showCreateCompartment, setShowCreateCompartment] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<DocItem | null>(null)
   const [search, setSearch] = useState('')
   const [sourceTypeFilter, setSourceTypeFilter] = useState('')
@@ -348,8 +304,13 @@ export default function DocumentsPage() {
   const { data: compartments = [] } = useCompartments(orgId)
   const deleteDoc = useDeleteDocument(orgId)
 
-  const getCompartmentName = (compartmentId: string) =>
-    compartments.find((c) => c.id === compartmentId)?.name ?? '—'
+  // Sub-compartments show their full path, e.g. "HR / Payroll"
+  const getCompartmentName = (compartmentId: string) => {
+    const comp = compartments.find((c) => c.id === compartmentId)
+    if (!comp) return '—'
+    const parent = compartments.find((c) => c.id === comp.parentCompartmentId)
+    return parent ? `${parent.name} / ${comp.name}` : comp.name
+  }
 
   const filtered = docs.filter((d) => {
     if (search && !d.filename.toLowerCase().includes(search.toLowerCase())) return false
@@ -379,7 +340,8 @@ export default function DocumentsPage() {
           </div>
           <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
             <button
-              onClick={() => setShowCreateCompartment(true)}
+              onClick={() => router.push('/settings?tab=compartments&create=1')}
+              title="Opens compartment creation in Settings"
               style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', color: '#004ac6', border: '1px solid #004ac6', borderRadius: 12, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
             >
               <FolderPlus size={16} /> New Compartment
@@ -431,7 +393,7 @@ export default function DocumentsPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
               <thead>
                 <tr style={{ background: '#f8f9ff', borderBottom: '1px solid #c3c6d7' }}>
-                  {['FILENAME', 'SOURCE TYPE', 'ACCESS TIER', 'STATUS', 'UPLOADED DATE', 'ACTIONS'].map((h) => (
+                  {['FILENAME', 'COMPARTMENT', 'SOURCE TYPE', 'ACCESS TIER', 'STATUS', 'UPLOADED DATE', 'ACTIONS'].map((h) => (
                     <th key={h} style={{ padding: '14px 24px', textAlign: 'left', fontSize: 11, fontWeight: 500, color: '#585f67', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -439,7 +401,7 @@ export default function DocumentsPage() {
               <tbody>
                 {isLoading && Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid #c3c6d7' }}>
-                    {Array.from({ length: 6 }).map((__, j) => (
+                    {Array.from({ length: 7 }).map((__, j) => (
                       <td key={j} style={{ padding: '16px 24px' }}>
                         <div style={{ height: 14, background: '#eff4ff', borderRadius: 4, width: j === 0 ? 200 : 80, animation: 'cb-skel 1.5s ease-in-out infinite' }} />
                       </td>
@@ -447,7 +409,7 @@ export default function DocumentsPage() {
                   </tr>
                 ))}
                 {!isLoading && filtered.length === 0 && (
-                  <tr><td colSpan={6} style={{ padding: 48, textAlign: 'center', color: '#737686' }}>No documents found.</td></tr>
+                  <tr><td colSpan={7} style={{ padding: 48, textAlign: 'center', color: '#737686' }}>No documents found.</td></tr>
                 )}
                 {filtered.map((doc) => (
                   <tr
@@ -465,6 +427,11 @@ export default function DocumentsPage() {
                           <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>PDF Document</p>
                         </div>
                       </div>
+                    </td>
+                    <td style={{ padding: '16px 24px' }}>
+                      <span style={{ display: 'inline-block', padding: '2px 10px', background: '#e5eeff', color: '#004ac6', borderRadius: 9999, fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' }}>
+                        {getCompartmentName(doc.compartmentId)}
+                      </span>
                     </td>
                     <td style={{ padding: '16px 24px', color: '#585f67' }}>{SOURCE_TYPE_LABELS[doc.sourceType] ?? doc.sourceType}</td>
                     <td style={{ padding: '16px 24px' }}><TierBadge tier={doc.accessTier} /></td>
@@ -505,7 +472,6 @@ export default function DocumentsPage() {
 
       <style>{`@keyframes cb-skel { 0%,100%{opacity:.5}50%{opacity:1} }`}</style>
       {showUpload && <UploadDialog orgId={orgId} onClose={() => setShowUpload(false)} />}
-      {showCreateCompartment && <CreateCompartmentDialog orgId={orgId} onClose={() => setShowCreateCompartment(false)} />}
     </div>
   )
 }
