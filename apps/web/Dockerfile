@@ -25,6 +25,8 @@ COPY apps/web/ ./apps/web/
 
 WORKDIR /app/apps/web
 ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN bun run build
 
 FROM oven/bun:1-alpine AS runner
