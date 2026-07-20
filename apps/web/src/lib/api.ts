@@ -56,7 +56,7 @@ async function apiFetch<T>(
     const res = await fetch(`${API_URL}${path}`, { ...options, headers, credentials: 'include' })
     if (res.status === 401) {
       if (typeof window !== 'undefined') {
-        fetch(`${API_URL}/api/auth/logout`, { method: 'POST' }).catch(() => {})
+        fetch(`${API_URL}/api/v1/auth/logout`, { method: 'POST' }).catch(() => {})
         localStorage.removeItem('auth_user')
         window.location.replace('/login')
       }
@@ -92,7 +92,7 @@ export interface AuthUser {
 
 export async function login(email: string, password: string) {
   try {
-    const res = await fetch(`${API_URL}/api/auth/login`, {
+    const res = await fetch(`${API_URL}/api/v1/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -106,7 +106,7 @@ export async function login(email: string, password: string) {
 
 export async function logout() {
   try {
-    const res = await fetch(`${API_URL}/api/auth/logout`, {
+    const res = await fetch(`${API_URL}/api/v1/auth/logout`, {
       method: 'POST',
       credentials: 'include',
     })
