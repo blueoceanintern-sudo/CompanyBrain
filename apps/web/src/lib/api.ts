@@ -10,7 +10,7 @@ import type {
   ConversationTurn,
 } from '@company-brain/shared'
 
-const API_URL = ''
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ''
 
 type ApiResult<T> = { success: true; data: T } | { success: false; error: { code: string; message: string } }
 
