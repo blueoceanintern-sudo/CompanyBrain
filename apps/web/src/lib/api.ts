@@ -56,7 +56,7 @@ async function apiFetch<T>(
     const res = await fetch(`${API_URL}${path}`, { ...options, headers, credentials: 'include' })
     if (res.status === 401) {
       if (typeof window !== 'undefined') {
-        fetch(`${API_URL}/api/v1/auth/logout`, { method: 'POST' }).catch(() => {})
+        fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
         localStorage.removeItem('auth_user')
         window.location.replace('/login')
       }
@@ -86,13 +86,12 @@ export interface AuthUser {
   email: string
   role: UserRole
   orgId: string
-  // Optional: sessions cached before org names were returned at login lack it
   orgName?: string
 }
 
 export async function login(email: string, password: string) {
   try {
-    const res = await fetch(`${API_URL}/api/v1/auth/login`, {
+    const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -106,7 +105,7 @@ export async function login(email: string, password: string) {
 
 export async function logout() {
   try {
-    const res = await fetch(`${API_URL}/api/v1/auth/logout`, {
+    const res = await fetch('/api/auth/logout', {
       method: 'POST',
       credentials: 'include',
     })
