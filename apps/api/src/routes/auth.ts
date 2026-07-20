@@ -53,7 +53,7 @@ authRoute.post('/login', zValidator('json', loginSchema), async (c) => {
     sameSite: 'Lax',
     path: '/',
     maxAge: COOKIE_MAX_AGE,
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,
   })
 
   const orgRows = await db
