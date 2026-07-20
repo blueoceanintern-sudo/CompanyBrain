@@ -5,8 +5,9 @@ B2B enterprise knowledge operating system. Multi-tenant, org-agnostic. v1 pilot:
 ## Prerequisites
 
 - [Bun](https://bun.sh) >= 1.1
-- Docker (for Postgres + pgvector)
+- Docker (for Postgres 17 + pgvector)
 - API keys: OpenAI, Anthropic, Stripe
+- SMTP credentials (user invite emails)
 
 ## Setup
 
@@ -20,8 +21,10 @@ cp .env.example .env
 ### 2. Start Postgres
 
 ```bash
-docker-compose up -d
+docker compose up -d db
 ```
+
+(`db` only — the compose file also defines `api` and `web` containers for production-style deploys; you don't want those in local dev. First run auto-applies `db/init.sql`, which creates the `vector` and `pg_trgm` extensions.)
 
 ### 3. Install dependencies
 
@@ -32,11 +35,10 @@ bun install
 ### 4. Run migrations
 
 ```bash
-bun db:generate
 bun db:migrate
 ```
 
-Then create required Postgres extensions and apply HNSW and FTS indexes (one-time, after first migration):
+(`bun db:generate` is only needed when you change the schema.) Then apply the HNSW, FTS, and performance indexes (one-time, after first migration):
 
 ```bash
 psql $DATABASE_URL -f db/post-migrate.sql
@@ -51,16 +53,7 @@ SETUP_ADMIN_PASSWORD="changeme123" \
 bun run scripts/setup.ts
 ```
 
-### 6. Install shadcn/ui components
-
-```bash
-cd apps/web
-npx shadcn@latest init
-npx shadcn@latest add button input textarea select dialog sheet tooltip table tabs badge card skeleton avatar alert switch toggle-group pagination progress sonner
-cd ../..
-```
-
-### 7. Start dev servers
+### 6. Start dev servers
 
 ```bash
 bun run dev          # starts api (port 3002) + web (port 3000)
@@ -69,22 +62,25 @@ bun run dev          # starts api (port 3002) + web (port 3000)
 ## Architecture
 
 ```
-apps/api       Hono backend -- /api/v1/*
-apps/web       Next.js 15 frontend
+apps/api       Hono backend -- /api/v1/* (JWT cookie auth)
+apps/web       Next.js 15 frontend; browser API calls go through its /api/v1 proxy routes
 services/      Business logic (no cross-service imports)
-workers/       node-cron jobs (ingestion-retry, re-embed)
-db/            Drizzle schema + migrations
+workers/       node-cron jobs (ingestion-retry, query-log purge, org-data purge; manual re-embed)
+db/            Drizzle schema + migrations + init/post-migrate SQL
 shared/        Types and constants
+scripts/       setup.ts seed, eval-retrieval.ts + golden-set.json
 ```
+
+shadcn/ui components are committed under `apps/web/src/components/ui/` — no shadcn init step is needed; add new components with `npx shadcn@latest add <component>` from `apps/web`.
 
 ## Key commands
 
 ```bash
-bun run dev --filter apps/api    # API only
-bun run dev --filter apps/web    # Web only
-bun run workers                  # Start cron jobs
-bun test                         # Run tests
-bun scripts/eval-retrieval.ts    # Retrieval quality eval (needs local DB + OPENAI_API_KEY)
+bun run --filter '@company-brain/api' dev    # API only
+bun run --filter '@company-brain/web' dev    # Web only
+bun run workers                              # Start cron jobs
+bun test                                     # Run tests
+bun scripts/eval-retrieval.ts                # Retrieval quality eval (needs local DB + OPENAI_API_KEY)
 ```
 
 ## How a question gets answered
@@ -118,4 +114,15 @@ change to chunking, scoring, or thresholds — the scoring rules live in `CLAUDE
 
 ## Access control model
 
-Every query is scoped to org_id. The visibility JSONB column on chunks is evaluated at query time against the requesting user's role. The access_tier column enforces internal/external plane separation at the SQL level.
+Every query is scoped to org_id. Four layers apply on top of that:
+
+1. **Roles** — `super_admin | org_admin | dept_admin | staff | external_client`, mapped to permissions in `shared/constants.ts`.
+2. **Visibility JSONB** on chunks (`allowedRoles`, `deniedRoles`, `allowedPrincipals`, `classification`), evaluated at query time against the requesting user.
+3. **Compartments** — documents live in compartments (one level of sub-compartments allowed). A `restricted` compartment is only accessible to users or groups with an explicit grant (`compartment_grants`); groups are managed on the Users page.
+4. **Access tier** — the `access_tier` column enforces internal/external plane separation at the SQL level; the external pipeline can never touch internal chunks.
+
+## Known gaps
+
+- `parent_chunk_id` is never set at ingest, so small-to-big retrieval expansion is currently a no-op.
+- Chunking is context-free (fixed 2000-char windows); section-aware chunking is planned — benchmark against the golden set before changing.
+- No CI pipeline yet — run `bun test` locally before pushing.
