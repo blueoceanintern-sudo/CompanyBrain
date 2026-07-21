@@ -56,7 +56,7 @@ async function apiFetch<T>(
     const res = await fetch(`${API_URL}${path}`, { ...options, headers, credentials: 'include' })
     if (res.status === 401) {
       if (typeof window !== 'undefined') {
-        fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+        await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
         localStorage.removeItem('auth_user')
         window.location.replace('/login')
       }

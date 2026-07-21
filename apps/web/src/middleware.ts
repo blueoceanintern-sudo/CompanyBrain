@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { jwtVerify } from 'jose'
-const PUBLIC_PATHS = ['/login', '/api/auth']
+const PUBLIC_PATHS = ['/login', '/api/auth', '/api/health']
 const COOKIE_NAME = 'auth_token'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
