@@ -64,6 +64,20 @@
       "when": 1784192198756,
       "tag": "0008_fix_double_encoded_jsonb",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784615703175,
+      "tag": "0009_legal_hiroim",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784615793759,
+      "tag": "0010_parched_roughhouse",
+      "breakpoints": true
     }
   ]
 }

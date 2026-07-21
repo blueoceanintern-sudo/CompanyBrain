@@ -113,6 +113,7 @@ export interface CompartmentSummary {
   name: string
   description: string | null
   restricted: boolean
+  accessTier: AccessTier
   parentCompartmentId: string | null
   grantCount: number
   createdAt: string

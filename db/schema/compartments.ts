@@ -1,5 +1,6 @@
 import { pgTable, text, uuid, timestamp, boolean, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { orgs } from './orgs'
+import { accessTierEnum } from './enums'
 
 export const compartments = pgTable('compartments', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -9,6 +10,10 @@ export const compartments = pgTable('compartments', {
   name: text('name').notNull(),
   description: text('description'),
   restricted: boolean('restricted').notNull().default(false),
+  // A compartment holds only one knowledge plane — never mixed. Fixed at
+  // creation (no re-parenting-style edit); a sub-compartment always inherits
+  // its parent's tier. Nullable only during the backfill migration.
+  accessTier: accessTierEnum('access_tier').notNull(),
   // One level of nesting only (a parent cannot itself have a parent) —
   // enforced in the admin route. RESTRICT backs up the "delete subs first"
   // rule at the DB level. Access narrows down the tree: reaching a

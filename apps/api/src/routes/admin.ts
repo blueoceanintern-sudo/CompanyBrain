@@ -5,6 +5,7 @@ import { db } from '@company-brain/db'
 import { compartments, users, auditLogs, orgs, documents, chunks, groups, groupMembers, compartmentGrants } from '@company-brain/db'
 import { eq, and, ne, count, inArray, sql } from 'drizzle-orm'
 import { hasPermission } from '@company-brain/shared'
+import { canPublishExternal } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
 import { sendOrgAdminWelcome, sendUserInvite } from '../lib/email'
 
@@ -18,9 +19,12 @@ const compartmentCreateSchema = z.object({
   restricted: z.boolean().optional(),
   // One level of nesting; the parent is fixed at creation (no re-parenting)
   parentId: z.string().uuid().optional(),
+  // Required for a top-level compartment; ignored for a sub-compartment,
+  // which always inherits its parent's tier — a folder holds one plane only.
+  accessTier: z.enum(['internal', 'external']).optional(),
 })
 
-const compartmentUpdateSchema = compartmentCreateSchema.omit({ parentId: true }).partial()
+const compartmentUpdateSchema = compartmentCreateSchema.omit({ parentId: true, accessTier: true }).partial()
 
 const BAD_ORG = { success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } } as const
 
@@ -34,6 +38,7 @@ adminRoute.get('/compartments', async (c) => {
       name: compartments.name,
       description: compartments.description,
       restricted: compartments.restricted,
+      accessTier: compartments.accessTier,
       parentCompartmentId: compartments.parentCompartmentId,
       grantCount: count(compartmentGrants.id),
       createdAt: compartments.createdAt,
@@ -58,9 +63,11 @@ adminRoute.post('/compartments', zValidator('json', compartmentCreateSchema), as
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
+  let accessTier: 'internal' | 'external'
+
   if (body.parentId) {
     const [parent] = await db
-      .select({ id: compartments.id, parentCompartmentId: compartments.parentCompartmentId })
+      .select({ id: compartments.id, parentCompartmentId: compartments.parentCompartmentId, accessTier: compartments.accessTier })
       .from(compartments)
       .where(and(eq(compartments.id, body.parentId), eq(compartments.orgId, orgId)))
       .limit(1)
@@ -74,6 +81,26 @@ adminRoute.post('/compartments', zValidator('json', compartmentCreateSchema), as
         400
       )
     }
+    // A sub-compartment always inherits its parent's tier — never mixed.
+    accessTier = parent.accessTier
+  } else {
+    if (!body.accessTier) {
+      return c.json(
+        { success: false, error: { code: 'MISSING_TIER', message: 'accessTier is required for a top-level compartment' } },
+        400
+      )
+    }
+    accessTier = body.accessTier
+  }
+
+  if (accessTier === 'external') {
+    const [orgRow] = await db.select({ plan: orgs.plan }).from(orgs).where(eq(orgs.id, orgId)).limit(1)
+    if (!canPublishExternal(orgRow?.plan ?? 'free')) {
+      return c.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'External publishing requires a paid plan' } },
+        403
+      )
+    }
   }
 
   const [compartment] = await db
@@ -81,6 +108,7 @@ adminRoute.post('/compartments', zValidator('json', compartmentCreateSchema), as
     .values({
       orgId,
       name: body.name,
+      accessTier,
       ...(body.description !== undefined ? { description: body.description } : {}),
       ...(body.restricted !== undefined ? { restricted: body.restricted } : {}),
       ...(body.parentId !== undefined ? { parentCompartmentId: body.parentId } : {}),
@@ -172,14 +200,28 @@ adminRoute.delete('/compartments/:cId', zValidator('json', deleteCompartmentSche
   }
 
   if (targetCompartmentId) {
+    const [sourceRow] = await db
+      .select({ accessTier: compartments.accessTier })
+      .from(compartments)
+      .where(and(eq(compartments.id, cId), eq(compartments.orgId, orgId)))
+      .limit(1)
     const [targetRow] = await db
-      .select({ id: compartments.id })
+      .select({ id: compartments.id, accessTier: compartments.accessTier })
       .from(compartments)
       .where(and(eq(compartments.id, targetCompartmentId), eq(compartments.orgId, orgId)))
       .limit(1)
 
     if (!targetRow) {
       return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Target compartment not found' } }, 404)
+    }
+    if (sourceRow && targetRow.accessTier !== sourceRow.accessTier) {
+      return c.json(
+        {
+          success: false,
+          error: { code: 'TIER_MISMATCH', message: 'Documents can only be reassigned to a compartment of the same access tier' },
+        },
+        400
+      )
     }
 
     await db.update(documents)

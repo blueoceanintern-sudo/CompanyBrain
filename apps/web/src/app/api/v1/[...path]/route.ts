@@ -20,7 +20,7 @@ async function proxy(request: NextRequest, path: string[]) {
     const res = await fetch(url, {
       method: request.method,
       headers,
-      body: body ? Buffer.from(body) : undefined,
+      ...(body ? { body } : {}),
     })
 
     const responseHeaders = new Headers()
@@ -44,6 +44,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  const { path } = await params
+  return proxy(request, path)
+}
+
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params
   return proxy(request, path)
 }

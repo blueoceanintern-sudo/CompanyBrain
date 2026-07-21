@@ -10,8 +10,17 @@ import {
   startCheckout,
   startOrgUpgrade,
   openBillingPortal,
+  getSubscription,
   unwrap,
 } from '@/lib/api'
+
+export function useSubscription(orgId: string) {
+  return useQuery({
+    queryKey: ['subscription', orgId],
+    queryFn: async () => unwrap(await getSubscription(orgId)),
+    enabled: !!orgId,
+  })
+}
 
 export function useConnectStatus(orgId: string) {
   return useQuery({

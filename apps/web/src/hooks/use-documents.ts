@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { getDocuments, uploadDocument, deleteDocument, archiveDocument, unarchiveDocument } from '@/lib/api'
+import { getDocuments, uploadDocument, deleteDocument, archiveDocument, unarchiveDocument, updateDocument } from '@/lib/api'
 
 export function useDocuments(orgId: string) {
   return useQuery({
@@ -61,6 +61,22 @@ export function useArchiveDocument(orgId: string) {
       qc.invalidateQueries({ queryKey: ['documents', orgId] })
     },
     onError: () => toast.error('Archive failed'),
+  })
+}
+
+export function useMoveDocument(orgId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ docId, compartmentId }: { docId: string; compartmentId: string }) =>
+      updateDocument(orgId, docId, { compartmentId }).then((r) => {
+        if (!r.success) throw new Error(r.error.message)
+        return null
+      }),
+    onSuccess: () => {
+      toast.success('Document moved')
+      qc.invalidateQueries({ queryKey: ['documents', orgId] })
+    },
+    onError: (err: Error) => toast.error(err.message),
   })
 }
 

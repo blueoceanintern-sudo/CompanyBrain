@@ -136,6 +136,17 @@ export async function archiveDocument(orgId: string, docId: string) {
   return apiFetch<null>(`/api/v1/orgs/${orgId}/documents/${docId}/archive`, { method: 'POST' })
 }
 
+export async function updateDocument(
+  orgId: string,
+  docId: string,
+  data: { compartmentId?: string; sourceType?: string }
+) {
+  return apiFetch<null>(`/api/v1/orgs/${orgId}/documents/${docId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
 export interface DocumentContent {
   documentId: string
   filename: string
@@ -180,7 +191,7 @@ export async function getCompartments(orgId: string) {
 
 export async function createCompartment(
   orgId: string,
-  data: { name: string; description?: string; restricted?: boolean; parentId?: string }
+  data: { name: string; description?: string; restricted?: boolean; parentId?: string; accessTier?: 'internal' | 'external' }
 ) {
   return apiFetch<CompartmentSummary>(`/api/v1/orgs/${orgId}/compartments`, {
     method: 'POST',
