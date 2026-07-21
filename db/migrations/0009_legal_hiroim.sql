@@ -1,0 +1,1 @@
+ALTER TABLE "compartments" ADD COLUMN "access_tier" "access_tier";

@@ -7,14 +7,14 @@ import { useUpdateCompartment } from '@/hooks/use-compartments'
 import { useUsers } from '@/hooks/use-users'
 import type { CompartmentSummary } from '@company-brain/shared'
 
-// Expandable panel for one compartment. View mode summarises restriction and
-// who has access; Edit mode stages restrict/unrestrict + grant changes behind
-// one Save, and hosts the delete action. Admins always have access.
+// Folder access panel: view mode summarises restriction and who has access;
+// edit mode stages restrict/unrestrict + grant changes behind one Save, and
+// hosts the delete action. Admins always have access.
 //
 // Access narrows down the hierarchy: a sub-compartment is only reachable by
 // people who can also access its parent, so grants here are inert for anyone
 // locked out of a restricted parent — flagged inline so admins can see why.
-export function CompartmentDetails({
+export function FolderAccessPanel({
   orgId,
   compartment,
   parent = null,
@@ -36,6 +36,7 @@ export function CompartmentDetails({
   const updateComp = useUpdateCompartment(orgId)
 
   const [editing, setEditing] = useState(initialEdit)
+  const [localName, setLocalName] = useState(compartment.name)
   const [localRestricted, setLocalRestricted] = useState(compartment.restricted)
   const [selectedGroups, setSelectedGroups] = useState<Set<string> | null>(null)
   const [selectedUsers, setSelectedUsers] = useState<Set<string> | null>(null)
@@ -52,8 +53,9 @@ export function CompartmentDetails({
 
   const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((v) => b.has(v))
   const grantsDirty = !sameSet(currentGroups, savedGroupIds) || !sameSet(currentUsers, savedUserIds)
+  const nameDirty = localName.trim().length > 0 && localName.trim() !== compartment.name
   const restrictedDirty = localRestricted !== compartment.restricted
-  const dirty = restrictedDirty || (localRestricted && grantsDirty)
+  const dirty = nameDirty || restrictedDirty || (localRestricted && grantsDirty)
   const saving = setGrants.isPending || updateComp.isPending
 
   // Grants only matter for non-admin internal users
@@ -100,6 +102,7 @@ export function CompartmentDetails({
   }
 
   const resetStaged = () => {
+    setLocalName(compartment.name)
     setLocalRestricted(compartment.restricted)
     setSelectedGroups(null)
     setSelectedUsers(null)
@@ -107,8 +110,14 @@ export function CompartmentDetails({
   }
 
   const save = async () => {
-    if (restrictedDirty) {
-      await updateComp.mutateAsync({ cId: compartment.id, data: { restricted: localRestricted } })
+    if (nameDirty || restrictedDirty) {
+      await updateComp.mutateAsync({
+        cId: compartment.id,
+        data: {
+          ...(nameDirty ? { name: localName.trim() } : {}),
+          ...(restrictedDirty ? { restricted: localRestricted } : {}),
+        },
+      })
     }
     if (localRestricted && grantsDirty) {
       await setGrants.mutateAsync({
@@ -148,17 +157,17 @@ export function CompartmentDetails({
         {!compartment.restricted ? (
           <p style={{ fontSize: 13, color: '#585f67', margin: 0 }}>
             {parentRestricted
-              ? <>Access is inherited from the parent compartment.</>
-              : <>Open — everyone in the organisation can see and query this compartment.</>}
+              ? <>Access is inherited from the parent folder.</>
+              : <>Open — everyone in the organisation can view and query this folder.</>}
           </p>
         ) : (
           <>
             <p style={{ fontSize: 13, color: '#585f67', margin: 0 }}>
-              Restricted · {grantedGroups.length} group{grantedGroups.length === 1 ? '' : 's'}, {grantedUsers.length} user{grantedUsers.length === 1 ? '' : 's'} — only those listed (plus org admins) can see and query it.
+              Restricted · {grantedGroups.length} group{grantedGroups.length === 1 ? '' : 's'}, {grantedUsers.length} user{grantedUsers.length === 1 ? '' : 's'} <br/> Only those listed (plus org admins) can view and query it.
             </p>
             {grantedCount === 0 ? (
               <p style={{ fontSize: 13, color: '#b91c1c', margin: 0, padding: '10px 12px', background: '#fef2f2', borderRadius: 8 }}>
-                No access granted yet — only org admins can see this compartment.
+                No access granted yet — only org admins can view this folder.
               </p>
             ) : (
               <div style={listBox}>
@@ -207,9 +216,18 @@ export function CompartmentDetails({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div>
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#434655', margin: '0 0 6px' }}>Name</label>
+        <input
+          value={localName}
+          onChange={(e) => setLocalName(e.target.value)}
+          placeholder={compartment.name}
+          style={{ width: '100%', height: 40, padding: '0 12px', border: '1px solid #c3c6d7', borderRadius: 8, background: '#ffffff', fontSize: 14, color: '#0b1c30', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+        />
+      </div>
       {parentRestricted && (
         <p style={{ fontSize: 13, color: '#9a3412', margin: 0, padding: '10px 12px', background: '#fff7ed', borderRadius: 8 }}>
-          Grants here can only narrow further. 
+          Grants here can only narrow further.
         </p>
       )}
       <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
@@ -219,7 +237,7 @@ export function CompartmentDetails({
         <span style={{ fontSize: 12, color: '#585f67' }}>
           {parent
             ? <>— unrestricted, it inherits &ldquo;{parent.name}&rdquo;&rsquo;s audience.</>
-            : <>— only granted users and groups (plus admins) can see and query it.</>}
+            : <>— only selected users (plus admins) can view and query it.</>}
         </span>
       </label>
 
@@ -231,7 +249,7 @@ export function CompartmentDetails({
             </p>
             {grantedCount === 0 ? (
               <p style={{ fontSize: 13, color: '#585f67', margin: 0, padding: '10px 12px', background: '#f8f9ff', borderRadius: 8 }}>
-                No one has access yet — only org admins can see this compartment. Add groups or users below.
+                No one has access yet — only org admins can view this folder. Add groups or users below.
               </p>
             ) : (
               <div style={listBox}>
@@ -329,7 +347,7 @@ export function CompartmentDetails({
           onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#fff1f0' }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none' }}
         >
-          <Trash2 size={14} /> Delete compartment
+          <Trash2 size={14} /> Delete folder
         </button>
         <div style={{ display: 'flex', gap: 12 }}>
           <button onClick={() => { resetStaged(); setEditing(false) }} style={secondaryBtn}>Cancel</button>

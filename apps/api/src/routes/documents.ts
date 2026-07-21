@@ -15,13 +15,28 @@ const documentsRoute = new Hono<AuthVars>()
 
 const updateDocSchema = z.object({
   compartmentId: z.string().uuid().optional(),
-  accessTier: z.enum(['internal', 'external']).optional(),
   sourceType: z
     .enum(['hr_policy', 'sop', 'faq', 'case_note', 'compliance', 'product_doc', 'other'])
     .optional(),
 })
 
 const BAD_ORG = { success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } } as const
+
+export function visibilityForTier(accessTier: 'internal' | 'external'): VisibilityPolicy {
+  return accessTier === 'external'
+    ? {
+        allowedRoles: ['super_admin', 'org_admin', 'dept_admin', 'staff', 'external_client'],
+        deniedRoles: [],
+        allowedPrincipals: [],
+        classification: 'public',
+      }
+    : {
+        allowedRoles: ['super_admin', 'org_admin', 'dept_admin', 'staff'],
+        deniedRoles: [],
+        allowedPrincipals: [],
+        classification: 'restricted',
+      }
+}
 
 // GET /orgs/:id/documents
 documentsRoute.get('/', async (c) => {
@@ -95,7 +110,6 @@ documentsRoute.post('/', async (c) => {
   const formData = await c.req.formData()
   const file = formData.get('file')
   const compartmentId = formData.get('compartmentId')?.toString()
-  const accessTier = (formData.get('accessTier')?.toString() ?? 'internal') as 'internal' | 'external'
   const sourceType = (formData.get('sourceType')?.toString() ?? 'other') as Parameters<typeof ingestDocument>[0]['sourceType']
 
   if (!(file instanceof File) || !compartmentId) {
@@ -105,18 +119,8 @@ documentsRoute.post('/', async (c) => {
     )
   }
 
-  if (accessTier === 'external') {
-    const orgRow = await db.select({ plan: orgs.plan }).from(orgs).where(eq(orgs.id, orgId)).limit(1)
-    if (!canPublishExternal(orgRow[0]?.plan ?? 'free')) {
-      return c.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'External publishing requires a paid plan' } },
-        403
-      )
-    }
-  }
-
   const compartmentRow = await db
-    .select({ id: compartments.id })
+    .select({ id: compartments.id, accessTier: compartments.accessTier })
     .from(compartments)
     .where(and(eq(compartments.id, compartmentId), eq(compartments.orgId, orgId)))
     .limit(1)
@@ -126,6 +130,19 @@ documentsRoute.post('/', async (c) => {
       { success: false, error: { code: 'NOT_FOUND', message: 'Compartment not found' } },
       404
     )
+  }
+
+  // A document's tier always matches its folder's tier — never chosen independently.
+  const accessTier = compartmentRow[0].accessTier
+
+  if (accessTier === 'external') {
+    const orgRow = await db.select({ plan: orgs.plan }).from(orgs).where(eq(orgs.id, orgId)).limit(1)
+    if (!canPublishExternal(orgRow[0]?.plan ?? 'free')) {
+      return c.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'External publishing requires a paid plan' } },
+        403
+      )
+    }
   }
 
   if (!(await canUseCompartment({ orgId, compartmentId, userId, userRole: role }))) {
@@ -166,19 +183,7 @@ documentsRoute.post('/', async (c) => {
     )
     .limit(1)
 
-  const visibilityPolicy: VisibilityPolicy = accessTier === 'external'
-    ? {
-        allowedRoles: ['super_admin', 'org_admin', 'dept_admin', 'staff', 'external_client'],
-        deniedRoles: [],
-        allowedPrincipals: [],
-        classification: 'public',
-      }
-    : {
-        allowedRoles: ['super_admin', 'org_admin', 'dept_admin', 'staff'],
-        deniedRoles: [],
-        allowedPrincipals: [],
-        classification: 'restricted',
-      }
+  const visibilityPolicy: VisibilityPolicy = visibilityForTier(accessTier)
 
   // Archive previous version's chunks before creating the new record
   if (previousDoc[0]) {
@@ -326,6 +331,7 @@ documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) =
   const orgId = c.req.param('id')
   const docId = c.req.param('docId')
   if (!orgId || !docId) return c.json(BAD_ORG, 400)
+  const userId = c.get('userId')
   const role = c.get('role')
   const updates = c.req.valid('json')
 
@@ -333,18 +339,10 @@ documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) =
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
-  if (updates.accessTier === 'external') {
-    const orgRow = await db.select({ plan: orgs.plan }).from(orgs).where(eq(orgs.id, orgId)).limit(1)
-    if (!canPublishExternal(orgRow[0]?.plan ?? 'free')) {
-      return c.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'External publishing requires a paid plan' } },
-        403
-      )
-    }
-  }
-
+  // Moving a document to a new folder moves its tier too — a document's tier
+  // is never chosen independently of its compartment's.
+  let newAccessTier: 'internal' | 'external' | undefined
   if (updates.compartmentId !== undefined) {
-    const userId = c.get('userId')
     const allowed = await canUseCompartment({
       orgId,
       compartmentId: updates.compartmentId,
@@ -357,6 +355,28 @@ documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) =
         403
       )
     }
+
+    const [targetCompartment] = await db
+      .select({ accessTier: compartments.accessTier })
+      .from(compartments)
+      .where(and(eq(compartments.id, updates.compartmentId), eq(compartments.orgId, orgId)))
+      .limit(1)
+
+    if (!targetCompartment) {
+      return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Target compartment not found' } }, 404)
+    }
+
+    newAccessTier = targetCompartment.accessTier
+
+    if (newAccessTier === 'external') {
+      const orgRow = await db.select({ plan: orgs.plan }).from(orgs).where(eq(orgs.id, orgId)).limit(1)
+      if (!canPublishExternal(orgRow[0]?.plan ?? 'free')) {
+        return c.json(
+          { success: false, error: { code: 'FORBIDDEN', message: 'External publishing requires a paid plan' } },
+          403
+        )
+      }
+    }
   }
 
   await db
@@ -364,30 +384,20 @@ documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) =
     .set({
       updatedAt: new Date(),
       ...(updates.compartmentId !== undefined ? { compartmentId: updates.compartmentId } : {}),
-      ...(updates.accessTier !== undefined ? { accessTier: updates.accessTier } : {}),
+      ...(newAccessTier !== undefined ? { accessTier: newAccessTier } : {}),
       ...(updates.sourceType !== undefined ? { sourceType: updates.sourceType } : {}),
     })
     .where(and(eq(documents.id, docId), eq(documents.orgId, orgId)))
 
-  // When access tier changes, propagate matching visibility to the document's active chunks
-  if (updates.accessTier !== undefined) {
-    const updatedVisibility: VisibilityPolicy = updates.accessTier === 'external'
-      ? {
-          allowedRoles: ['super_admin', 'org_admin', 'dept_admin', 'staff', 'external_client'],
-          deniedRoles: [],
-          allowedPrincipals: [],
-          classification: 'public',
-        }
-      : {
-          allowedRoles: ['super_admin', 'org_admin', 'dept_admin', 'staff'],
-          deniedRoles: [],
-          allowedPrincipals: [],
-          classification: 'restricted',
-        }
-
+  // Chunks follow the document: compartment, tier, and visibility all move together
+  if (updates.compartmentId !== undefined && newAccessTier !== undefined) {
     await db
       .update(chunks)
-      .set({ visibility: updatedVisibility })
+      .set({
+        compartmentId: updates.compartmentId,
+        accessTier: newAccessTier,
+        visibility: visibilityForTier(newAccessTier),
+      })
       .where(and(eq(chunks.documentId, docId), eq(chunks.status, 'active')))
   }
 

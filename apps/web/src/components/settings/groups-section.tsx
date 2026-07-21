@@ -337,7 +337,7 @@ export function GroupsSection({ orgId, canManage, inputBase }: { orgId: string; 
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#434655', marginBottom: 6 }}>
-                  Type <strong style={{ color: '#ba1a1a' }}>Delete</strong> to confirm (case-sensitive)
+                  Type <strong style={{ color: '#ba1a1a' }}>Delete</strong> to confirm 
                 </label>
                 <input
                   autoFocus

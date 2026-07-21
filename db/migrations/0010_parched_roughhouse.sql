@@ -1,0 +1,1 @@
+ALTER TABLE "compartments" ALTER COLUMN "access_tier" SET NOT NULL;

@@ -1,3 +1,3 @@
 export * from './client'
 export * from './schema/index'
-export { eq, and, sql } from 'drizzle-orm'
+export { eq, and, sql, inArray } from 'drizzle-orm'
