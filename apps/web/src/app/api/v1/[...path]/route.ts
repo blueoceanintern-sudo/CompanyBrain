@@ -20,7 +20,7 @@ async function proxy(request: NextRequest, path: string[]) {
     const res = await fetch(url, {
       method: request.method,
       headers,
-      body: body ? Buffer.from(body) : undefined,
+      ...(body ? { body } : {}),
     })
 
     const responseHeaders = new Headers()
