@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import { submitQuery as apiSubmitQuery } from '@/lib/api'
 import { useExternalPricing, useStartCheckout } from '@/hooks/use-payments'
 import { getAuthUser } from '@/lib/auth'
+import { generateId } from '@/lib/utils'
 import { useChatHistory } from '@/lib/chat-history-context'
 import { DocumentPreview } from '@/components/document-preview'
 import type { ConversationTurn } from '@company-brain/shared'
@@ -415,7 +416,7 @@ export default function ChatPage() {
 
   // Use a plain async function instead of useMutation to avoid reset/dedup issues
   const submitQuery = useCallback(async (q: string, entryId?: string, historySnapshot?: ConversationTurn[]) => {
-    const id = entryId ?? crypto.randomUUID()
+    const id = entryId ?? generateId()
 
     // Set pending state
     if (!entryId) {

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useRef, useCallback } from 'react'
 import type { QueryResponse } from '@company-brain/shared'
+import { generateId } from '@/lib/utils'
 
 export interface HistoryEntry {
   id: string
@@ -47,7 +48,7 @@ export function ChatHistoryProvider({ children }: { children: React.ReactNode })
     const rawTitle = current[0].question
     const title = rawTitle.length > 60 ? rawTitle.slice(0, 57) + '…' : rawTitle
     setSessions(prev => [
-      { id: crypto.randomUUID(), title, entries: current, createdAt: new Date().toISOString() },
+      { id: generateId(), title, entries: current, createdAt: new Date().toISOString() },
       ...prev.slice(0, 19),
     ])
     setHistory([])
