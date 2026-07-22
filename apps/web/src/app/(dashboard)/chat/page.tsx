@@ -381,13 +381,17 @@ export default function ChatPage() {
     }
   }, [searchParams, router, orgId, isExternalClient])
 
-  const { history, setHistory, recentQueries, setRecentQueries, saveCurrentAsSession, pendingSession, clearPendingSession } = useChatHistory()
+  const { history, setHistory, recentQueries, setRecentQueries, saveCurrentAsSession, pendingSession, pendingSessionToken, clearPendingSession } = useChatHistory()
   const [input, setInput] = useState('')
   const [isPending, setIsPending] = useState(false)
   const [previewDocId, setPreviewDocId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // On mount: restore a clicked session, otherwise start fresh
+  // Restore a clicked session, otherwise start fresh. Keyed on
+  // pendingSessionToken (not just mount) so clicking a *different* saved
+  // session in the sidebar while already on /chat still swaps the visible
+  // history — a same-route Link is a no-op in Next, so this component
+  // doesn't remount for that case.
   useEffect(() => {
     if (pendingSession) {
       setHistory(pendingSession)
@@ -396,17 +400,11 @@ export default function ChatPage() {
       setHistory([])
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [pendingSessionToken])
 
   useEffect(() => {
     const q = searchParams.get('q')
-    const isNew = searchParams.get('new') === '1'
-    if (isNew) {
-      saveCurrentAsSession()
-      setInput('')
-      if (textareaRef.current) textareaRef.current.style.height = 'auto'
-      router.replace('/chat')
-    } else if (q) {
+    if (q) {
       setInput(q)
       router.replace('/chat')
       textareaRef.current?.focus()

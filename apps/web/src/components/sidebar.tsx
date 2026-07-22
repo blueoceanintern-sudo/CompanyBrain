@@ -46,7 +46,7 @@ function SidebarContent({
 
   useEffect(() => { setUser(getAuthUser()) }, [])
 
-  const { sessions, loadSession } = useChatHistory()
+  const { sessions, loadSession, saveCurrentAsSession } = useChatHistory()
 
   const visible = NAV.filter((n) => user?.role && hasPermission(user.role, n.permission))
   const initial = (user?.email?.[0] ?? '?').toUpperCase()
@@ -150,9 +150,14 @@ function SidebarContent({
         {visible.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + '/')
           const Icon = NAV_ICONS[item.href]
+          // Same-route Link clicks are a no-op in Next (URL doesn't change), so
+          // clicking "Documents" while already inside a folder wouldn't reset
+          // the page's local folder-browsing state. Route through ?home=1
+          // instead so the documents page can detect it and reset itself.
+          const isDocumentsReset = item.href === '/documents' && pathname.startsWith('/documents')
           const linkEl = (
             <Link
-              href={item.href as Route}
+              href={(isDocumentsReset ? '/documents?home=1' : item.href) as Route}
               {...(isSheet && onClose ? { onClick: onClose } : {})}
               className="flex items-center rounded-xl"
               style={{
@@ -192,7 +197,7 @@ function SidebarContent({
                 {linkEl}
                 <div style={{ paddingLeft: 48, paddingRight: 8, display: 'flex', flexDirection: 'column', gap: 1, marginTop: 2 }}>
                   <button
-                    onClick={() => router.push('/chat?new=1')}
+                    onClick={() => { saveCurrentAsSession(); router.push('/chat') }}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 8px', background: 'none', border: 'none', cursor: 'pointer', color: '#004ac6', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', borderRadius: 8, width: '100%', textAlign: 'left' }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#dce9ff' }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none' }}

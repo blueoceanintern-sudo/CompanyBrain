@@ -166,7 +166,6 @@ export default function AuditPage() {
       <header style={{ height: 50, borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 18, fontWeight: 700, color: '#004ac6' }}>Audit Log</span>
-          <span style={{ padding: '2px 8px', background: '#dce3ec', color: '#5e656d', borderRadius: 4, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Internal</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>

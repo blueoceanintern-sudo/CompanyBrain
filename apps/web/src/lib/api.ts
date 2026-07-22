@@ -184,6 +184,19 @@ export async function getQueryHistory(orgId: string) {
   return apiFetch<QueryHistoryItem[]>(`/api/v1/orgs/${orgId}/queries`)
 }
 
+// ─── Org profile ────────────────────────────────────────────────────────────
+
+export async function getOrgProfile(orgId: string) {
+  return apiFetch<{ id: string; name: string; plan: string; createdAt: string }>(`/api/v1/orgs/${orgId}`)
+}
+
+export async function updateOrgProfile(orgId: string, data: { name: string }) {
+  return apiFetch<{ id: string; name: string }>(`/api/v1/orgs/${orgId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
 export async function getCompartments(orgId: string) {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -39,8 +40,6 @@ function PageHeader() {
     <header style={{ height: 64, borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
       <span style={{ fontSize: 20, fontWeight: 700, color: '#004ac6' }}>Documents</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <span style={{ fontSize: 14, color: '#585f67' }}>Status: <strong style={{ color: '#004ac6' }}>Internal</strong></span>
-        <div style={{ width: 1, height: 24, background: '#c3c6d7' }} />
         <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         </button>
@@ -585,7 +584,7 @@ function FolderAccessDialog({ orgId, folder, parent, initialEdit, onClose, onReq
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #c3c6d7', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Shield size={18} color="#004ac6" />
-            <span style={{ fontSize: 16, fontWeight: 700, color: '#0b1c30' }}>Manage Access — {folder.name}</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: '#0b1c30' }}>Manage — {folder.name}</span>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}><X size={18} /></button>
         </div>
@@ -872,6 +871,8 @@ export default function DocumentsPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
   const canManageFolders = !!user?.role && hasPermission(user.role, 'users:manage')
+  const searchParams = useSearchParams()
+  const router = useRouter()
 
   const [showUpload, setShowUpload] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<DocItem | null>(null)
@@ -891,8 +892,29 @@ export default function DocumentsPage() {
 
   useEffect(() => { setExpandedSubfolders(new Set()) }, [openCompartmentId])
 
+  // Sidebar "Documents" link navigates here with ?home=1 when already on this
+  // page (a same-route Link is otherwise a no-op) — return to the top-level
+  // folder browser and clear any open panel/search state.
+  useEffect(() => {
+    if (searchParams.get('home') === '1') {
+      setOpenCompartmentId(null)
+      setSelectedDoc(null)
+      setSearch('')
+      setRootSearch('')
+      router.replace('/documents')
+    }
+  }, [searchParams, router])
+
   const { data: docs = [], isLoading } = useDocuments(orgId)
-  const { data: compartments = [] } = useCompartments(orgId)
+  const { data: compartments = [], refetch: refetchCompartments } = useCompartments(orgId)
+
+  // The "move documents to" list in the delete dialog is only as fresh as the
+  // last fetch (30s staleTime) — force a refetch right as the dialog opens so
+  // it can't offer a folder another session already deleted.
+  const requestDeleteFolder = (folder: CompartmentSummary) => {
+    refetchCompartments()
+    setFolderToDelete(folder)
+  }
   const { data: sub } = useSubscription(orgId)
   const deleteDoc = useDeleteDocument(orgId)
   const archiveDoc = useArchiveDocument(orgId)
@@ -902,7 +924,15 @@ export default function DocumentsPage() {
   const isPaid = sub?.plan === 'paid'
   const topLevel = compartments.filter((c) => !c.parentCompartmentId)
   const subsOf = (parentId: string) => compartments.filter((c) => c.parentCompartmentId === parentId)
-  const docCount = (compartmentId: string) => docs.filter((d) => d.compartmentId === compartmentId).length
+  // A folder's count includes its subfolders' documents (nesting is one level
+  // deep, so subfolders never have children of their own). `docs` is already
+  // scoped to what the current user can see — GET /documents excludes
+  // restricted (sub-)compartments the caller has no grant for — so this count
+  // never reveals documents the viewer can't actually open.
+  const docCount = (compartmentId: string) => {
+    const includedIds = new Set([compartmentId, ...subsOf(compartmentId).map((s) => s.id)])
+    return docs.filter((d) => includedIds.has(d.compartmentId)).length
+  }
 
   const getCompartmentName = (compartmentId: string) => {
     const comp = compartments.find((c) => c.id === compartmentId)
@@ -987,7 +1017,7 @@ export default function DocumentsPage() {
                 canManage={canManageFolders}
                 onOpen={() => setOpenCompartmentId(c.id)}
                 onManageAccess={(edit) => setAccessPanel({ folderId: c.id, edit })}
-                onDelete={() => setFolderToDelete(c)}
+                onDelete={() => requestDeleteFolder(c)}
               />
             ))}
           </div>
@@ -1084,13 +1114,13 @@ export default function DocumentsPage() {
                 <button
                   onClick={() => setShowUpload(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 12, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
-                  ><Plus size={16} /> Document</button>
+                  ><Plus size={16} />Documents</button>
                 {canManageFolders && (
                 <FolderActionsMenu
                     isTopLevel={isParentLevel}
                     onNewSubfolder={() => setCreateFolder({ parent: openCompartment, tier: openCompartment.accessTier as 'internal' | 'external' })}
                     onManage={() => setAccessPanel({ folderId: openCompartment.id, edit: false })}
-                    onDelete={() => setFolderToDelete(openCompartment)}
+                    onDelete={() => requestDeleteFolder(openCompartment)}
                 />
                 )}
               </div>
@@ -1108,7 +1138,7 @@ export default function DocumentsPage() {
                     parentRestricted={openCompartment.restricted}
                     onOpen={() => setOpenCompartmentId(c.id)}
                     onManageAccess={(edit) => setAccessPanel({ folderId: c.id, edit })}
-                    onDelete={() => setFolderToDelete(c)}
+                    onDelete={() => requestDeleteFolder(c)}
                   />
                 ))}
               </div>
@@ -1174,7 +1204,7 @@ export default function DocumentsPage() {
                       })}
                       onOpenDoc={(docId) => { const d = docs.find((x) => x.id === docId); if (d) setSelectedDoc(d) }}
                       onManageAccess={(edit) => setAccessPanel({ folderId: sub.id, edit })}
-                      onDelete={() => setFolderToDelete(sub)}
+                      onDelete={() => requestDeleteFolder(sub)}
                     />
                   )
                 })}
@@ -1184,6 +1214,11 @@ export default function DocumentsPage() {
               </div>
             )}
           </div>
+        )}
+
+        {/* Backdrop — click outside the detail panel to close it */}
+        {selectedDoc && (
+          <div onClick={() => setSelectedDoc(null)} style={{ position: 'absolute', inset: 0, zIndex: 49 }} />
         )}
 
         {/* Detail panel */}
@@ -1260,7 +1295,7 @@ export default function DocumentsPage() {
           parent={compartments.find((c) => c.id === accessPanelFolder.parentCompartmentId) ?? null}
           initialEdit={accessPanel.edit}
           onClose={() => setAccessPanel(null)}
-          onRequestDelete={() => setFolderToDelete(accessPanelFolder)}
+          onRequestDelete={() => requestDeleteFolder(accessPanelFolder)}
         />
       )}
       {folderToDelete && (

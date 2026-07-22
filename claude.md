@@ -291,7 +291,6 @@ All tables in `db/schema/` (one file per table). Drizzle only — never raw `pg`
 
 ```ts
 access_tier:        internal | external
-visibility_class:   public | restricted | confidential
 chunk_status:       active | processing | error | archived
 org_plan:           free | paid
 source_type:        hr_policy | sop | faq | case_note | compliance | product_doc | other

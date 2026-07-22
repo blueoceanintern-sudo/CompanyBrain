@@ -3,13 +3,63 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { db } from '@company-brain/db'
 import { compartments, users, auditLogs, orgs, documents, chunks, groups, groupMembers, compartmentGrants } from '@company-brain/db'
-import { eq, and, ne, count, inArray, sql } from 'drizzle-orm'
+import { eq, and, ne, count, inArray, sql, isNull } from 'drizzle-orm'
 import { hasPermission } from '@company-brain/shared'
 import { canPublishExternal } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
 import { sendOrgAdminWelcome, sendUserInvite } from '../lib/email'
 
 const adminRoute = new Hono<AuthVars>()
+
+// ─── Org profile ──────────────────────────────────────────────────────────────
+
+adminRoute.get('/', async (c) => {
+  const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
+
+  const [org] = await db
+    .select({ id: orgs.id, name: orgs.name, plan: orgs.plan, createdAt: orgs.createdAt })
+    .from(orgs)
+    .where(eq(orgs.id, orgId))
+    .limit(1)
+
+  if (!org) return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Organisation not found' } }, 404)
+  return c.json({ success: true, data: org })
+})
+
+const orgProfileUpdateSchema = z.object({
+  name: z.string().min(1).max(200),
+})
+
+adminRoute.patch('/', zValidator('json', orgProfileUpdateSchema), async (c) => {
+  const orgId = c.req.param('id')
+  if (!orgId) return c.json(BAD_ORG, 400)
+  const role = c.get('role')
+  const userId = c.get('userId')
+  const { name } = c.req.valid('json')
+
+  if (!hasPermission(role, 'users:manage')) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
+
+  const [updated] = await db
+    .update(orgs)
+    .set({ name, updatedAt: new Date() })
+    .where(eq(orgs.id, orgId))
+    .returning({ id: orgs.id, name: orgs.name })
+
+  if (!updated) return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Organisation not found' } }, 404)
+
+  await db.insert(auditLogs).values({
+    orgId, userId,
+    action: 'org.update',
+    resourceType: 'org',
+    resourceId: orgId,
+    metadata: { name },
+  })
+
+  return c.json({ success: true, data: updated })
+})
 
 // ─── Compartments ─────────────────────────────────────────────────────────────
 
@@ -27,6 +77,40 @@ const compartmentCreateSchema = z.object({
 const compartmentUpdateSchema = compartmentCreateSchema.omit({ parentId: true, accessTier: true }).partial()
 
 const BAD_ORG = { success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } } as const
+
+// Siblings (same org + same parent for sub-compartments, same org + same tier
+// for top-level ones) can't share a name case-insensitively; it makes folder
+// pickers, breadcrumbs, and the move dialog ambiguous since only the ID
+// actually disambiguates them. Different tiers may reuse a name (e.g. an
+// "Onboarding" folder in both Internal and External).
+async function findDuplicateSiblingName(
+  orgId: string,
+  name: string,
+  parentId: string | null,
+  accessTier: 'internal' | 'external',
+  excludeId?: string
+): Promise<boolean> {
+  const [existing] = await db
+    .select({ id: compartments.id })
+    .from(compartments)
+    .where(
+      and(
+        eq(compartments.orgId, orgId),
+        parentId
+          ? eq(compartments.parentCompartmentId, parentId)
+          : and(isNull(compartments.parentCompartmentId), eq(compartments.accessTier, accessTier)),
+        sql`lower(${compartments.name}) = lower(${name})`,
+        excludeId ? ne(compartments.id, excludeId) : undefined
+      )
+    )
+    .limit(1)
+  return !!existing
+}
+
+const DUPLICATE_NAME_ERROR = {
+  success: false,
+  error: { code: 'DUPLICATE_NAME', message: 'A folder with this name already exists here' },
+} as const
 
 adminRoute.get('/compartments', async (c) => {
   const orgId = c.req.param('id')
@@ -103,6 +187,10 @@ adminRoute.post('/compartments', zValidator('json', compartmentCreateSchema), as
     }
   }
 
+  if (await findDuplicateSiblingName(orgId, body.name, body.parentId ?? null, accessTier)) {
+    return c.json(DUPLICATE_NAME_ERROR, 409)
+  }
+
   const [compartment] = await db
     .insert(compartments)
     .values({
@@ -136,6 +224,20 @@ adminRoute.patch('/compartments/:cId', zValidator('json', compartmentUpdateSchem
 
   if (!hasPermission(role, 'users:manage')) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
+
+  if (updates.name !== undefined) {
+    const [current] = await db
+      .select({ parentCompartmentId: compartments.parentCompartmentId, accessTier: compartments.accessTier })
+      .from(compartments)
+      .where(and(eq(compartments.id, cId), eq(compartments.orgId, orgId)))
+      .limit(1)
+    if (!current) {
+      return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Compartment not found' } }, 404)
+    }
+    if (await findDuplicateSiblingName(orgId, updates.name, current.parentCompartmentId, current.accessTier, cId)) {
+      return c.json(DUPLICATE_NAME_ERROR, 409)
+    }
   }
 
   const [updated] = await db

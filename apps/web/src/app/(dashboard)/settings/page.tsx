@@ -8,6 +8,7 @@ import { CreditCard } from 'lucide-react'
 import { GroupsSection } from '@/components/settings/groups-section'
 
 import { useSubscription, useConnectStatus, useStartConnectOnboarding, useExternalPricing, useSetExternalPricing, useStartOrgUpgrade, useOpenBillingPortal } from '@/hooks/use-payments'
+import { useOrgProfile, useUpdateOrgProfile } from '@/hooks/use-orgs'
 import { getAuthUser } from '@/lib/auth'
 import { cancelSubscription } from '@/lib/api'
 import { hasPermission } from '@company-brain/shared'
@@ -151,6 +152,14 @@ export default function SettingsPage() {
   const billingPortal = useOpenBillingPortal(orgId)
   const canManageBilling = !!user?.role && hasPermission(user.role, 'billing:manage')
   const canManageGroups = !!user?.role && hasPermission(user.role, 'users:manage')
+  const canManageOrgProfile = !!user?.role && hasPermission(user.role, 'users:manage')
+
+  const { data: orgProfile } = useOrgProfile(orgId)
+  const updateOrgProfile = useUpdateOrgProfile(orgId)
+  const [orgName, setOrgName] = useState('')
+  useEffect(() => {
+    if (orgProfile) setOrgName(orgProfile.name)
+  }, [orgProfile])
 
   const inputBase: React.CSSProperties = {
     width: '100%', height: 48, padding: '0 16px', border: '1px solid #c3c6d7', borderRadius: 8,
@@ -207,22 +216,16 @@ export default function SettingsPage() {
                 <div style={{ border: '1px solid #c3c6d7', borderRadius: 12, padding: 32, display: 'flex', flexDirection: 'column', gap: 24, background: '#ffffff' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <label style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>Organization Name</label>
-                    <input type="text" defaultValue={user?.email?.split('@')[1]?.split('.')[0] ?? 'BlueOcean EdTech'}
-                      style={inputBase}
+                    <input type="text" value={orgName} disabled={!canManageOrgProfile}
+                      onChange={(e) => setOrgName(e.target.value)}
+                      style={{ ...inputBase, ...(canManageOrgProfile ? {} : { color: '#585f67', background: '#f8f9ff' }) }}
                       onFocus={(e) => { e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)' }}
                       onBlur={(e) => { e.currentTarget.style.borderColor = '#c3c6d7'; e.currentTarget.style.boxShadow = 'none' }}
                     />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <label style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>Workspace Slug</label>
-                    <div style={{ display: 'flex' }}>
-                      <span style={{ padding: '0 16px', height: 48, display: 'flex', alignItems: 'center', background: '#e5eeff', border: '1px solid #c3c6d7', borderRight: 'none', borderRadius: '8px 0 0 8px', fontSize: 14, color: '#434655', whiteSpace: 'nowrap' }}>app/</span>
-                      <input type="text" defaultValue={user?.orgId ?? ''}
-                        style={{ ...inputBase, borderRadius: '0 8px 8px 0', flex: 1 }}
-                        onFocus={(e) => { e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)' }}
-                        onBlur={(e) => { e.currentTarget.style.borderColor = '#c3c6d7'; e.currentTarget.style.boxShadow = 'none' }}
-                      />
-                    </div>
+                    <label style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>Organisation ID</label>
+                    <input type="text" readOnly value={orgProfile?.id ?? user?.orgId ?? ''} style={{ ...inputBase, color: '#585f67', background: '#f8f9ff', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }} aria-label="Organisation ID" />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <label style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>Email</label>
@@ -232,13 +235,17 @@ export default function SettingsPage() {
                     <label style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>Role</label>
                     <input type="text" readOnly value={user?.role?.replace(/_/g, ' ') ?? ''} style={{ ...inputBase, color: '#585f67', background: '#f8f9ff', textTransform: 'capitalize' }} aria-label="Role" />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 8 }}>
-                    <button style={{ padding: '10px 24px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
-                      onClick={() => toast.success('Changes saved')}
-                    >
-                      Save Changes
-                    </button>
-                  </div>
+                  {canManageOrgProfile && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 8 }}>
+                      <button
+                        disabled={updateOrgProfile.isPending || !orgName.trim() || orgName === orgProfile?.name}
+                        style={{ padding: '10px 24px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: (updateOrgProfile.isPending || !orgName.trim() || orgName === orgProfile?.name) ? 'not-allowed' : 'pointer', opacity: (updateOrgProfile.isPending || !orgName.trim() || orgName === orgProfile?.name) ? 0.5 : 1, fontFamily: 'inherit' }}
+                        onClick={() => updateOrgProfile.mutate({ name: orgName.trim() })}
+                      >
+                        {updateOrgProfile.isPending ? 'Saving…' : 'Save Changes'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -323,11 +330,11 @@ export default function SettingsPage() {
                     <p style={{ fontSize: 14, color: '#434655', margin: 0, maxWidth: 360, lineHeight: 1.5 }}>Once you cancel, your organization will lose access to premium AI models at the end of the current billing cycle.</p>
                   </div>
                   <button
-                    disabled={cancelSub.isPending || sub?.plan === 'free'}
+                    disabled={cancelSub.isPending || !sub?.subscriptionId}
                     onClick={() => { if (confirm('Are you sure? This cannot be undone.')) cancelSub.mutate() }}
-                    style={{ padding: '10px 24px', background: '#ba1a1a', color: '#ffffff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: cancelSub.isPending || sub?.plan === 'free' ? 'not-allowed' : 'pointer', opacity: sub?.plan === 'free' ? 0.5 : 1, fontFamily: 'inherit', flexShrink: 0 }}
+                    style={{ padding: '10px 24px', background: '#ba1a1a', color: '#ffffff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: cancelSub.isPending || !sub?.subscriptionId ? 'not-allowed' : 'pointer', opacity: !sub?.subscriptionId ? 0.5 : 1, fontFamily: 'inherit', flexShrink: 0 }}
                   >
-                    {cancelSub.isPending ? 'Cancelling…' : sub?.plan === 'free' ? 'No active plan' : 'Cancel Subscription'}
+                    {cancelSub.isPending ? 'Cancelling…' : !sub?.subscriptionId ? 'No active plan' : 'Cancel Subscription'}
                   </button>
                 </div>
                 {/* Delete organization */}
