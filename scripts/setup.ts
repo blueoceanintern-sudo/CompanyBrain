@@ -4,7 +4,7 @@
  *
  * Creates the first org + super_admin user so you can log in.
  */
-import { eq } from 'drizzle-orm'
+import { eq } from '../db'
 import { db } from '../db/client'
 import { orgs, users } from '../db/schema'
 
