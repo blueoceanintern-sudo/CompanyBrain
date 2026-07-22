@@ -115,6 +115,48 @@ const DUPLICATE_NAME_ERROR = {
 adminRoute.get('/compartments', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
+  const userId = c.get('userId')
+  const role = c.get('role')
+
+  // Non-admins only see unrestricted compartments or ones they hold a grant
+  // for (directly or via a group) — mirrors the document list filter in
+  // documents.ts, so a folder with no visible documents isn't shown as an
+  // empty folder either. Sub-compartments also require access to the parent.
+  const isAdmin = role === 'super_admin' || role === 'org_admin'
+  const grantFilter = isAdmin
+    ? undefined
+    : sql`(
+        NOT ${compartments.restricted}
+        OR EXISTS (
+          SELECT 1 FROM compartment_grants g
+          WHERE g.compartment_id = ${compartments.id}
+            AND (
+              g.user_id = ${userId}
+              OR g.group_id IN (
+                SELECT gm.group_id FROM group_members gm WHERE gm.user_id = ${userId}
+              )
+            )
+        )
+      )
+      AND (
+        ${compartments.parentCompartmentId} IS NULL
+        OR NOT EXISTS (
+          SELECT 1 FROM compartments pp
+          WHERE pp.id = ${compartments.parentCompartmentId}
+            AND pp.restricted
+            AND NOT EXISTS (
+              SELECT 1 FROM compartment_grants g
+              WHERE g.compartment_id = pp.id
+                AND (
+                  g.user_id = ${userId}
+                  OR g.group_id IN (
+                    SELECT gm.group_id FROM group_members gm WHERE gm.user_id = ${userId}
+                  )
+                )
+            )
+        )
+      )`
+
   const rows = await db
     .select({
       id: compartments.id,
@@ -130,7 +172,7 @@ adminRoute.get('/compartments', async (c) => {
     })
     .from(compartments)
     .leftJoin(compartmentGrants, eq(compartmentGrants.compartmentId, compartments.id))
-    .where(eq(compartments.orgId, orgId))
+    .where(and(eq(compartments.orgId, orgId), grantFilter))
     .groupBy(compartments.id)
     .orderBy(compartments.name)
   return c.json({ success: true, data: rows })

@@ -67,10 +67,11 @@ function TierBadge({ tier }: { tier: string }) {
 
 // ─── Detail panel ─────────────────────────────────────────────────────────────
 
-function DetailPanel({ doc, compartmentName, canMove, onClose, onDelete, onArchive, onUnarchive, onMove, onPreview }: {
+function DetailPanel({ doc, compartmentName, canMove, canManage, onClose, onDelete, onArchive, onUnarchive, onMove, onPreview }: {
   doc: { id: string; filename: string; accessTier: string; status: string; sourceType: string; createdAt: string } | null
   compartmentName: string
   canMove: boolean
+  canManage: boolean
   onClose: () => void
   onDelete: (id: string) => void
   onArchive: (id: string) => void
@@ -161,7 +162,7 @@ function DetailPanel({ doc, compartmentName, canMove, onClose, onDelete, onArchi
       )}
 
       {/* Footer */}
-      {doc && (
+      {doc && canManage && (
         <div style={{ padding: 24, borderTop: '1px solid #c3c6d7', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', gap: 12 }}>
             {doc.status === 'archived' ? (
@@ -608,7 +609,7 @@ function FolderCard({ folder, docCount, canManage, parentRestricted = false, onO
   onDelete: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const showLock = folder.restricted || parentRestricted
+  const showLock = canManage && (folder.restricted || parentRestricted)
   const iconBtn: React.CSSProperties = { padding: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 6, display: 'flex', flexShrink: 0 }
 
   return (
@@ -649,11 +650,11 @@ function FolderCard({ folder, docCount, canManage, parentRestricted = false, onO
         )}
       </div>
 
-      {folder.restricted && folder.grantCount === 0 && (
+      {canManage && folder.restricted && folder.grantCount === 0 && (
         <button
-          onClick={() => canManage && onManageAccess(true)}
-          title={canManage ? 'Grant access to users or groups' : undefined}
-          style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: 11, fontWeight: 600, borderRadius: 999, cursor: canManage ? 'pointer' : 'default', fontFamily: 'inherit' }}
+          onClick={() => onManageAccess(true)}
+          title="Grant access to users or groups"
+          style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: 11, fontWeight: 600, borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit' }}
         >
           <AlertTriangle size={10} /> No access granted
         </button>
@@ -747,7 +748,7 @@ function SubfolderListGroup({ folder, docs, docIcon, canManage, parentRestricted
   onDelete: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const showLock = folder.restricted || parentRestricted
+  const showLock = canManage && (folder.restricted || parentRestricted)
   const iconBtn: React.CSSProperties = { padding: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 6, display: 'flex', flexShrink: 0 }
 
   return (
@@ -871,6 +872,7 @@ export default function DocumentsPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
   const canManageFolders = !!user?.role && hasPermission(user.role, 'users:manage')
+  const canManageDocs = !!user?.role && hasPermission(user.role, 'documents:manage')
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -1079,7 +1081,7 @@ export default function DocumentsPage() {
                 )}
                 <ChevronRight size={14} color="#c3c6d7" />
                 <span style={{ color: '#0b1c30', fontWeight: 600 }}>{openCompartment.name}</span>
-                {(openCompartment.restricted || openParent?.restricted) && (
+                {canManageFolders && (openCompartment.restricted || openParent?.restricted) && (
                   <RestrictedAccessBadge
                     orgId={orgId}
                     compartment={openCompartment.restricted ? openCompartment : openParent!}
@@ -1111,10 +1113,12 @@ export default function DocumentsPage() {
                     style={{ padding: '0 14px', border: 'none', borderLeft: '1px solid #c3c6d7', background: viewMode === 'list' ? '#eff4ff' : 'transparent', color: viewMode === 'list' ? '#004ac6' : '#585f67', cursor: 'pointer', display: 'flex', alignItems: 'center', height: 40 }}
                   ><ListIcon size={16} /></button>
                 </div>
+                {canManageDocs && (
                 <button
                   onClick={() => setShowUpload(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 12, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
                   ><Plus size={16} />Documents</button>
+                )}
                 {canManageFolders && (
                 <FolderActionsMenu
                     isTopLevel={isParentLevel}
@@ -1226,6 +1230,7 @@ export default function DocumentsPage() {
           doc={selectedDoc}
           compartmentName={selectedDoc ? getCompartmentName(selectedDoc.compartmentId) : '—'}
           canMove={!!selectedDoc && compartments.filter((c) => c.accessTier === selectedDoc.accessTier && c.id !== selectedDoc.compartmentId).length > 0}
+          canManage={canManageDocs}
           onClose={() => setSelectedDoc(null)}
           onDelete={() => { if (selectedDoc) setDocToDelete(selectedDoc) }}
           onArchive={() => { if (selectedDoc) setDocToArchive(selectedDoc) }}
