@@ -33,6 +33,9 @@ FROM oven/bun:1-alpine AS runner
 # Root at the monorepo level so the standalone mirror (apps/web/server.js, etc.) lands correctly
 WORKDIR /app
 
+# curl is required for Coolify's container healthcheck (runs inside the container)
+RUN apk add --no-cache curl
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
