@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { createHash } from 'crypto'
 import { db } from '@company-brain/db'
 import { documents, ingestionJobs, chunks, orgs, compartments, auditLogs } from '@company-brain/db'
-import { eq, and, desc, sql } from 'drizzle-orm'
+import { eq, and, desc, sql, getTableColumns } from 'drizzle-orm'
 import { ingestDocument, stitchChunks } from '@company-brain/ingestion'
 import { hasPermission } from '@company-brain/shared'
 import type { VisibilityPolicy } from '@company-brain/shared'
@@ -84,9 +84,17 @@ documentsRoute.get('/', async (c) => {
           )
       )`
 
+  // LEFT JOIN is safe 1:1 here — exactly one ingestion_jobs row is ever
+  // created per document (retries update it in place, see workers/ingestion-retry.ts).
   const rows = await db
-    .select()
+    .select({
+      ...getTableColumns(documents),
+      ingestionStartedAt: ingestionJobs.startedAt,
+      ingestionCompletedAt: ingestionJobs.completedAt,
+      ingestionError: ingestionJobs.errorMessage,
+    })
     .from(documents)
+    .leftJoin(ingestionJobs, eq(ingestionJobs.documentId, documents.id))
     .where(and(eq(documents.orgId, orgId), grantFilter))
     .orderBy(desc(documents.createdAt))
 

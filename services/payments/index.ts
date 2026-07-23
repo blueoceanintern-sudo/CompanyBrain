@@ -242,9 +242,14 @@ export async function cancelOrgSubscription(
       .limit(1)
 
     const subId = org[0]?.stripeSubscriptionId
-    if (subId) {
-      await getStripe().subscriptions.cancel(subId)
+    // An org can be on the paid plan without a Stripe subscription (e.g. a
+    // comped pilot org seeded directly onto 'paid') — there's nothing to
+    // cancel, and downgrading it here would incorrectly start the 30-day
+    // data-purge quarantine for an org that never subscribed.
+    if (!subId) {
+      return { success: false, error: { code: 'NO_ACTIVE_SUBSCRIPTION', message: 'No active subscription to cancel' } }
     }
+    await getStripe().subscriptions.cancel(subId)
 
     await db
       .update(orgs)

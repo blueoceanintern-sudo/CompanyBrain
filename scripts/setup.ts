@@ -13,6 +13,11 @@ async function main() {
 
   const orgName = process.env.SETUP_ORG_NAME ?? 'Equest School Network'
   const adminPassword = process.env.SETUP_ADMIN_PASSWORD ?? 'changeme123'
+  // The pilot org is comped, not a paying customer — grant the paid plan
+  // directly so external-plane upload/query works without ever going
+  // through Stripe checkout. `orgs.plan` is the only thing canPublishExternal
+  // checks; it doesn't require a stripe_subscription_id to be set.
+  const orgPlan = (process.env.SETUP_ORG_PLAN as 'free' | 'paid' | undefined) ?? 'paid'
 
   const [existing] = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1)
   if (existing) {
@@ -20,8 +25,8 @@ async function main() {
     return
   }
 
-  console.log(`Creating org: ${orgName}`)
-  const [org] = await db.insert(orgs).values({ name: orgName }).returning()
+  console.log(`Creating org: ${orgName} (${orgPlan} plan)`)
+  const [org] = await db.insert(orgs).values({ name: orgName, plan: orgPlan }).returning()
   if (!org) throw new Error('Failed to create org')
 
   console.log(`Creating admin: ${adminEmail}`)

@@ -1,10 +1,10 @@
 import type { UserRole, Permission } from './types'
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  super_admin:     ['orgs:manage', 'documents:manage', 'analytics:view', 'users:manage', 'billing:manage', 'queries:submit'],
-  org_admin:       ['documents:manage', 'analytics:view', 'users:manage', 'billing:manage', 'queries:submit'],
-  dept_admin:      ['documents:manage', 'queries:submit'],
-  staff:           ['queries:submit'],
+  super_admin:     ['orgs:manage', 'documents:manage', 'documents:view', 'analytics:view', 'users:manage', 'billing:manage', 'queries:submit'],
+  org_admin:       ['documents:manage', 'documents:view', 'analytics:view', 'users:manage', 'billing:manage', 'queries:submit'],
+  dept_admin:      ['documents:manage', 'documents:view', 'queries:submit'],
+  staff:           ['documents:view', 'queries:submit'],
   external_client: ['queries:submit', 'external-access:subscribe'],
 }
 

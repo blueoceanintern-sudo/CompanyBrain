@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -19,7 +20,7 @@ import { useGroups, useCompartmentGrants } from '@/hooks/use-groups'
 import { useUsers } from '@/hooks/use-users'
 import { getAuthUser } from '@/lib/auth'
 import { hasPermission } from '@company-brain/shared'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatDateTime } from '@/lib/utils'
 import { DocumentPreview } from '@/components/document-preview'
 import { FolderAccessPanel } from '@/components/documents/folder-access'
 import type { CompartmentSummary } from '@company-brain/shared'
@@ -38,17 +39,6 @@ function PageHeader() {
   return (
     <header style={{ height: 64, borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
       <span style={{ fontSize: 20, fontWeight: 700, color: '#004ac6' }}>Documents</span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <span style={{ fontSize: 14, color: '#585f67' }}>Status: <strong style={{ color: '#004ac6' }}>Internal</strong></span>
-        <div style={{ width: 1, height: 24, background: '#c3c6d7' }} />
-        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        </button>
-        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        </button>
-        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e5eeff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#004ac6' }}>A</div>
-      </div>
     </header>
   )
 }
@@ -68,10 +58,11 @@ function TierBadge({ tier }: { tier: string }) {
 
 // ─── Detail panel ─────────────────────────────────────────────────────────────
 
-function DetailPanel({ doc, compartmentName, canMove, onClose, onDelete, onArchive, onUnarchive, onMove, onPreview }: {
-  doc: { id: string; filename: string; accessTier: string; status: string; sourceType: string; createdAt: string } | null
+function DetailPanel({ doc, compartmentName, canMove, canManage, onClose, onDelete, onArchive, onUnarchive, onMove, onPreview }: {
+  doc: { id: string; filename: string; accessTier: string; status: string; sourceType: string; createdAt: string; ingestionStartedAt: string | null; ingestionCompletedAt: string | null; ingestionError: string | null } | null
   compartmentName: string
   canMove: boolean
+  canManage: boolean
   onClose: () => void
   onDelete: (id: string) => void
   onArchive: (id: string) => void
@@ -108,16 +99,9 @@ function DetailPanel({ doc, compartmentName, canMove, onClose, onDelete, onArchi
           {/* Primary Info */}
           <div>
             <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#585f67', marginBottom: 8 }}>Primary Info</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              {[
-                { label: 'Filename', value: doc.filename },
-                { label: 'Size', value: '—' },
-              ].map(({ label, value }) => (
-                <div key={label} style={{ background: '#e5eeff', padding: 12, borderRadius: 8, border: '1px solid #c3c6d7' }}>
-                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#585f67', margin: '0 0 4px' }}>{label}</p>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: '#0b1c30', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</p>
-                </div>
-              ))}
+            <div style={{ background: '#e5eeff', padding: 12, borderRadius: 8, border: '1px solid #c3c6d7' }}>
+              <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#585f67', margin: '0 0 4px' }}>Filename</p>
+              <p style={{ fontSize: 14, fontWeight: 500, color: '#0b1c30', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.filename}</p>
             </div>
           </div>
 
@@ -128,7 +112,6 @@ function DetailPanel({ doc, compartmentName, canMove, onClose, onDelete, onArchi
               {[
                 { label: 'Access Tier', value: <TierBadge tier={doc.accessTier} /> },
                 { label: 'Folder', value: compartmentName },
-                { label: 'Encryption', value: 'AES-256' },
               ].map(({ label, value }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #c3c6d7' }}>
                   <span style={{ fontSize: 14, color: '#434655' }}>{label}</span>
@@ -138,31 +121,61 @@ function DetailPanel({ doc, compartmentName, canMove, onClose, onDelete, onArchi
             </div>
           </div>
 
-          {/* Ingestion history */}
+          {/* Ingestion history — real ingestion_jobs timestamps, not fabricated ones */}
           <div>
             <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#585f67', marginBottom: 12 }}>Ingestion History</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {[
-                { dot: '#22c55e', label: 'Successfully Ingested', time: formatDate(doc.createdAt) + ' · 09:45 AM' },
-                { dot: '#3b82f6', label: 'Vectorized & Indexed', time: formatDate(doc.createdAt) + ' · 09:46 AM' },
-              ].map(({ dot, label, time }) => (
-                <div key={label} style={{ display: 'flex', gap: 16 }}>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#3b82f6', marginTop: 4 }} />
+                </div>
+                <div>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: '#0b1c30', margin: '0 0 2px' }}>Ingestion started</p>
+                  <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>
+                    {doc.ingestionStartedAt ? formatDateTime(doc.ingestionStartedAt) : formatDate(doc.createdAt)}
+                  </p>
+                </div>
+              </div>
+              {doc.status === 'failed' ? (
+                <div style={{ display: 'flex', gap: 16 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: dot, marginTop: 4 }} />
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#dc2626', marginTop: 4 }} />
                   </div>
                   <div>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: '#0b1c30', margin: '0 0 2px' }}>{label}</p>
-                    <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>{time}</p>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: '#0b1c30', margin: '0 0 2px' }}>Ingestion failed</p>
+                    <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>
+                      {doc.ingestionCompletedAt ? formatDateTime(doc.ingestionCompletedAt) : '—'}
+                      {doc.ingestionError ? ` · ${doc.ingestionError}` : ''}
+                    </p>
                   </div>
                 </div>
-              ))}
+              ) : doc.ingestionCompletedAt ? (
+                <div style={{ display: 'flex', gap: 16 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#22c55e', marginTop: 4 }} />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: '#0b1c30', margin: '0 0 2px' }}>Vectorized &amp; indexed</p>
+                    <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>{formatDateTime(doc.ingestionCompletedAt)}</p>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 16 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#94a3b8', marginTop: 4 }} />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: '#0b1c30', margin: '0 0 2px' }}>In progress</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {/* Footer */}
-      {doc && (
+      {doc && canManage && (
         <div style={{ padding: 24, borderTop: '1px solid #c3c6d7', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', gap: 12 }}>
             {doc.status === 'archived' ? (
@@ -585,7 +598,7 @@ function FolderAccessDialog({ orgId, folder, parent, initialEdit, onClose, onReq
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #c3c6d7', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Shield size={18} color="#004ac6" />
-            <span style={{ fontSize: 16, fontWeight: 700, color: '#0b1c30' }}>Manage Access — {folder.name}</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: '#0b1c30' }}>Manage — {folder.name}</span>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}><X size={18} /></button>
         </div>
@@ -609,7 +622,7 @@ function FolderCard({ folder, docCount, canManage, parentRestricted = false, onO
   onDelete: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const showLock = folder.restricted || parentRestricted
+  const showLock = canManage && (folder.restricted || parentRestricted)
   const iconBtn: React.CSSProperties = { padding: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 6, display: 'flex', flexShrink: 0 }
 
   return (
@@ -650,11 +663,11 @@ function FolderCard({ folder, docCount, canManage, parentRestricted = false, onO
         )}
       </div>
 
-      {folder.restricted && folder.grantCount === 0 && (
+      {canManage && folder.restricted && folder.grantCount === 0 && (
         <button
-          onClick={() => canManage && onManageAccess(true)}
-          title={canManage ? 'Grant access to users or groups' : undefined}
-          style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: 11, fontWeight: 600, borderRadius: 999, cursor: canManage ? 'pointer' : 'default', fontFamily: 'inherit' }}
+          onClick={() => onManageAccess(true)}
+          title="Grant access to users or groups"
+          style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: 11, fontWeight: 600, borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit' }}
         >
           <AlertTriangle size={10} /> No access granted
         </button>
@@ -748,7 +761,7 @@ function SubfolderListGroup({ folder, docs, docIcon, canManage, parentRestricted
   onDelete: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const showLock = folder.restricted || parentRestricted
+  const showLock = canManage && (folder.restricted || parentRestricted)
   const iconBtn: React.CSSProperties = { padding: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 6, display: 'flex', flexShrink: 0 }
 
   return (
@@ -872,6 +885,9 @@ export default function DocumentsPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
   const canManageFolders = !!user?.role && hasPermission(user.role, 'users:manage')
+  const canManageDocs = !!user?.role && hasPermission(user.role, 'documents:manage')
+  const searchParams = useSearchParams()
+  const router = useRouter()
 
   const [showUpload, setShowUpload] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<DocItem | null>(null)
@@ -891,8 +907,29 @@ export default function DocumentsPage() {
 
   useEffect(() => { setExpandedSubfolders(new Set()) }, [openCompartmentId])
 
+  // Sidebar "Documents" link navigates here with ?home=1 when already on this
+  // page (a same-route Link is otherwise a no-op) — return to the top-level
+  // folder browser and clear any open panel/search state.
+  useEffect(() => {
+    if (searchParams.get('home') === '1') {
+      setOpenCompartmentId(null)
+      setSelectedDoc(null)
+      setSearch('')
+      setRootSearch('')
+      router.replace('/documents')
+    }
+  }, [searchParams, router])
+
   const { data: docs = [], isLoading } = useDocuments(orgId)
-  const { data: compartments = [] } = useCompartments(orgId)
+  const { data: compartments = [], refetch: refetchCompartments } = useCompartments(orgId)
+
+  // The "move documents to" list in the delete dialog is only as fresh as the
+  // last fetch (30s staleTime) — force a refetch right as the dialog opens so
+  // it can't offer a folder another session already deleted.
+  const requestDeleteFolder = (folder: CompartmentSummary) => {
+    refetchCompartments()
+    setFolderToDelete(folder)
+  }
   const { data: sub } = useSubscription(orgId)
   const deleteDoc = useDeleteDocument(orgId)
   const archiveDoc = useArchiveDocument(orgId)
@@ -902,7 +939,15 @@ export default function DocumentsPage() {
   const isPaid = sub?.plan === 'paid'
   const topLevel = compartments.filter((c) => !c.parentCompartmentId)
   const subsOf = (parentId: string) => compartments.filter((c) => c.parentCompartmentId === parentId)
-  const docCount = (compartmentId: string) => docs.filter((d) => d.compartmentId === compartmentId).length
+  // A folder's count includes its subfolders' documents (nesting is one level
+  // deep, so subfolders never have children of their own). `docs` is already
+  // scoped to what the current user can see — GET /documents excludes
+  // restricted (sub-)compartments the caller has no grant for — so this count
+  // never reveals documents the viewer can't actually open.
+  const docCount = (compartmentId: string) => {
+    const includedIds = new Set([compartmentId, ...subsOf(compartmentId).map((s) => s.id)])
+    return docs.filter((d) => includedIds.has(d.compartmentId)).length
+  }
 
   const getCompartmentName = (compartmentId: string) => {
     const comp = compartments.find((c) => c.id === compartmentId)
@@ -987,7 +1032,7 @@ export default function DocumentsPage() {
                 canManage={canManageFolders}
                 onOpen={() => setOpenCompartmentId(c.id)}
                 onManageAccess={(edit) => setAccessPanel({ folderId: c.id, edit })}
-                onDelete={() => setFolderToDelete(c)}
+                onDelete={() => requestDeleteFolder(c)}
               />
             ))}
           </div>
@@ -1049,7 +1094,7 @@ export default function DocumentsPage() {
                 )}
                 <ChevronRight size={14} color="#c3c6d7" />
                 <span style={{ color: '#0b1c30', fontWeight: 600 }}>{openCompartment.name}</span>
-                {(openCompartment.restricted || openParent?.restricted) && (
+                {canManageFolders && (openCompartment.restricted || openParent?.restricted) && (
                   <RestrictedAccessBadge
                     orgId={orgId}
                     compartment={openCompartment.restricted ? openCompartment : openParent!}
@@ -1081,16 +1126,18 @@ export default function DocumentsPage() {
                     style={{ padding: '0 14px', border: 'none', borderLeft: '1px solid #c3c6d7', background: viewMode === 'list' ? '#eff4ff' : 'transparent', color: viewMode === 'list' ? '#004ac6' : '#585f67', cursor: 'pointer', display: 'flex', alignItems: 'center', height: 40 }}
                   ><ListIcon size={16} /></button>
                 </div>
+                {canManageDocs && (
                 <button
                   onClick={() => setShowUpload(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 12, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
-                  ><Plus size={16} /> Document</button>
+                  ><Plus size={16} />Documents</button>
+                )}
                 {canManageFolders && (
                 <FolderActionsMenu
                     isTopLevel={isParentLevel}
                     onNewSubfolder={() => setCreateFolder({ parent: openCompartment, tier: openCompartment.accessTier as 'internal' | 'external' })}
                     onManage={() => setAccessPanel({ folderId: openCompartment.id, edit: false })}
-                    onDelete={() => setFolderToDelete(openCompartment)}
+                    onDelete={() => requestDeleteFolder(openCompartment)}
                 />
                 )}
               </div>
@@ -1108,7 +1155,7 @@ export default function DocumentsPage() {
                     parentRestricted={openCompartment.restricted}
                     onOpen={() => setOpenCompartmentId(c.id)}
                     onManageAccess={(edit) => setAccessPanel({ folderId: c.id, edit })}
-                    onDelete={() => setFolderToDelete(c)}
+                    onDelete={() => requestDeleteFolder(c)}
                   />
                 ))}
               </div>
@@ -1174,7 +1221,7 @@ export default function DocumentsPage() {
                       })}
                       onOpenDoc={(docId) => { const d = docs.find((x) => x.id === docId); if (d) setSelectedDoc(d) }}
                       onManageAccess={(edit) => setAccessPanel({ folderId: sub.id, edit })}
-                      onDelete={() => setFolderToDelete(sub)}
+                      onDelete={() => requestDeleteFolder(sub)}
                     />
                   )
                 })}
@@ -1186,11 +1233,17 @@ export default function DocumentsPage() {
           </div>
         )}
 
+        {/* Backdrop — click outside the detail panel to close it */}
+        {selectedDoc && (
+          <div onClick={() => setSelectedDoc(null)} style={{ position: 'absolute', inset: 0, zIndex: 49 }} />
+        )}
+
         {/* Detail panel */}
         <DetailPanel
           doc={selectedDoc}
           compartmentName={selectedDoc ? getCompartmentName(selectedDoc.compartmentId) : '—'}
           canMove={!!selectedDoc && compartments.filter((c) => c.accessTier === selectedDoc.accessTier && c.id !== selectedDoc.compartmentId).length > 0}
+          canManage={canManageDocs}
           onClose={() => setSelectedDoc(null)}
           onDelete={() => { if (selectedDoc) setDocToDelete(selectedDoc) }}
           onArchive={() => { if (selectedDoc) setDocToArchive(selectedDoc) }}
@@ -1260,7 +1313,7 @@ export default function DocumentsPage() {
           parent={compartments.find((c) => c.id === accessPanelFolder.parentCompartmentId) ?? null}
           initialEdit={accessPanel.edit}
           onClose={() => setAccessPanel(null)}
-          onRequestDelete={() => setFolderToDelete(accessPanelFolder)}
+          onRequestDelete={() => requestDeleteFolder(accessPanelFolder)}
         />
       )}
       {folderToDelete && (

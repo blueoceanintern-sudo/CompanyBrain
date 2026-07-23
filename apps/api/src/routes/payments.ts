@@ -99,7 +99,10 @@ paymentsRoute.delete('/subscriptions', async (c) => {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
   const result = await cancelOrgSubscription(orgId)
-  if (!result.success) return c.json({ success: false, error: result.error }, 500)
+  if (!result.success) {
+    const status = result.error.code === 'NO_ACTIVE_SUBSCRIPTION' ? 400 : 500
+    return c.json({ success: false, error: result.error }, status)
+  }
   return c.json({ success: true, data: null })
 })
 
