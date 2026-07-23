@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { db } from '@company-brain/db'
-import { compartments, users, auditLogs, orgs, documents, chunks, groups, groupMembers, compartmentGrants } from '@company-brain/db'
+import { compartments, users, auditLogs, orgs, documents, chunks, groups, groupMembers, compartmentGrants, queries } from '@company-brain/db'
 import { eq, and, ne, count, inArray, sql, isNull } from 'drizzle-orm'
 import { hasPermission } from '@company-brain/shared'
 import { canPublishExternal } from '@company-brain/access-control'
@@ -424,6 +424,9 @@ adminRoute.get('/users', async (c) => {
       groups: sql<string[]>`coalesce(array_agg(${groups.name} ORDER BY ${groups.name}) FILTER (WHERE ${groups.name} IS NOT NULL), '{}')`,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
+      // Scalar subquery rather than a join — a join against `queries` here would
+      // multiply rows before the groups array_agg, duplicating group names.
+      lastActiveAt: sql<string | null>`(SELECT MAX(${queries.createdAt}) FROM ${queries} WHERE ${queries.userId} = ${users.id} AND ${queries.orgId} = ${orgId})`,
     })
     .from(users)
     .leftJoin(groupMembers, eq(groupMembers.userId, users.id))

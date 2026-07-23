@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Database, MessageSquare, Link2, AlertTriangle, TrendingUp, TrendingDown, MoreHorizontal, ExternalLink } from 'lucide-react'
+import { Database, MessageSquare, Link2, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react'
 import { useAnalyticsOverview, useTopUnanswered } from '@/hooks/use-analytics'
 import { getAuthUser } from '@/lib/auth'
 import { formatDate, formatPercent } from '@/lib/utils'
@@ -14,18 +14,8 @@ function PageHeader() {
     <header style={{ height: 50, borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ fontSize: 18, fontWeight: 700, color: '#004ac6' }}>Analytics</span>
-        <span style={{ width: 1, height: 16, background: '#c3c6d7' }} />
-        <span style={{ fontSize: 14, color: '#585f67' }}>Company&apos;s Brain</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        </button>
-        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        </button>
-        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e5eeff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#004ac6' }}>A</div>
-      </div>
+
     </header>
   )
 }
@@ -196,7 +186,6 @@ export default function AnalyticsPage() {
             <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 24, minHeight: 320, display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                 <h3 style={{ fontSize: 18, fontWeight: 600, color: '#0b1c30', margin: 0 }}>Query Volume Over Time</h3>
-                <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}><MoreHorizontal size={18} /></button>
               </div>
               {overviewLoading ? (
                 <Skel h={220} />
@@ -248,9 +237,6 @@ export default function AnalyticsPage() {
           <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ padding: '16px 24px', borderBottom: '1px solid #c3c6d7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: 18, fontWeight: 600, color: '#0b1c30', margin: 0 }}>Top Unanswered Queries</h3>
-              <button style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#004ac6', fontSize: 14, fontWeight: 500, fontFamily: 'inherit' }}>
-                View all <ExternalLink size={14} />
-              </button>
             </div>
             {unansweredLoading ? (
               <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -280,7 +266,7 @@ export default function AnalyticsPage() {
                         <span style={{ background: '#eff4ff', color: '#004ac6', padding: '2px 10px', borderRadius: 9999, fontSize: 12 }}>Update Docs</span>
                       </td>
                       <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                        <button onClick={() => toast.success('Added to training queue')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#004ac6', fontSize: 14, fontWeight: 500, fontFamily: 'inherit' }}>Train</button>
+                        <button onClick={() => toast.info('Training queue coming soon')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#004ac6', fontSize: 14, fontWeight: 500, fontFamily: 'inherit' }}>Train</button>
                       </td>
                     </tr>
                   ))}

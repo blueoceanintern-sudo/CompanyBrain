@@ -106,6 +106,9 @@ export interface DocumentSummary {
   previousVersionId: string | null
   createdAt: string
   updatedAt: string
+  ingestionStartedAt: string | null
+  ingestionCompletedAt: string | null
+  ingestionError: string | null
 }
 
 export interface CompartmentSummary {
@@ -144,6 +147,7 @@ export interface UserSummary {
   groups: string[]
   createdAt: string
   updatedAt: string
+  lastActiveAt: string | null
 }
 
 export interface QueryHistoryItem {

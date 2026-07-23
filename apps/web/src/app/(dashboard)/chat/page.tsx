@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   Search, Send, BookOpen, FileText, Calendar,
-  Paperclip, Globe, Bot, ThumbsUp, Copy, RefreshCw,
+  Copy, RefreshCw,
   Sparkles, Clock, CreditCard,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -68,15 +68,6 @@ function PageHeader({ onNew }: { onNew?: () => void }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ fontSize: 20, fontWeight: 700, color: '#004ac6' }}>Chat</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex', alignItems: 'center' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        </button>
-        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex', alignItems: 'center' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        </button>
-        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e5eeff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#004ac6' }}>A</div>
-      </div>
     </header>
   )
 }
@@ -108,7 +99,7 @@ function EmptyState({
             <h1 style={{ fontSize: 32, fontWeight: 700, color: '#0b1c30', margin: '0 0 8px' }}>{greeting}, {name.charAt(0).toUpperCase() + name.slice(1)}</h1>
             <p style={{ fontSize: 16, color: '#434655', margin: 0 }}>Ask anything from {user?.orgName || 'your organisation'}&apos;s knowledge base</p>
           </div>
-          <div style={{ width: '100%', background: '#ffffff', borderRadius: 24, border: '1px solid #c3c6d7', padding: 8, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 10px 30px -10px rgba(0,0,0,0.08)' }}>
+          <div style={{ width: '100%', background: '#ffffff', borderRadius: 24, border: '1px solid #c3c6d7', padding: 8, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 10px 30px -10px rgba(0,0,0,0.06)' }}>
             <div style={{ paddingLeft: 12, color: '#737686', display: 'flex', alignItems: 'center' }}>
               <Search size={20} />
             </div>
@@ -118,14 +109,14 @@ function EmptyState({
               onChange={(e) => onChange(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); onSubmit() } }}
               placeholder="Ask about policies, processes, documents…"
-              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 16, color: '#0b1c30', padding: '12px 0', fontFamily: 'inherit' }}
+              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 16, color: '#0b1c30', padding: '9px 2px', fontFamily: 'inherit' }}
             />
             <button
               onClick={onSubmit}
               disabled={!input.trim() || disabled}
-              style={{ background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 16, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: (!input.trim() || disabled) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, opacity: (!input.trim() || disabled) ? 0.5 : 1, fontFamily: 'inherit', flexShrink: 0 }}
+              style={{ background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 16, padding: '9px 9px', fontSize: 14, fontWeight: 600, cursor: (!input.trim() || disabled) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, opacity: (!input.trim() || disabled) ? 0.5 : 1, fontFamily: 'inherit', flexShrink: 0 }}
             >
-              Send <Send size={14} />
+              <Send size={14} />
             </button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10 }}>
@@ -284,7 +275,6 @@ function ActiveChat({
 
                   <div style={{ display: 'flex', gap: 16 }}>
                     {[
-                      { icon: ThumbsUp, label: 'Helpful', onClick: () => toast.success('Marked as helpful') },
                       { icon: Copy, label: 'Copy', onClick: () => { navigator.clipboard.writeText(entry.response?.answer ?? '').then(() => toast.success('Copied to clipboard')) } },
                       { icon: RefreshCw, label: 'Regenerate', onClick: () => onRetry(entry.id, entry.question) },
                     ].map(({ icon: Icon, label, onClick }) => (
@@ -319,28 +309,13 @@ function ActiveChat({
               rows={1}
               style={{ width: '100%', padding: '16px', background: 'transparent', border: 'none', outline: 'none', fontSize: 14, color: '#0b1c30', resize: 'none', minHeight: 56, maxHeight: 160, fontFamily: 'inherit', lineHeight: 1.5 }}
             />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px 12px' }}>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {[
-                  { Icon: Paperclip, title: 'Attach file', handler: () => toast.info('File attachments coming soon') },
-                  { Icon: Globe, title: 'Web search', handler: () => toast.info('Web search coming soon') },
-                  { Icon: Bot, title: 'AI settings', handler: () => toast.info('AI model selection coming soon') },
-                ].map(({ Icon, title, handler }) => (
-                  <button key={title} title={title} onClick={handler}
-                    style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 8 }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#eff4ff'; (e.currentTarget as HTMLElement).style.color = '#004ac6' }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none'; (e.currentTarget as HTMLElement).style.color = '#585f67' }}
-                  >
-                    <Icon size={18} />
-                  </button>
-                ))}
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 16px 12px' }}>
               <button
                 onClick={onSubmit}
                 disabled={!input.trim() || disabled}
-                style={{ background: '#004ac6', color: '#ffffff', border: 'none', borderRadius: 10, padding: '8px 20px', fontSize: 14, fontWeight: 500, cursor: (!input.trim() || disabled) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, opacity: (!input.trim() || disabled) ? 0.5 : 1, fontFamily: 'inherit' }}
+                style={{ background: '#004ac6', color: '#ffffff', border: 'none', borderRadius: 30, padding: '9px 9px', fontSize: 14, fontWeight: 500, cursor: (!input.trim() || disabled) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, opacity: (!input.trim() || disabled) ? 0.5 : 1, fontFamily: 'inherit' }}
               >
-                Send <Send size={14} />
+                <Send size={14} />
               </button>
             </div>
           </div>

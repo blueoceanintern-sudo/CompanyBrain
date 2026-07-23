@@ -20,7 +20,7 @@ import { useGroups, useCompartmentGrants } from '@/hooks/use-groups'
 import { useUsers } from '@/hooks/use-users'
 import { getAuthUser } from '@/lib/auth'
 import { hasPermission } from '@company-brain/shared'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatDateTime } from '@/lib/utils'
 import { DocumentPreview } from '@/components/document-preview'
 import { FolderAccessPanel } from '@/components/documents/folder-access'
 import type { CompartmentSummary } from '@company-brain/shared'
@@ -39,15 +39,6 @@ function PageHeader() {
   return (
     <header style={{ height: 64, borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
       <span style={{ fontSize: 20, fontWeight: 700, color: '#004ac6' }}>Documents</span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        </button>
-        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        </button>
-        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e5eeff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#004ac6' }}>A</div>
-      </div>
     </header>
   )
 }
@@ -68,7 +59,7 @@ function TierBadge({ tier }: { tier: string }) {
 // ─── Detail panel ─────────────────────────────────────────────────────────────
 
 function DetailPanel({ doc, compartmentName, canMove, canManage, onClose, onDelete, onArchive, onUnarchive, onMove, onPreview }: {
-  doc: { id: string; filename: string; accessTier: string; status: string; sourceType: string; createdAt: string } | null
+  doc: { id: string; filename: string; accessTier: string; status: string; sourceType: string; createdAt: string; ingestionStartedAt: string | null; ingestionCompletedAt: string | null; ingestionError: string | null } | null
   compartmentName: string
   canMove: boolean
   canManage: boolean
@@ -108,16 +99,9 @@ function DetailPanel({ doc, compartmentName, canMove, canManage, onClose, onDele
           {/* Primary Info */}
           <div>
             <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#585f67', marginBottom: 8 }}>Primary Info</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              {[
-                { label: 'Filename', value: doc.filename },
-                { label: 'Size', value: '—' },
-              ].map(({ label, value }) => (
-                <div key={label} style={{ background: '#e5eeff', padding: 12, borderRadius: 8, border: '1px solid #c3c6d7' }}>
-                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#585f67', margin: '0 0 4px' }}>{label}</p>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: '#0b1c30', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</p>
-                </div>
-              ))}
+            <div style={{ background: '#e5eeff', padding: 12, borderRadius: 8, border: '1px solid #c3c6d7' }}>
+              <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#585f67', margin: '0 0 4px' }}>Filename</p>
+              <p style={{ fontSize: 14, fontWeight: 500, color: '#0b1c30', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.filename}</p>
             </div>
           </div>
 
@@ -128,7 +112,6 @@ function DetailPanel({ doc, compartmentName, canMove, canManage, onClose, onDele
               {[
                 { label: 'Access Tier', value: <TierBadge tier={doc.accessTier} /> },
                 { label: 'Folder', value: compartmentName },
-                { label: 'Encryption', value: 'AES-256' },
               ].map(({ label, value }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #c3c6d7' }}>
                   <span style={{ fontSize: 14, color: '#434655' }}>{label}</span>
@@ -138,24 +121,54 @@ function DetailPanel({ doc, compartmentName, canMove, canManage, onClose, onDele
             </div>
           </div>
 
-          {/* Ingestion history */}
+          {/* Ingestion history — real ingestion_jobs timestamps, not fabricated ones */}
           <div>
             <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#585f67', marginBottom: 12 }}>Ingestion History</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {[
-                { dot: '#22c55e', label: 'Successfully Ingested', time: formatDate(doc.createdAt) + ' · 09:45 AM' },
-                { dot: '#3b82f6', label: 'Vectorized & Indexed', time: formatDate(doc.createdAt) + ' · 09:46 AM' },
-              ].map(({ dot, label, time }) => (
-                <div key={label} style={{ display: 'flex', gap: 16 }}>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#3b82f6', marginTop: 4 }} />
+                </div>
+                <div>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: '#0b1c30', margin: '0 0 2px' }}>Ingestion started</p>
+                  <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>
+                    {doc.ingestionStartedAt ? formatDateTime(doc.ingestionStartedAt) : formatDate(doc.createdAt)}
+                  </p>
+                </div>
+              </div>
+              {doc.status === 'failed' ? (
+                <div style={{ display: 'flex', gap: 16 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: dot, marginTop: 4 }} />
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#dc2626', marginTop: 4 }} />
                   </div>
                   <div>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: '#0b1c30', margin: '0 0 2px' }}>{label}</p>
-                    <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>{time}</p>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: '#0b1c30', margin: '0 0 2px' }}>Ingestion failed</p>
+                    <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>
+                      {doc.ingestionCompletedAt ? formatDateTime(doc.ingestionCompletedAt) : '—'}
+                      {doc.ingestionError ? ` · ${doc.ingestionError}` : ''}
+                    </p>
                   </div>
                 </div>
-              ))}
+              ) : doc.ingestionCompletedAt ? (
+                <div style={{ display: 'flex', gap: 16 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#22c55e', marginTop: 4 }} />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: '#0b1c30', margin: '0 0 2px' }}>Vectorized &amp; indexed</p>
+                    <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>{formatDateTime(doc.ingestionCompletedAt)}</p>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 16 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#94a3b8', marginTop: 4 }} />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: '#0b1c30', margin: '0 0 2px' }}>In progress</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

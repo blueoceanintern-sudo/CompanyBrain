@@ -272,7 +272,8 @@ export default function UsersPage() {
 
   const totalUsers = users.length
   const adminCount = users.filter((u) => u.role === 'org_admin' || u.role === 'super_admin').length
-  const activeCount = users.length
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000
+  const activeCount = users.filter((u) => u.lastActiveAt && new Date(u.lastActiveAt).getTime() >= thirtyDaysAgo).length
 
   const PAGE_SIZE = 10
   const pageSlice = users.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -284,17 +285,6 @@ export default function UsersPage() {
       <header style={{ height: 50, borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 18, fontWeight: 700, color: '#004ac6' }}>Users</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          </button>
-          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          </button>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#dce9ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#004ac6', border: '1px solid #c3c6d7' }}>
-            {user ? initials(user.email ?? 'A') : 'A'}
-          </div>
         </div>
       </header>
 
