@@ -34,6 +34,13 @@ queryRoute.post('/', zValidator('json', querySchema), async (c) => {
   const userRole = c.get('role')
   const { query, accessTier, sourceTypes, history } = c.req.valid('json')
 
+  if (userRole === 'external_client' && accessTier !== 'external') {
+    return c.json(
+      { success: false, error: { code: 'FORBIDDEN', message: 'External clients can only access the external knowledge plane' } },
+      403
+    )
+  }
+
   if (accessTier === 'external') {
     const orgRow = await db.select({ plan: orgs.plan }).from(orgs).where(eq(orgs.id, orgId)).limit(1)
     if (!canPublishExternal(orgRow[0]?.plan ?? 'free')) {
@@ -99,7 +106,7 @@ queryRoute.post('/', zValidator('json', querySchema), async (c) => {
     }
 
     // Synthesize
-    const synthesisResult = await synthesizeAnswer({ query, chunks, history })
+    const synthesisResult = await synthesizeAnswer({ query, chunks, ...(history ? { history } : {}) })
 
     if (!synthesisResult.success) {
       return c.json({ success: false, error: synthesisResult.error }, 500)

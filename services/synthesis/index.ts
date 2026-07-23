@@ -110,6 +110,7 @@ export async function synthesizeAnswer(
     if (hasHistory) {
       for (let i = 0; i < history!.length; i++) {
         const turn = history![i]
+        if (!turn) continue
         const isLastAssistant = turn.role === 'assistant' && i === history!.length - 1
 
         messages.push({

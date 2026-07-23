@@ -4,6 +4,8 @@ import { createContext, useContext, useState, useRef, useCallback } from 'react'
 import type { QueryResponse } from '@company-brain/shared'
 import { generateId } from '@/lib/utils'
 
+export type Plane = 'internal' | 'external'
+
 export interface HistoryEntry {
   id: string
   question: string
@@ -18,6 +20,7 @@ export interface ChatSession {
   title: string
   entries: HistoryEntry[]
   createdAt: string
+  plane: Plane
 }
 
 interface ChatHistoryContextValue {
@@ -31,6 +34,12 @@ interface ChatHistoryContextValue {
   pendingSession: HistoryEntry[] | null
   pendingSessionToken: number
   clearPendingSession: () => void
+  // The knowledge plane (internal/external) the current conversation is
+  // grounded in. Lives here rather than on the chat page so it survives
+  // saveCurrentAsSession/loadSession, which are also called from the
+  // sidebar's "New Chat" / session-list buttons outside the chat page.
+  plane: Plane
+  setPlane: React.Dispatch<React.SetStateAction<Plane>>
 }
 
 const ChatHistoryContext = createContext<ChatHistoryContextValue | null>(null)
@@ -40,6 +49,9 @@ export function ChatHistoryProvider({ children }: { children: React.ReactNode })
   const [recentQueries, setRecentQueries] = useState<string[]>([])
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [pendingSession, setPendingSession] = useState<HistoryEntry[] | null>(null)
+  const [plane, setPlane] = useState<Plane>('internal')
+  const planeRef = useRef(plane)
+  planeRef.current = plane
   // Bumped on every loadSession call (even reloading the same id) so the chat
   // page can react via useEffect even when the route doesn't change — a
   // pendingSession *value* alone doesn't change if you click the same
@@ -65,11 +77,11 @@ export function ChatHistoryProvider({ children }: { children: React.ReactNode })
       const existingIdx = loadedId ? prev.findIndex(s => s.id === loadedId) : -1
       if (existingIdx !== -1) {
         const updated = [...prev]
-        updated[existingIdx] = { ...updated[existingIdx]!, entries: current }
+        updated[existingIdx] = { ...updated[existingIdx]!, entries: current, plane: planeRef.current }
         return updated
       }
       return [
-        { id: generateId(), title, entries: current, createdAt: new Date().toISOString() },
+        { id: generateId(), title, entries: current, createdAt: new Date().toISOString(), plane: planeRef.current },
         ...prev.slice(0, 19),
       ]
     })
@@ -87,6 +99,7 @@ export function ChatHistoryProvider({ children }: { children: React.ReactNode })
     currentSessionIdRef.current = sessionId
     setPendingSession(session.entries)
     setPendingSessionToken(t => t + 1)
+    setPlane(session.plane)
   }, [saveCurrentAsSession])
 
   const clearPendingSession = useCallback(() => setPendingSession(null), [])
@@ -97,6 +110,7 @@ export function ChatHistoryProvider({ children }: { children: React.ReactNode })
       recentQueries, setRecentQueries,
       sessions, saveCurrentAsSession, loadSession,
       pendingSession, pendingSessionToken, clearPendingSession,
+      plane, setPlane,
     }}>
       {children}
     </ChatHistoryContext.Provider>
