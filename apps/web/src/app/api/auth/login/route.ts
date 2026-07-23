@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 const BACKEND_URL = process.env.API_INTERNAL_URL ?? 'http://api:3002'
 const COOKIE_NAME = 'auth_token'
-const COOKIE_MAX_AGE = 8 * 60 * 60
+const DEFAULT_COOKIE_MAX_AGE = 8 * 60 * 60
 
 export async function POST(request: Request) {
   let body: unknown
@@ -48,12 +48,17 @@ export async function POST(request: Request) {
     // so Next.js middleware can read it on localhost:3000
     const cookieHeader = apiRes.headers.get('set-cookie') ?? ''
     const match = cookieHeader.match(/auth_token=([^;]+)/)
+    // The API already picked the real duration based on rememberMe — read its
+    // Max-Age back off the same Set-Cookie header instead of hardcoding one,
+    // so a remembered session actually outlives the default 8h here too.
+    const maxAgeMatch = cookieHeader.match(/Max-Age=(\d+)/i)
+    const maxAge = maxAgeMatch?.[1] ? Number(maxAgeMatch[1]) : DEFAULT_COOKIE_MAX_AGE
     if (match?.[1]) {
       response.cookies.set(COOKIE_NAME, match[1], {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        maxAge: COOKIE_MAX_AGE,
+        maxAge,
         secure: false,
       })
     }

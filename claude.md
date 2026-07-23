@@ -308,7 +308,8 @@ cancelled_at,                           # set on cancellation; starts 30-day qua
 created_at, updated_at
 
 // users
-id, org_id (FK), email (UNIQUE), password_hash, role (user_role),
+id, org_id (FK), name (nullable),        # collected on invite; null for users predating this field
+email (UNIQUE), password_hash, role (user_role),
 stripe_customer_id, stripe_subscription_id, subscription_status,   # external-client billing
 created_at, updated_at
 
@@ -360,6 +361,10 @@ error_message, retry_count, max_retries, started_at, completed_at, created_at
 
 // stripe_events
 id, org_id (FK), stripe_event_id (UNIQUE), event_type, payload (JSONB), processed_at
+
+// password_reset_tokens
+id, user_id (FK), token_hash,               # SHA-256 hash; raw token only ever exists in the emailed link
+expires_at, used_at, created_at
 ```
 
 ### Key relationships
@@ -374,6 +379,7 @@ id, org_id (FK), stripe_event_id (UNIQUE), event_type, payload (JSONB), processe
 - `queries` → `orgs`, `users`: many-to-one each
 - `audit_logs` → `orgs`, `users`: many-to-one each
 - `ingestion_jobs` → `documents`: one-to-one
+- `password_reset_tokens` → `users`: many-to-one
 
 ### Content hash dedup
 
@@ -397,8 +403,10 @@ Prefix: `/api/v1`. All routes except `/auth/*` and `/webhooks/stripe` require th
 ### Auth (public)
 
 ```
-POST   /auth/login                          # email + password → sets HttpOnly JWT cookie
+POST   /auth/login                          # email + password (+ optional rememberMe) → sets HttpOnly JWT cookie
 POST   /auth/logout                         # clears cookie
+POST   /auth/forgot-password                # { email } → always returns a generic response; emails a reset link if the account exists
+POST   /auth/reset-password                 # { token, newPassword } → consumes a single-use password_reset_tokens row
 ```
 
 ### Orgs (super_admin)
@@ -438,6 +446,12 @@ GET    /orgs/:id/users                      # list users
 POST   /orgs/:id/users                      # invite user (sends email)
 PATCH  /orgs/:id/users/:userId/role         # update role
 DELETE /orgs/:id/users/:userId              # remove user
+```
+
+### Account (self-service, any authenticated role)
+
+```
+PATCH  /orgs/:id/account/password           # { currentPassword, newPassword } — operates on the caller's own userId; no permission check needed
 ```
 
 ### Access (groups + grants) — `users:manage` permission
@@ -511,6 +525,7 @@ PORT=3002
 NEXT_PUBLIC_WEB_URL=http://localhost:3000   # CORS origin + links in emails
 API_INTERNAL_URL=http://localhost:3002      # Next.js proxy → Hono API (defaults to http://api:3002 for Docker)
 NEXT_PUBLIC_API_URL=http://localhost:3002   # docker build arg only; browser traffic goes through the Next.js proxy
+NEXT_PUBLIC_SUPPORT_EMAIL=                  # mailto: target for "Contact Administrator" on the login page
 ```
 
 ---

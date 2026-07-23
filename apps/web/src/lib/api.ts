@@ -83,24 +83,41 @@ async function apiUpload<T>(
 
 export interface AuthUser {
   id: string
+  // Optional/nullable: sessions cached before this field existed lack it;
+  // null for users created before the name field or without one on invite.
+  name?: string | null
   email: string
   role: UserRole
   orgId: string
   orgName?: string
 }
 
-export async function login(email: string, password: string) {
+export async function login(email: string, password: string, rememberMe?: boolean) {
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, rememberMe }),
       credentials: 'include',
     })
     return parseResult<{ user: AuthUser }>(res)
   } catch {
     return networkError('Could not reach the server. Check your connection.')
   }
+}
+
+export async function requestPasswordReset(email: string) {
+  return apiFetch<null>('/api/v1/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  return apiFetch<null>('/api/v1/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, newPassword }),
+  })
 }
 
 export async function logout() {
@@ -291,7 +308,7 @@ export async function getUsers(orgId: string) {
 
 export async function inviteUser(
   orgId: string,
-  data: { email: string; role: string; temporaryPassword: string; groupIds?: string[] }
+  data: { name: string; email: string; role: string; temporaryPassword: string; groupIds?: string[] }
 ) {
   return apiFetch<{ id: string; email: string; role: UserRole }>(`/api/v1/orgs/${orgId}/users`, {
     method: 'POST',
@@ -308,6 +325,15 @@ export async function updateUserRole(orgId: string, userId: string, role: string
 
 export async function deleteUser(orgId: string, userId: string) {
   return apiFetch<null>(`/api/v1/orgs/${orgId}/users/${userId}`, { method: 'DELETE' })
+}
+
+// ─── Account (self-service) ────────────────────────────────────────────────────
+
+export async function changePassword(orgId: string, currentPassword: string, newPassword: string) {
+  return apiFetch<null>(`/api/v1/orgs/${orgId}/account/password`, {
+    method: 'PATCH',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  })
 }
 
 // ─── Analytics ────────────────────────────────────────────────────────────────

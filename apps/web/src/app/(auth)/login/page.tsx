@@ -6,10 +6,13 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import Link from 'next/link'
 import { Eye, EyeOff, ArrowRight, Network } from 'lucide-react'
 import { login } from '@/lib/api'
 import { setAuth } from '@/lib/auth'
 import { Providers } from '@/app/providers'
+
+const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? 'blueoceanintern@gmail.com'
 
 const loginSchema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -21,6 +24,7 @@ type LoginForm = z.infer<typeof loginSchema>
 function LoginForm() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
 
   const {
     register,
@@ -29,7 +33,7 @@ function LoginForm() {
   } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) })
 
   const onSubmit = async (data: LoginForm) => {
-    const result = await login(data.email, data.password)
+    const result = await login(data.email, data.password, rememberMe)
     if (!result.success) {
       toast.error(result.error.message)
       return
@@ -89,7 +93,7 @@ function LoginForm() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <label htmlFor="password" style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>Password</label>
-                <a href="#" style={{ fontSize: 12, color: '#004ac6', textDecoration: 'none' }}>Forgot password?</a>
+                <Link href="/forgot-password" style={{ fontSize: 12, color: '#004ac6', textDecoration: 'none' }}>Forgot password?</Link>
               </div>
               <div style={{ position: 'relative' }}>
                 <input
@@ -115,7 +119,13 @@ function LoginForm() {
 
             {/* Remember */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" id="remember" style={{ width: 16, height: 16, borderRadius: 4, borderColor: '#c3c6d7', cursor: 'pointer', accentColor: '#2563eb' }} />
+              <input
+                type="checkbox"
+                id="remember"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                style={{ width: 16, height: 16, borderRadius: 4, borderColor: '#c3c6d7', cursor: 'pointer', accentColor: '#2563eb' }}
+              />
               <label htmlFor="remember" style={{ fontSize: 14, color: '#434655', cursor: 'pointer' }}>Remember this device</label>
             </div>
 
@@ -139,20 +149,10 @@ function LoginForm() {
         </div>
 
         {/* Footer */}
-        <div style={{ marginTop: 32, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <p style={{ fontSize: 14, color: '#434655', margin: 0 }}>
-            Don&apos;t have an account?{' '}
-            <a href="#" style={{ color: '#004ac6', fontWeight: 500, textDecoration: 'none' }}>Contact Administrator</a>
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
-            {['Privacy Policy', 'Terms of Service', 'System Status'].map((link, i) => (
-              <span key={link} style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-                {i > 0 && <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#737686', display: 'inline-block' }} />}
-                <a href="#" style={{ fontSize: 12, color: '#737686', textDecoration: 'none' }}>{link}</a>
-              </span>
-            ))}
-          </div>
-        </div>
+        <p style={{ marginTop: 32, fontSize: 14, color: '#434655', margin: '32px 0 0' }}>
+          Don&apos;t have an account?{' '}
+          <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: '#004ac6', fontWeight: 500, textDecoration: 'none' }}>Contact Administrator</a>
+        </p>
       </div>
     </div>
   )

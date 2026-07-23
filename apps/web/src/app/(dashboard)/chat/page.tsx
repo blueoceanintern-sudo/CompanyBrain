@@ -9,13 +9,16 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { submitQuery as apiSubmitQuery } from '@/lib/api'
-import { useExternalPricing, useStartCheckout } from '@/hooks/use-payments'
+import { useExternalPricing, useStartCheckout, useSubscription } from '@/hooks/use-payments'
 import { getAuthUser } from '@/lib/auth'
 import { generateId } from '@/lib/utils'
 import { useChatHistory } from '@/lib/chat-history-context'
 import { DocumentPreview } from '@/components/document-preview'
+import { hasPermission } from '@company-brain/shared'
 import type { ConversationTurn } from '@company-brain/shared'
 import type { HistoryEntry } from '@/lib/chat-history-context'
+
+type Plane = 'internal' | 'external'
 
 const SUGGESTIONS = [
   { icon: BookOpen,  label: 'Company remote policy' },
@@ -63,12 +66,61 @@ function SubscribeGate({ orgId }: { orgId: string }) {
 
 // ─── Header bar ───────────────────────────────────────────────────────────────
 
-function PageHeader({ onNew }: { onNew?: () => void }) {
+function PlaneToggle({ plane, onChange, externalAvailable }: {
+  plane: Plane
+  onChange: (p: Plane) => void
+  externalAvailable: boolean
+}) {
+  const options: { value: Plane; label: string }[] = [
+    { value: 'internal', label: 'Internal' },
+    { value: 'external', label: 'External' },
+  ]
   return (
-    <header style={{ height: 50, borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
+    <div
+      role="group"
+      aria-label="Preview knowledge plane"
+      title={externalAvailable ? undefined : 'External plane requires a paid plan'}
+      style={{ background: '#eff4ff', borderRadius: 8, padding: 3, display: 'flex', gap: 2 }}
+    >
+      {options.map(({ value, label }) => {
+        const disabled = value === 'external' && !externalAvailable
+        const active = plane === value
+        return (
+          <button
+            key={value}
+            disabled={disabled}
+            onClick={() => onChange(value)}
+            style={{
+              padding: '5px 12px', borderRadius: 6, border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+              fontSize: 12, fontWeight: active ? 600 : 400, fontFamily: 'inherit',
+              color: disabled ? '#c3c6d7' : active ? '#004ac6' : '#585f67',
+              background: active ? '#ffffff' : 'transparent',
+              boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              opacity: disabled ? 0.6 : 1,
+            }}
+          >
+            {label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function PageHeader({ plane, onPlaneChange, showPlaneToggle, externalAvailable }: {
+  plane: Plane
+  onPlaneChange: (p: Plane) => void
+  showPlaneToggle: boolean
+  externalAvailable: boolean
+}) {
+  return (
+    <header style={{ height: '64px', borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ fontSize: 20, fontWeight: 700, color: '#004ac6' }}>Chat</span>
       </div>
+      {showPlaneToggle && (
+        <PlaneToggle plane={plane} onChange={onPlaneChange} externalAvailable={externalAvailable} />
+      )}
     </header>
   )
 }
@@ -333,9 +385,14 @@ export default function ChatPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
   const isExternalClient = user?.role === 'external_client'
+  const canPreviewPlanes = !!user?.role && hasPermission(user.role, 'documents:manage')
 
   const searchParams = useSearchParams()
   const router = useRouter()
+
+  const [plane, setPlane] = useState<Plane>('internal')
+  const { data: sub } = useSubscription(orgId)
+  const externalAvailable = sub?.plan === 'paid'
 
   const [hasAccess, setHasAccess] = useState(() => {
     if (!isExternalClient) return true
@@ -407,7 +464,7 @@ export default function ChatPage() {
 
     setIsPending(true)
     try {
-      const result = await apiSubmitQuery(orgId, q, 'internal', historySnapshot?.length ? historySnapshot : undefined)
+      const result = await apiSubmitQuery(orgId, q, plane, historySnapshot?.length ? historySnapshot : undefined)
       if (!result.success) throw new Error(result.error.message)
       setHistory((prev) => prev.map((h) =>
         h.id === id ? { id, question: q, response: result.data, expanded: true } : h
@@ -421,7 +478,7 @@ export default function ChatPage() {
     } finally {
       setIsPending(false)
     }
-  }, [orgId])
+  }, [orgId, plane])
 
   const buildHistorySnapshot = (): ConversationTurn[] =>
     history.flatMap((h) =>
@@ -447,9 +504,23 @@ export default function ChatPage() {
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
   }
 
+  // Switching planes mid-conversation would mix answers grounded in different
+  // document sets into one history sent back to the model as context — start
+  // a fresh thread instead.
+  const handlePlaneChange = (p: Plane) => {
+    if (p === plane) return
+    handleNewChat()
+    setPlane(p)
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <PageHeader onNew={handleNewChat} />
+      <PageHeader
+        plane={plane}
+        onPlaneChange={handlePlaneChange}
+        showPlaneToggle={canPreviewPlanes}
+        externalAvailable={externalAvailable}
+      />
       {isExternalClient && !hasAccess ? (
         <SubscribeGate orgId={orgId} />
       ) : isEmpty ? (

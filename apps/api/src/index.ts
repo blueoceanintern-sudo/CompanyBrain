@@ -8,6 +8,7 @@ import orgsRoute from './routes/orgs'
 import documentsRoute from './routes/documents'
 import queryRoute from './routes/query'
 import adminRoute from './routes/admin'
+import accountRoute from './routes/account'
 import accessRoute from './routes/access'
 import paymentsRoute from './routes/payments'
 import analyticsRoute from './routes/analytics'
@@ -44,6 +45,7 @@ orgApp.use('*', orgIsolationMiddleware)
 orgApp.route('/documents', documentsRoute)
 orgApp.route('/query', queryRoute)
 orgApp.route('/', adminRoute)
+orgApp.route('/account', accountRoute)
 orgApp.route('/', accessRoute)
 orgApp.route('/', paymentsRoute)
 orgApp.route('/analytics', analyticsRoute)

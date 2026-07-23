@@ -32,6 +32,7 @@ const ROLE_STYLE: Record<string, { bg: string; color: string; label: string }> =
 }
 
 const inviteSchema = z.object({
+  name: z.string().min(1, 'Required'),
   email: z.string().email('Valid email required'),
   role: z.enum(['org_admin', 'dept_admin', 'staff', 'external_client']),
   temporaryPassword: z.string().min(8, 'At least 8 characters'),
@@ -203,6 +204,14 @@ function InviteDialog({ orgId, onClose }: { orgId: string; onClose: () => void }
           style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>Name</label>
+            <input type="text" {...register('name')} placeholder="Jane Doe" style={{ ...inputBase, borderColor: errors.name ? '#ba1a1a' : '#c3c6d7' }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)' }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = errors.name ? '#ba1a1a' : '#c3c6d7'; e.currentTarget.style.boxShadow = 'none' }}
+            />
+            {errors.name && <p style={{ fontSize: 12, color: '#ba1a1a', margin: 0 }}>{errors.name.message}</p>}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <label style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>Email Address</label>
             <input type="email" {...register('email')} placeholder="name@company.com" style={{ ...inputBase, borderColor: errors.email ? '#ba1a1a' : '#c3c6d7' }}
               onFocus={(e) => { e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)' }}
@@ -282,7 +291,7 @@ export default function UsersPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Top nav */}
-      <header style={{ height: 50, borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
+      <header style={{ height: '64px', borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 18, fontWeight: 700, color: '#004ac6' }}>Users</span>
         </div>
@@ -356,9 +365,9 @@ export default function UsersPage() {
                       <td style={{ padding: '16px 24px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                           <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#dbe1ff', color: '#00174b', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #c3c6d7' }}>
-                            {initials(u.email ?? 'U')}
+                            {initials(u.name ?? u.email ?? 'U')}
                           </div>
-                          <span style={{ fontWeight: 500, color: '#0b1c30' }}>{u.email?.split('@')[0] ?? 'User'}</span>
+                          <span style={{ fontWeight: 500, color: '#0b1c30' }}>{u.name ?? u.email?.split('@')[0] ?? 'User'}</span>
                         </div>
                       </td>
                       <td style={{ padding: '16px 24px', color: '#585f67' }}>{u.email}</td>

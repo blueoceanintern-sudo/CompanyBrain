@@ -26,11 +26,13 @@ async function loadTemplate(name: string): Promise<string> {
 
 export async function sendOrgAdminWelcome(params: {
   to: string
+  name: string
   orgName: string
   temporaryPassword: string
 }): Promise<void> {
   const template = await loadTemplate('org-admin-welcome')
   const html = fillTemplate(template, {
+    name: params.name,
     email: params.to,
     orgName: params.orgName,
     temporaryPassword: params.temporaryPassword,
@@ -47,11 +49,13 @@ export async function sendOrgAdminWelcome(params: {
 
 export async function sendUserInvite(params: {
   to: string
+  name: string
   orgName: string
   temporaryPassword: string
 }): Promise<void> {
   const template = await loadTemplate('user-invite')
   const html = fillTemplate(template, {
+    name: params.name,
     email: params.to,
     orgName: params.orgName,
     temporaryPassword: params.temporaryPassword,
@@ -62,6 +66,23 @@ export async function sendUserInvite(params: {
     from: FROM,
     to: params.to,
     subject: `You've been added to ${params.orgName}'s knowledge base`,
+    html,
+  })
+}
+
+export async function sendPasswordReset(params: {
+  to: string
+  resetUrl: string
+}): Promise<void> {
+  const template = await loadTemplate('password-reset')
+  const html = fillTemplate(template, {
+    resetUrl: params.resetUrl,
+  })
+
+  await transporter.sendMail({
+    from: FROM,
+    to: params.to,
+    subject: `Reset your Company's Brain password`,
     html,
   })
 }

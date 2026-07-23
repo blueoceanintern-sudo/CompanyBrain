@@ -142,6 +142,7 @@ export interface CompartmentGrantSet {
 
 export interface UserSummary {
   id: string
+  name: string | null
   email: string
   role: UserRole
   groups: string[]

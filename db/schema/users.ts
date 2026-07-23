@@ -9,6 +9,9 @@ export const users = pgTable(
     orgId: uuid('org_id')
       .notNull()
       .references(() => orgs.id, { onDelete: 'cascade' }),
+    // Nullable: only collected on invite (POST /orgs/:id/users); users created
+    // via org provisioning (POST /orgs) predate this field and have none.
+    name: text('name'),
     email: text('email').notNull(),
     passwordHash: text('password_hash').notNull(),
     role: userRoleEnum('role').notNull().default('staff'),
