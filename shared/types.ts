@@ -191,7 +191,7 @@ export interface RetrieveParams {
 export interface SynthesisParams {
   query: string
   chunks: ChunkContext[]
-  conversationHistory?: ConversationTurn[]
+  history?: ConversationTurn[]
 }
 
 export interface ConversationTurn {

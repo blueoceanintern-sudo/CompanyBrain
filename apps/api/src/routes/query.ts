@@ -99,7 +99,7 @@ queryRoute.post('/', zValidator('json', querySchema), async (c) => {
     }
 
     // Synthesize
-    const synthesisResult = await synthesizeAnswer({ query, chunks, history })
+    const synthesisResult = await synthesizeAnswer({ query, chunks, ...(history ? { history } : {}) })
 
     if (!synthesisResult.success) {
       return c.json({ success: false, error: synthesisResult.error }, 500)
