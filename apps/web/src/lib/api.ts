@@ -54,14 +54,17 @@ async function apiFetch<T>(
 
   try {
     const res = await fetch(`${API_URL}${path}`, { ...options, headers, credentials: 'include' })
-    if (res.status === 401) {
+    const result = await parseResult<T>(res)
+    // Only a dead/invalid session forces logout — other 401s (e.g. wrong
+    // current password on account change) are domain errors, not session errors.
+    if (res.status === 401 && !result.success && result.error.code === 'UNAUTHORIZED') {
       if (typeof window !== 'undefined') {
         await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
         localStorage.removeItem('auth_user')
         window.location.replace('/login')
       }
     }
-    return parseResult<T>(res)
+    return result
   } catch {
     return networkError('Could not reach the server. Check your connection.')
   }
