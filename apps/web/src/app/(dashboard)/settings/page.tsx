@@ -177,7 +177,7 @@ export default function SettingsPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Top nav */}
-      <header style={{ height: 50, borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
+      <header style={{ height: '64px', borderBottom: '1px solid #c3c6d7', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, position: 'sticky', top: 0, zIndex: 40 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 18, fontWeight: 700, color: '#004ac6' }}>Settings</span>
         </div>
@@ -265,21 +265,6 @@ export default function SettingsPage() {
                       <p style={{ fontSize: 14, color: '#434655', margin: 0 }}>Professional grade intelligence for large scale educational institutions.</p>
                       {sub?.subscriptionId && <p style={{ fontSize: 12, color: '#585f67', fontFamily: 'JetBrains Mono, monospace', margin: '8px 0 0' }}>{sub.subscriptionId}</p>}
                     </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
-                    {[
-                      { label: 'API Requests', value: '—' },
-                      { label: 'Storage', value: '—' },
-                    ].map(({ label, value }) => (
-                      <div key={label} style={{ padding: 16, border: '1px solid #c3c6d7', borderRadius: 8, background: '#f8f9ff' }}>
-                        <p style={{ fontSize: 12, color: '#585f67', margin: '0 0 4px' }}>{label}</p>
-                        <p style={{ fontSize: 16, fontWeight: 700, color: '#0b1c30', margin: '0 0 8px' }}>{value}</p>
-                        <div style={{ width: '100%', background: '#e5eeff', height: 6, borderRadius: 3 }}>
-                          <div style={{ width: '0%', background: '#004ac6', height: 6, borderRadius: 3 }} />
-                        </div>
-                      </div>
-                    ))}
                   </div>
 
                   {sub?.plan === 'paid' ? (

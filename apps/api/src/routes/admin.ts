@@ -403,6 +403,7 @@ adminRoute.delete('/compartments/:cId', zValidator('json', deleteCompartmentSche
 // ─── Users ────────────────────────────────────────────────────────────────────
 
 const inviteUserSchema = z.object({
+  name: z.string().min(1).max(200),
   email: z.string().email(),
   role: z.enum(['org_admin', 'dept_admin', 'staff', 'external_client']),
   temporaryPassword: z.string().min(8),
@@ -419,6 +420,7 @@ adminRoute.get('/users', async (c) => {
   const rows = await db
     .select({
       id: users.id,
+      name: users.name,
       email: users.email,
       role: users.role,
       groups: sql<string[]>`coalesce(array_agg(${groups.name} ORDER BY ${groups.name}) FILTER (WHERE ${groups.name} IS NOT NULL), '{}')`,
@@ -476,7 +478,7 @@ adminRoute.post('/users', zValidator('json', inviteUserSchema), async (c) => {
   try {
     ;[newUser] = await db
       .insert(users)
-      .values({ orgId, email: body.email, passwordHash, role: body.role })
+      .values({ orgId, name: body.name, email: body.email, passwordHash, role: body.role })
       .returning({ id: users.id, email: users.email, role: users.role })
   } catch (err) {
     const pg = err as { code?: string }
@@ -500,12 +502,15 @@ adminRoute.post('/users', zValidator('json', inviteUserSchema), async (c) => {
     action: 'user.invite',
     resourceType: 'user',
     resourceId: newUser?.id ?? null,
-    metadata: { email: body.email, role: body.role, groupIds },
+    metadata: { name: body.name, email: body.email, role: body.role, groupIds },
   })
 
-  // Fire-and-forget — a failed email does not roll back the user creation
-  const emailParams = { to: body.email, orgName, temporaryPassword: body.temporaryPassword }
-  if (actorRole === 'super_admin') {
+  // Fire-and-forget — a failed email does not roll back the user creation.
+  // Which template to send depends on the role being *assigned* to the new
+  // user, not who's doing the inviting — a super_admin inviting a staff
+  // member should not send that person the "you're the new admin" email.
+  const emailParams = { to: body.email, name: body.name, orgName, temporaryPassword: body.temporaryPassword }
+  if (body.role === 'org_admin') {
     sendOrgAdminWelcome(emailParams).catch((err) =>
       console.error('Failed to send org admin welcome email', { to: body.email, err })
     )

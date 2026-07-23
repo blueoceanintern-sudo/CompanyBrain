@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { jwtVerify } from 'jose'
 
-const PUBLIC_PATHS = ['/login', '/api/auth']
+const PUBLIC_PATHS = ['/login', '/forgot-password', '/reset-password', '/api/auth', '/api/v1/auth']
 const COOKIE_NAME = 'auth_token'
 
 export async function middleware(request: NextRequest) {

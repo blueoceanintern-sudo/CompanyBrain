@@ -22,38 +22,35 @@
 
 **Production** runs on an AWS Lightsail VPS (2 GB RAM, 2 vCPUs, 60 GB SSD), **shared with the Automated Marketing Solution** — mind the memory headroom; batch sizes in ingestion/re-embedding are tuned for this box.
 
-Three containers via `docker-compose.yml`:
+⚠️ **Deployed via Coolify, as two separate application resources (web, api) — not as a single `docker-compose.yml` stack.** `docker-compose.yml` still exists and is used for local dev (`docker compose up -d db`), but in production each Coolify app builds from its own Dockerfile and gets its own env vars configured directly in the Coolify UI. **`docker-compose.yml`'s `environment:` blocks do not apply in production** — don't use it as a reference for what env vars a prod app actually has; check each app's Coolify config individually.
 
-| Container | Image/build | Port | Notes |
+| Resource | Build | Port | Notes |
 |---|---|---|---|
-| `db` | `pgvector/pgvector:pg17` | 5432 (internal) | Volume `pgdata`; `db/init.sql` auto-applied on first boot (extensions) |
-| `api` | `apps/api/Dockerfile` | 3002 | Hono API; env injected from compose |
-| `web` | `apps/web/Dockerfile` | 3000 | Next.js; proxies API calls server-side to `http://api:3002` |
+| `db` | `pgvector/pgvector:pg16` | 5432 (internal) | `TODO(Tori): confirm whether db also runs as a Coolify resource or separately` |
+| `api` | `apps/api/Dockerfile` | 3002 | Hono API; env vars set in Coolify's app config, not compose |
+| `web` | `apps/web/Dockerfile` | 3000 | Next.js; proxies API calls server-side via `API_INTERNAL_URL` (must be set — see gotchas) |
 
-- `TODO(Tori): VPS IP / hostname, SSH access method (key location, user), and the domain(s) pointing at it + how TLS is terminated (Caddy? nginx? Lightsail LB? none?)`
-- `TODO(Tori): where the production .env file lives on the VPS and who else has a copy`
-- ⚠️ **Workers:** the cron workers (`bun run workers`) are **not** part of docker-compose. `TODO(Tori): document how workers run in production (systemd? tmux? not running?!). If they are not running, the 90-day/30-day retention guarantees in §7 are currently not being met — flag this to your manager.`
+- `TODO(Tori): VPS IP / hostname, SSH access method (key location, user), and the domain(s) pointing at it + how TLS is terminated. As of this writing production may be plain HTTP — confirm and add TLS if not (see gotchas below, `crypto.randomUUID` gotcha).`
+- `TODO(Tori): where the production .env file lives / whether it's used at all now that env vars live in Coolify per-app`
+- ⚠️ **No GitHub webhook configured** (missing repo permissions) — deploys are triggered manually via Coolify's "Redeploy" button per app, not automatic on push to `Production`.
+- ⚠️ **Workers:** the cron workers (`bun run workers`) are **not** part of either Coolify app. `TODO(Tori): document how workers run in production (systemd? tmux? not running?!). If they are not running, the 90-day/30-day retention guarantees in §7 are currently not being met — flag this to your manager.`
 
 > 📊 **[DIAGRAM: deployment topology — one box per container + workers process, ports, what is public vs internal. Base it on the mermaid diagram in 02_Technical_Handover.md Part I.]**
 
 ## 2. Deploy procedure
 
-The deployed branch is **`Production`**; development happens on `main` (PRs target `main`, then `main` is merged into `Production`).
-
-`TODO(Tori): replace this block with the exact commands you actually run, in order. Presumed shape:`
-
-```bash
-ssh <vps>
-cd <repo path>
-git pull origin Production
-docker compose build api web
-docker compose up -d
-# workers: <however they are restarted>
-```
+The deployed branch is **`Production`**; development happens on `main` (PRs target `main`, then `main` is merged into `Production`). Deploy = merge to `Production`, then manually hit **Redeploy** on each Coolify app (web, api) — no webhook, so pushing alone does nothing.
 
 - Database migrations in production: `TODO(Tori): how are bun db:migrate and db/post-migrate.sql run against the prod DB?`
-- Rollback: `TODO(Tori): what you'd do if a deploy breaks (git checkout previous commit + rebuild?)`
-- Known deploy gotchas already hit: compose needs `PORT`/`NODE_ENV` hardcoded (commit `c13addc`); all API env vars must be passed through compose (commit `0606e54`); auth cookies on plain HTTP needed a fix (commit `3ccc06b`) — if TLS is added later, revisit cookie `Secure` flags.
+- Rollback: `TODO(Tori): what you'd do if a deploy breaks (revert the commit on Production + redeploy both apps?)`
+- Known deploy gotchas already hit (older, single-compose era): compose needs `PORT`/`NODE_ENV` hardcoded (commit `c13addc`); all API env vars must be passed through compose (commit `0606e54`); auth cookies on plain HTTP needed a fix (commit `3ccc06b`) — if TLS is added later, revisit cookie `Secure` flags.
+- **Known gotchas from the Coolify two-app setup (2026-07-21/22):**
+  - `API_INTERNAL_URL` (web app) must point somewhere the web container can actually reach the api app — `http://api:3002` only resolves inside a shared `docker-compose` network and does **not** work across two independent Coolify apps. Use the api app's actual Coolify-assigned URL.
+  - `NEXT_PUBLIC_API_URL` (web app **build arg**, not runtime env) must stay **empty**. It's baked into the client bundle; if set, the browser calls the API's origin directly instead of going through the Next.js proxy, which breaks auth — the `auth_token` cookie is scoped to the web app's host and never gets attached to a cross-origin request. Symptom: login loop with a `204` (CORS preflight) then `401` on every API call.
+  - `JWT_SECRET` must be byte-identical on both apps, **and both must be redeployed** after any edit — Coolify only applies env var changes on next container start, so the value shown in its UI can silently diverge from what a still-running container actually has.
+  - Any `auth_token` cookie issued before a `JWT_SECRET` fix is permanently stale (signed under the old secret) — clear it / log out and log back in after rotating the secret.
+  - Production currently looks to be served over plain HTTP: `crypto.randomUUID()` is only exposed in secure contexts (HTTPS/localhost), so client code calling it directly throws `TypeError: crypto.randomUUID is not a function` in the browser. Fixed in code with a fallback (`apps/web/src/lib/utils.ts` → `generateId()`), but adding TLS in Coolify is the real fix and also lets the auth cookie be marked `Secure`.
+  - `scripts/setup.ts` used to insert a new `orgs` row on **every** container start before checking whether the admin user already existed (the org insert wasn't guarded by the same idempotency check as the user insert) — every redeploy created an orphan org. Fixed by checking for the existing admin user first and skipping entirely if found. Any orphan orgs already in prod (rows in `orgs` with zero `users`) are safe to delete — see cleanup query in chat history / ask Tori.
 
 ## 3. Credentials & accounts inventory
 

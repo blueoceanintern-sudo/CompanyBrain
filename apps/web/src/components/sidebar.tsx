@@ -49,7 +49,7 @@ function SidebarContent({
   const { sessions, loadSession, saveCurrentAsSession } = useChatHistory()
 
   const visible = NAV.filter((n) => user?.role && hasPermission(user.role, n.permission))
-  const initial = (user?.email?.[0] ?? '?').toUpperCase()
+  const initial = ((user?.name || user?.email)?.[0] ?? '?').toUpperCase()
   const handleLogout = async () => {
     clearAuth()
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
@@ -229,7 +229,14 @@ function SidebarContent({
       <div className="flex flex-col gap-2 px-2 pb-6 mt-auto" style={{ borderTop: '1px solid #c3c6d7', paddingTop: 16 }}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="flex items-center rounded-xl cursor-default" style={{ height: 48, overflow: 'hidden' }}>
+            <Link
+              href="/account"
+              {...(isSheet && onClose ? { onClick: onClose } : {})}
+              className="flex items-center rounded-xl"
+              style={{ height: 48, overflow: 'hidden', textDecoration: 'none', background: pathname.startsWith('/account') ? bgHover : 'transparent', transition: 'background 0.15s' }}
+              onMouseEnter={(e) => { if (!pathname.startsWith('/account')) (e.currentTarget as HTMLElement).style.background = bgHover }}
+              onMouseLeave={(e) => { if (!pathname.startsWith('/account')) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+            >
               <span style={iconZone}>
                 <span
                   className="flex items-center justify-center rounded-full text-xs font-bold"
@@ -242,11 +249,11 @@ function SidebarContent({
                 <p className="text-xs font-semibold truncate" style={{ color: '#0b1c30' }}>{user?.email}</p>
                 <p className="text-xs capitalize" style={{ color: '#585f67' }}>{user?.role?.replace(/_/g, ' ')}</p>
               </div>
-            </div>
+            </Link>
           </TooltipTrigger>
           <TooltipContent side="right">
             <p>{user?.email}</p>
-            <p className="opacity-60 text-xs">{user?.role?.replace(/_/g, ' ')}</p>
+            <p className="opacity-60 text-xs">{user?.role?.replace(/_/g, ' ')} · View account</p>
           </TooltipContent>
         </Tooltip>
 
