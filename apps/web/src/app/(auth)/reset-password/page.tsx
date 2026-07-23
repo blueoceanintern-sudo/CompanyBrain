@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -134,7 +135,9 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <Providers>
-      <ResetPasswordForm />
+      <Suspense fallback={null}>
+        <ResetPasswordForm />
+      </Suspense>
     </Providers>
   )
 }

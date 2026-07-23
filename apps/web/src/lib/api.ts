@@ -10,7 +10,7 @@ import type {
   ConversationTurn,
 } from '@company-brain/shared'
 
-const API_URL = ''
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ''
 
 type ApiResult<T> = { success: true; data: T } | { success: false; error: { code: string; message: string } }
 
@@ -56,7 +56,7 @@ async function apiFetch<T>(
     const res = await fetch(`${API_URL}${path}`, { ...options, headers, credentials: 'include' })
     if (res.status === 401) {
       if (typeof window !== 'undefined') {
-        fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+        await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
         localStorage.removeItem('auth_user')
         window.location.replace('/login')
       }
@@ -89,7 +89,6 @@ export interface AuthUser {
   email: string
   role: UserRole
   orgId: string
-  // Optional: sessions cached before org names were returned at login lack it
   orgName?: string
 }
 
@@ -461,7 +460,7 @@ export async function listAuditLogs(
 
 export async function exportAuditLog(orgId: string): Promise<Blob> {
   try {
-    const res = await fetch(`/api/v1/orgs/${orgId}/analytics/export`, {
+    const res = await fetch(`${API_URL}/api/v1/orgs/${orgId}/analytics/export`, {
       credentials: 'include',
     })
     if (!res.ok) throw new Error(`Server error: ${res.status}`)

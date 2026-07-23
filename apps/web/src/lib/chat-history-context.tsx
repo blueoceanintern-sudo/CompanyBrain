@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useRef, useCallback } from 'react'
 import type { QueryResponse } from '@company-brain/shared'
+import { generateId } from '@/lib/utils'
 
 export interface HistoryEntry {
   id: string
@@ -68,7 +69,7 @@ export function ChatHistoryProvider({ children }: { children: React.ReactNode })
         return updated
       }
       return [
-        { id: crypto.randomUUID(), title, entries: current, createdAt: new Date().toISOString() },
+        { id: generateId(), title, entries: current, createdAt: new Date().toISOString() },
         ...prev.slice(0, 19),
       ]
     })
