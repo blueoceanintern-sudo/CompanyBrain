@@ -5,9 +5,9 @@ import Link from 'next/link'
 import type { Route } from 'next'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  MessageSquare, FileText, BarChart2, ClipboardCheck,
+  MessageCircle, FileText, BarChart2, ClipboardCheck,
   Users, Settings, Brain, LogOut, Menu, X, Building2,
-  ChevronLeft, ChevronRight, Plus, MessageCircle,
+  ChevronLeft, ChevronRight, Plus,
 } from 'lucide-react'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useChatHistory } from '@/lib/chat-history-context'
@@ -17,7 +17,7 @@ import { NAV } from '@/lib/nav'
 import { hasPermission } from '@company-brain/shared'
 
 const NAV_ICONS: Record<string, React.ElementType> = {
-  '/chat':      MessageSquare,
+  '/chat':      MessageCircle,
   '/documents': FileText,
   '/analytics': BarChart2,
   '/audit':     ClipboardCheck,
@@ -99,22 +99,38 @@ function SidebarContent({
             aria-label="Expand sidebar"
             onMouseEnter={() => setLogoHovered(true)}
             onMouseLeave={() => setLogoHovered(false)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors"
-            style={{ background: logoHovered ? '#1d4ed8' : '#2563eb', border: 'none', cursor: 'pointer', color: '#ffffff' }}
+            className="relative w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors duration-200 ease-out"
+            style={{ background: logoHovered ? '#1d4ed8' : '', border: 'none', cursor: 'pointer' }}
           >
-            {logoHovered ? <ChevronRight size={18} /> : <Brain size={18} />}
+            <Brain
+              size={28}
+              color="#1d4ed8"
+              className="absolute transition-all duration-200 ease-out"
+              style={{
+                opacity: logoHovered ? 0 : 1,
+                transform: logoHovered ? 'scale(0.6) rotate(20deg)' : 'scale(1) rotate(0deg)',
+              }}
+            />
+            <ChevronRight
+              size={18}
+              color="#ffffff"
+              className="absolute transition-all duration-200 ease-out"
+              style={{
+                opacity: logoHovered ? 1 : 0,
+                transform: logoHovered ? 'scale(1) rotate(0deg)' : 'scale(0.6) rotate(-20deg)',
+              }}
+            />
           </button>
         ) : (
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#2563eb' }}>
-            <Brain size={18} color="#ffffff" />
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0">
+            <Brain size={26} color="#2563eb" />
           </div>
         )}
 
         {isSheet ? (
           <>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold" style={{ color: '#004ac6', lineHeight: 1.2 }}>Brain</p>
-              <p className="text-xs" style={{ color: '#585f67', opacity: 0.7 }}>AI Agent</p>
+              <p className="text-sm font-bold" style={{ color: '#004ac6', lineHeight: 1.2 }}>Company Brain</p>
             </div>
             <button onClick={onClose} className="p-1 rounded shrink-0" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67' }}>
               <X size={18} />
@@ -124,8 +140,7 @@ function SidebarContent({
           <>
             {/* Text stays in DOM and collapses via labelStyle — no reflow jump */}
             <div className="flex-1 min-w-0" style={labelStyle}>
-              <p className="text-sm font-bold" style={{ color: '#004ac6', lineHeight: 1.2 }}>Brain</p>
-              <p className="text-xs" style={{ color: '#585f67', opacity: 0.7 }}>AI Agent</p>
+              <p className="text-sm font-bold" style={{ color: '#004ac6', lineHeight: 1.2 }}>Company Brain</p>
             </div>
             {onToggle && (
               <span style={{ ...labelStyle, display: 'flex', alignItems: 'center' }}>
@@ -198,7 +213,7 @@ function SidebarContent({
                 <div style={{ paddingLeft: 48, paddingRight: 8, display: 'flex', flexDirection: 'column', gap: 1, marginTop: 2 }}>
                   <button
                     onClick={() => { saveCurrentAsSession(); router.push('/chat') }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 8px', background: 'none', border: 'none', cursor: 'pointer', color: '#004ac6', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', borderRadius: 8, width: '100%', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 8px', background: 'none', border: 'none', cursor: 'pointer', color: '#004ac6', fontSize: 13, fontWeight: 500, fontFamily: 'inherit', borderRadius: 8, width: '100%', textAlign: 'left' }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#dce9ff' }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none' }}
                   >
@@ -208,7 +223,7 @@ function SidebarContent({
                     <button
                       key={s.id}
                       onClick={() => { loadSession(s.id); router.push('/chat') }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 8px', background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', fontSize: 12, fontFamily: 'inherit', borderRadius: 8, width: '100%', textAlign: 'left', overflow: 'hidden' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 8px', background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', fontSize: 13, fontFamily: 'inherit', borderRadius: 8, width: '100%', textAlign: 'left', overflow: 'hidden' }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#dce9ff'; (e.currentTarget as HTMLElement).style.color = '#0b1c30' }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none'; (e.currentTarget as HTMLElement).style.color = '#585f67' }}
                     >
