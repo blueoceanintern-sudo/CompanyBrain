@@ -16,9 +16,7 @@ import { useChatHistory } from '@/lib/chat-history-context'
 import { DocumentPreview } from '@/components/document-preview'
 import { hasPermission } from '@company-brain/shared'
 import type { ConversationTurn } from '@company-brain/shared'
-import type { HistoryEntry } from '@/lib/chat-history-context'
-
-type Plane = 'internal' | 'external'
+import type { HistoryEntry, Plane } from '@/lib/chat-history-context'
 
 const SUGGESTIONS = [
   { icon: BookOpen,  label: 'Company remote policy' },
@@ -240,7 +238,7 @@ function SourcePill({ filename, tier, onClick }: { filename: string; tier: strin
 
 function ActiveChat({
   history, input, onChange, onSubmit, disabled, textareaRef,
-  onToggle, onRetry, onNew, onPreviewDoc,
+  onToggle, onRetry, onNew, onPreviewDoc, plane,
 }: {
   history: HistoryEntry[]
   input: string
@@ -252,6 +250,7 @@ function ActiveChat({
   onRetry: (id: string, q: string) => void
   onNew: () => void
   onPreviewDoc: (docId: string) => void
+  plane: Plane
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -270,9 +269,20 @@ function ActiveChat({
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#ffffff', overflow: 'hidden' }}>
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <div style={{ width: '100%', maxWidth: 800, padding: '48px 32px', display: 'flex', flexDirection: 'column', gap: 40 }}>
-          <div style={{ textAlign: 'center' }}>
+          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#737686' }}>
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            </span>
+            <span
+              title={plane === 'external' ? 'This conversation is grounded in the external knowledge plane' : 'This conversation is grounded in the internal knowledge plane'}
+              style={{
+                fontSize: 11, fontWeight: 600, padding: '3px 12px', borderRadius: 9999,
+                background: plane === 'external' ? '#fff4e5' : '#eff4ff',
+                color: plane === 'external' ? '#9a5b00' : '#004ac6',
+                border: `1px solid ${plane === 'external' ? '#ffd9a0' : '#d3e4fe'}`,
+              }}
+            >
+              {plane === 'external' ? 'External' : 'Internal'} plane
             </span>
           </div>
 
@@ -390,7 +400,6 @@ export default function ChatPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
-  const [plane, setPlane] = useState<Plane>('internal')
   const { data: sub } = useSubscription(orgId)
   const externalAvailable = sub?.plan === 'paid'
 
@@ -414,11 +423,20 @@ export default function ChatPage() {
     }
   }, [searchParams, router, orgId, isExternalClient])
 
-  const { history, setHistory, recentQueries, setRecentQueries, saveCurrentAsSession, pendingSession, pendingSessionToken, clearPendingSession } = useChatHistory()
+  const { history, setHistory, recentQueries, setRecentQueries, saveCurrentAsSession, pendingSession, pendingSessionToken, clearPendingSession, plane, setPlane } = useChatHistory()
   const [input, setInput] = useState('')
   const [isPending, setIsPending] = useState(false)
   const [previewDocId, setPreviewDocId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // External clients only ever query the external plane — the toggle to
+  // switch away is already hidden for them (no documents:manage permission),
+  // but this defends against a stale session saved with plane:'internal'
+  // from before that was enforced, or the shared plane state otherwise
+  // drifting away from 'external'.
+  useEffect(() => {
+    if (isExternalClient && plane !== 'external') setPlane('external')
+  }, [isExternalClient, plane, setPlane])
 
   // Restore a clicked session, otherwise start fresh. Keyed on
   // pendingSessionToken (not just mount) so clicking a *different* saved
@@ -553,6 +571,7 @@ export default function ChatPage() {
           }}
           onNew={handleNewChat}
           onPreviewDoc={setPreviewDocId}
+          plane={plane}
         />
       )}
       {previewDocId && (
