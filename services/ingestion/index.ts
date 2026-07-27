@@ -1,11 +1,10 @@
 import { createHash } from 'crypto'
 import { db } from '@company-brain/db'
-import { chunks, documents, ingestionJobs } from '@company-brain/db'
+import { chunks, documents } from '@company-brain/db'
 import { eq, and, sql } from 'drizzle-orm'
 import type {
   IngestParams,
   ServiceResult,
-  VisibilityPolicy,
 } from '@company-brain/shared'
 import { CHUNK_SIZE_CHARS, CHUNK_OVERLAP_CHARS } from '@company-brain/shared'
 import { getEmbeddingProvider, AiProviderError } from '@company-brain/ai-provider'

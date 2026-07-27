@@ -47,3 +47,15 @@ export async function runReEmbed(): Promise<void> {
 
   console.log('[re-embed] Re-embedding complete')
 }
+
+// Runnable directly: `bun run re-embed` (root script) or `bun run workers/re-embed-worker.ts`.
+// Manual-only by design — it rewrites every active chunk's embedding, so it must never be
+// put on a schedule. Run it after changing AI_EMBEDDING_MODEL / AI_EMBEDDING_DIMENSIONS.
+if (import.meta.main) {
+  runReEmbed()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('[re-embed] Failed:', err)
+      process.exit(1)
+    })
+}

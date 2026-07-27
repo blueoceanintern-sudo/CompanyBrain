@@ -7,7 +7,7 @@ export async function runQueryLogPurge(): Promise<void> {
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - QUERY_LOG_RETENTION_DAYS)
 
-  const result = await db.delete(queries).where(lt(queries.createdAt, cutoff))
+  await db.delete(queries).where(lt(queries.createdAt, cutoff))
   console.log(`[retention] Query log purge complete (cutoff: ${cutoff.toISOString()})`)
 }
 

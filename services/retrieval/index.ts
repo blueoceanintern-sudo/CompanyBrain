@@ -1,6 +1,6 @@
 import { db } from '@company-brain/db'
-import { chunks, documents, compartments } from '@company-brain/db'
-import { eq, and, sql, type SQL } from 'drizzle-orm'
+import { documents, compartments } from '@company-brain/db'
+import { eq, sql, type SQL } from 'drizzle-orm'
 import type { RetrieveParams, ServiceResult, ChunkContext, SourceType, UserRole } from '@company-brain/shared'
 import { CONFIDENCE_GATE_THRESHOLD, RRF_K, TOP_K_CHUNKS } from '@company-brain/shared'
 import { canAccessChunk } from '@company-brain/access-control'
