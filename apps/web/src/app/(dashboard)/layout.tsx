@@ -30,6 +30,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       return
     }
 
+    // Invited users must set a real password before reaching any dashboard
+    // route; blocks direct navigation around the login redirect.
+    if (getAuthUser()?.mustChangePassword) {
+      router.replace('/change-password')
+      return
+    }
+
     const permission = routePermission(pathname)
     if (permission) {
       const user = getAuthUser()

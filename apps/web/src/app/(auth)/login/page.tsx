@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { Eye, EyeOff, ArrowRight, Network } from 'lucide-react'
 import { login } from '@/lib/api'
 import { setAuth } from '@/lib/auth'
+import { stashTempPassword, clearTempPassword } from '@/lib/pending-credential'
 import { Providers } from '@/app/providers'
 
 const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? 'blueoceanintern@gmail.com'
@@ -39,7 +40,15 @@ function LoginForm() {
       return
     }
     setAuth(result.data.user)
-    router.push('/chat')
+    if (result.data.user.mustChangePassword) {
+      // Carry the just-entered temporary password in memory so the forced
+      // change screen can prefill it; cleared there once consumed.
+      stashTempPassword(data.password)
+      router.push('/change-password')
+    } else {
+      clearTempPassword()
+      router.push('/chat')
+    }
   }
 
   const inputBase: React.CSSProperties = {

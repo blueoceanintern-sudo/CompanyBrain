@@ -82,6 +82,7 @@ authRoute.post('/login', zValidator('json', loginSchema), async (c) => {
         role: user.role,
         orgId: user.orgId,
         orgName: orgRows[0]?.name ?? '',
+        mustChangePassword: user.mustChangePassword,
       },
     },
   })

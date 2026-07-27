@@ -478,7 +478,7 @@ adminRoute.post('/users', zValidator('json', inviteUserSchema), async (c) => {
   try {
     ;[newUser] = await db
       .insert(users)
-      .values({ orgId, name: body.name, email: body.email, passwordHash, role: body.role })
+      .values({ orgId, name: body.name, email: body.email, passwordHash, role: body.role, mustChangePassword: true })
       .returning({ id: users.id, email: users.email, role: users.role })
   } catch (err) {
     const pg = err as { code?: string }

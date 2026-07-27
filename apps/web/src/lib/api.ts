@@ -93,6 +93,10 @@ export interface AuthUser {
   role: UserRole
   orgId: string
   orgName?: string
+  // True while an invited user still holds their temporary password; the app
+  // forces a password change before granting access. Absent on sessions cached
+  // before this field existed (treated as false).
+  mustChangePassword?: boolean
 }
 
 export async function login(email: string, password: string, rememberMe?: boolean) {

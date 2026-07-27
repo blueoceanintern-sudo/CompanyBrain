@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, unique } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, timestamp, unique, boolean } from 'drizzle-orm/pg-core'
 import { userRoleEnum } from './enums'
 import { orgs } from './orgs'
 
@@ -15,6 +15,11 @@ export const users = pgTable(
     email: text('email').notNull(),
     passwordHash: text('password_hash').notNull(),
     role: userRoleEnum('role').notNull().default('staff'),
+    // Set true when an admin invites the user with a temporary password; the
+    // web app forces a password change before granting access, then clears it
+    // (see PATCH /orgs/:id/account/password). Users provisioned via POST /orgs
+    // keep the default false.
+    mustChangePassword: boolean('must_change_password').notNull().default(false),
     stripeCustomerId: text('stripe_customer_id'),
     stripeSubscriptionId: text('stripe_subscription_id'),
     subscriptionStatus: text('subscription_status'),

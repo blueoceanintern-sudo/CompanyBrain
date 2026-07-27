@@ -35,7 +35,12 @@ accountRoute.patch('/password', zValidator('json', changePasswordSchema), async 
   }
 
   const passwordHash = await Bun.password.hash(newPassword)
-  await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, userId))
+  // Clearing mustChangePassword here is what lifts the forced-change gate for
+  // invited users; a no-op for anyone who already had it false.
+  await db
+    .update(users)
+    .set({ passwordHash, mustChangePassword: false, updatedAt: new Date() })
+    .where(eq(users.id, userId))
 
   return c.json({ success: true, data: null })
 })
