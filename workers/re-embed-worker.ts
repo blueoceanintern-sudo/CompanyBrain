@@ -1,12 +1,7 @@
 import { db } from '@company-brain/db'
 import { chunks } from '@company-brain/db'
 import { eq, sql } from 'drizzle-orm'
-import OpenAI from 'openai'
-import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@company-brain/shared'
-
-function getOpenAI() {
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? '' })
-}
+import { getEmbeddingProvider } from '@company-brain/ai-provider'
 
 /**
  * Re-embeds all active chunks. Run manually after an embedding model change.
@@ -23,21 +18,21 @@ export async function runReEmbed(): Promise<void> {
       .select({ id: chunks.id, content: chunks.content })
       .from(chunks)
       .where(eq(chunks.status, 'active'))
+      // Stable order is required for LIMIT/OFFSET pagination — without it
+      // Postgres can return rows in any order between pages, so some chunks
+      // get re-embedded twice and others skipped entirely.
+      .orderBy(chunks.id)
       .limit(BATCH_SIZE)
       .offset(offset)
 
     if (batch.length === 0) break
 
     const texts = batch.map((c) => c.content)
-    const response = await getOpenAI().embeddings.create({
-      model: EMBEDDING_MODEL,
-      input: texts,
-      dimensions: EMBEDDING_DIMENSIONS,
-    })
+    const result = await getEmbeddingProvider().embed({ input: texts })
 
     for (let i = 0; i < batch.length; i++) {
       const chunk = batch[i]
-      const embedding = response.data[i]?.embedding
+      const embedding = result.embeddings[i]
       if (!chunk || !embedding) continue
       const vectorLiteral = `[${embedding.join(',')}]`
       await db.execute(

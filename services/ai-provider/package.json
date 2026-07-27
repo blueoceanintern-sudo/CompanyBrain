@@ -1,0 +1,11 @@
+{
+  "name": "@company-brain/ai-provider",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.0",
+    "openai": "^4.52.0",
+    "zod": "^3.23.8"
+  }
+}

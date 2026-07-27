@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "@company-brain/access-control": "workspace:*",
+    "@company-brain/ai-provider": "workspace:*",
     "@company-brain/db": "workspace:*",
     "@company-brain/ingestion": "workspace:*",
     "@company-brain/payments": "workspace:*",

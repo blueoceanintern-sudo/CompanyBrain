@@ -9,6 +9,7 @@
     "@company-brain/db": "workspace:*",
     "@company-brain/shared": "workspace:*",
     "@company-brain/ingestion": "workspace:*",
+    "@company-brain/ai-provider": "workspace:*",
     "node-cron": "^3.0.3"
   }
 }

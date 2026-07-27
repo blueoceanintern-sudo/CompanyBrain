@@ -17,6 +17,7 @@ The repo shares a VPS and Postgres instance with the Automated Marketing Solutio
 | Auth | JWT (HS256, HttpOnly cookie) issued by `/api/v1/auth/login`; role-based permissions in `shared/constants.ts` |
 | Document ingestion | PDF (`pdf-parse`) and Word (`mammoth`) → chunk (2000 chars, 200 overlap) → embed → store; retry via ingestion_jobs |
 | Vector search | pgvector HNSW + tsvector parallel retrieval, RRF fusion, golden-set eval harness |
+| AI provider layer | `services/ai-provider` abstracts chat + embedding calls behind capability interfaces (`ChatProvider`, `EmbeddingProvider`); adapters for Anthropic and OpenAI-compatible (OpenAI or any local runtime — Ollama, vLLM, LM Studio, llama.cpp — via `baseURL`); provider/model selection is env-driven, defaults unchanged from the previous hardcoded values |
 | Frontend | Login, chat, documents (upload/preview/archive/delete), users & groups, compartments (settings), audit log, analytics, orgs (super admin) |
 | Payments | Stripe Connect: org subscription, connect onboarding, external client checkout with 15% platform fee, billing portal, webhook |
 | Workers | ingestion-retry (03:00), query-log-purge (03:30), org-data-purge (04:00); re-embed runs manually |
@@ -61,8 +62,8 @@ When implementing anything in this project:
 | Auth | Hand-rolled JWT (HS256) | `apps/api/src/lib/jwt.ts` via `node:crypto`; HttpOnly cookie; no auth library |
 | Email | nodemailer over SMTP | Invite + welcome emails; templates in `apps/api/src/email-templates/` |
 | ORM | Drizzle + postgres.js | Close to raw SQL; no heavy abstraction |
-| Embeddings | OpenAI text-embedding-3-large | 1536 dimensions; computed once at ingest; cached in DB |
-| AI — query synthesis | Claude Haiku 4.5 | RAG-style answer synthesis; called only after confidence gate passes |
+| Embeddings | OpenAI text-embedding-3-large (default) | 1536 dimensions; computed once at ingest; cached in DB; called via `services/ai-provider`, swappable to a local model through `AI_EMBEDDING_PROVIDER`/`AI_EMBEDDING_BASE_URL` |
+| AI — query synthesis | Claude Haiku 4.5 (default) | RAG-style answer synthesis; called only after confidence gate passes; called via `services/ai-provider`, swappable through `AI_CHAT_PROVIDER`/`AI_CHAT_BASE_URL` |
 | Payments | Stripe Connect | Org subscriptions + automatic 15% platform fee split |
 | Background jobs | node-cron | No Redis, Bull, or external queue |
 | Hosting | AWS Lightsail | 2 GB RAM, 2 vCPUs, 60 GB SSD — shared with Marketing Tool |
@@ -81,6 +82,7 @@ When implementing anything in this project:
 │   ├── retrieval/            # pgvector + tsvector parallel search + RRF fusion
 │   ├── synthesis/            # Claude Haiku RAG answer generation + follow-up query rewriting
 │   ├── access-control/       # Visibility JSONB + compartment grant evaluation at query time
+│   ├── ai-provider/          # Chat + embedding capability interfaces; Anthropic / OpenAI-compatible adapters
 │   └── payments/             # Stripe Connect subscriptions + fee logic
 ├── workers/                  # node-cron jobs (ingestion-retry, retention purges, manual re-embed)
 ├── db/
@@ -509,6 +511,20 @@ JWT_SECRET=                          # signs auth cookies (HS256)
 OPENAI_API_KEY=
 ANTHROPIC_API_KEY=
 
+# AI provider layer (services/ai-provider) — all optional, defaults preserve
+# the previous hardcoded behavior (Anthropic chat, OpenAI embeddings)
+AI_CHAT_PROVIDER=anthropic | openai-compatible      # default: anthropic
+AI_EMBEDDING_PROVIDER=openai-compatible             # default: openai-compatible
+AI_CHAT_MODEL=                                      # default: claude-haiku-4-5-20251001
+AI_EMBEDDING_MODEL=                                 # default: text-embedding-3-large
+AI_EMBEDDING_DIMENSIONS=                            # default: 1536 — must match the chunks.embedding column width
+AI_CHAT_BASE_URL=                                   # local/OpenAI-compatible chat endpoint (e.g. Ollama, vLLM)
+AI_EMBEDDING_BASE_URL=                              # local/OpenAI-compatible embedding endpoint
+AI_REQUEST_TIMEOUT_MS=                              # default: 30000
+AI_MAX_RETRIES=                                     # default: 2
+AI_ALLOW_INSECURE_BASE_URL=                         # default: false — allows http:// base URLs beyond localhost
+AI_LOG_PROMPTS=                                     # default: false — never enable in production (logs prompts/completions)
+
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_ORG_PRICE_ID=                 # price ID for the org subscription plan
@@ -612,6 +628,7 @@ Response: { answer, citations, confidence, missing }
 | `services/retrieval` | pgvector semantic + tsvector full-text in parallel; deterministic RRF fusion; confidence gate; small-to-big expansion |
 | `services/synthesis` | Claude Haiku RAG generation; citation assembly; enforces no-freeform rule |
 | `services/access-control` | Visibility JSONB evaluation; restricted-compartment grant checks (user/group); role-to-chunk permission resolution at query time |
+| `services/ai-provider` | `ChatProvider`/`EmbeddingProvider` interfaces; Anthropic and OpenAI-compatible adapters; env-driven provider/model selection, config validation, error normalization. Only place that constructs an AI SDK client — `services/retrieval`, `services/ingestion`, `services/synthesis`, and `workers/re-embed-worker` consume it, never the SDKs directly |
 | `services/payments` | Stripe Connect subscription management; platform fee routing |
 | `workers/` | node-cron only — ingestion retry, query-log purge (90d), org-data purge (30d quarantine); manual re-embed script |
 | `db/schema` | Drizzle models + migrations; all persistence |

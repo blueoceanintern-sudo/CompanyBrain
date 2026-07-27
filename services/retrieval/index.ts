@@ -1,40 +1,34 @@
-import OpenAI from 'openai'
 import { db } from '@company-brain/db'
 import { chunks, documents, compartments } from '@company-brain/db'
 import { eq, and, sql, type SQL } from 'drizzle-orm'
 import type { RetrieveParams, ServiceResult, ChunkContext, SourceType, UserRole } from '@company-brain/shared'
-import {
-  EMBEDDING_MODEL,
-  EMBEDDING_DIMENSIONS,
-  CONFIDENCE_GATE_THRESHOLD,
-  RRF_K,
-  TOP_K_CHUNKS,
-} from '@company-brain/shared'
+import { CONFIDENCE_GATE_THRESHOLD, RRF_K, TOP_K_CHUNKS } from '@company-brain/shared'
 import { canAccessChunk } from '@company-brain/access-control'
+import { getEmbeddingProvider, AiProviderError } from '@company-brain/ai-provider'
 
-function getOpenAI() {
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? '' })
-}
-
-function friendlyServiceError(raw: string): string {
-  if (raw.includes('401') || /api.?key|authentication|unauthorized/i.test(raw))
-    return 'The knowledge base search is not configured. Please contact your administrator.'
-  if (raw.includes('429') || /rate.?limit/i.test(raw))
-    return 'Too many requests. Please wait a moment and try again.'
-  if (/timeout|ETIMEDOUT|ECONNREFUSED/i.test(raw))
-    return 'Search timed out. Please try again.'
+function friendlyServiceError(err: unknown): string {
+  if (err instanceof AiProviderError) {
+    switch (err.code) {
+      case 'AUTH':
+        return 'The knowledge base search is not configured. Please contact your administrator.'
+      case 'RATE_LIMIT':
+        return 'Too many requests. Please wait a moment and try again.'
+      case 'TIMEOUT':
+        return 'Search timed out. Please try again.'
+      default:
+        return 'Search is temporarily unavailable. Please try again.'
+    }
+  }
+  const raw = err instanceof Error ? err.message : ''
+  if (/timeout|ETIMEDOUT|ECONNREFUSED/i.test(raw)) return 'Search timed out. Please try again.'
   return 'Search is temporarily unavailable. Please try again.'
 }
 
 // ─── Embed a single query ─────────────────────────────────────────────────────
 
 async function embedQuery(text: string): Promise<number[]> {
-  const response = await getOpenAI().embeddings.create({
-    model: EMBEDDING_MODEL,
-    input: text,
-    dimensions: EMBEDDING_DIMENSIONS,
-  })
-  return response.data[0]?.embedding ?? []
+  const result = await getEmbeddingProvider().embed({ input: text })
+  return result.embeddings[0] ?? []
 }
 
 function parseVisibility(raw: unknown): Record<string, unknown> {
@@ -353,8 +347,7 @@ export async function retrieveChunks(
     return { success: true, data: { chunks: enriched, confidence } }
   } catch (err) {
     console.error('[retrieval]', err)
-    const raw = err instanceof Error ? err.message : ''
-    const message = friendlyServiceError(raw)
+    const message = friendlyServiceError(err)
     return { success: false, error: { code: 'RETRIEVAL_ERROR', message } }
   }
 }
