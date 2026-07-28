@@ -13,6 +13,7 @@
     "build": "bun run --filter '@company-brain/*' build",
     "test": "bun test",
     "workers": "bun run workers/index.ts",
+    "re-embed": "bun --env-file=.env run workers/re-embed-worker.ts",
     "db:generate": "bunx drizzle-kit generate",
     "db:migrate": "bunx drizzle-kit migrate",
     "db:studio": "bunx drizzle-kit studio"

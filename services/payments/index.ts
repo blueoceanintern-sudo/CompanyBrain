@@ -202,8 +202,8 @@ export async function getSubscriptionStatus(
         status: 'active',
         limit: 1,
       })
-      if (activeSubs.data.length > 0) {
-        const active = activeSubs.data[0]
+      const active = activeSubs.data[0]
+      if (active) {
         await db
           .update(orgs)
           .set({ plan: 'paid', stripeSubscriptionId: active.id, updatedAt: new Date() })
@@ -475,18 +475,20 @@ export async function handleStripeWebhook(params: {
       return { success: true, data: { eventType: event.type } }
     }
 
-    // Determine orgId from event metadata
+    // Determine orgId from event metadata. Stripe types event.data.object as a wide
+    // union; use `in`-narrowing to read metadata without casting the whole object.
     let orgId: string | null = null
-    const obj = event.data.object as Record<string, unknown>
-    if (typeof obj['metadata'] === 'object' && obj['metadata'] !== null) {
-      orgId = (obj['metadata'] as Record<string, string>)['orgId'] ?? null
+    const obj = event.data.object
+    if ('metadata' in obj && obj.metadata && typeof obj.metadata === 'object') {
+      orgId = (obj.metadata as Record<string, string>)['orgId'] ?? null
     }
 
     await db.insert(stripeEvents).values({
       orgId,
       stripeEventId: event.id,
       eventType: event.type,
-      payload: event.data.object as Record<string, unknown>,
+      // Raw Stripe event object, stored verbatim as jsonb (column type is `unknown`).
+      payload: event.data.object,
       processedAt: new Date(),
     })
 

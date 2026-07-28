@@ -1,6 +1,9 @@
 import cron from 'node-cron'
+import { validateAiConfig } from '@company-brain/ai-provider'
 import { runIngestionRetry } from './ingestion-retry'
 import { runQueryLogPurge, runOrgDataPurge } from './retention'
+
+validateAiConfig()
 
 // Ingest retry — daily at 3am
 cron.schedule('0 3 * * *', async () => {

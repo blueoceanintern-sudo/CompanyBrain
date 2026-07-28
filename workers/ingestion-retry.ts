@@ -1,8 +1,6 @@
 import { db } from '@company-brain/db'
 import { ingestionJobs, documents } from '@company-brain/db'
 import { eq, and, lt } from 'drizzle-orm'
-import { ingestDocument } from '@company-brain/ingestion'
-import type { AccessTier, SourceType, VisibilityPolicy } from '@company-brain/shared'
 
 export async function runIngestionRetry(): Promise<void> {
   console.log('[ingestion-retry] Starting retry pass')

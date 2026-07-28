@@ -19,8 +19,8 @@ export function signJwt(payload: Record<string, unknown>, secret: string, expire
 
 export function verifyJwt(token: string, secret: string): Record<string, unknown> {
   const parts = token.split('.')
-  if (parts.length !== 3) throw new Error('Invalid token')
   const [header, body, sig] = parts
+  if (parts.length !== 3 || !header || !body || !sig) throw new Error('Invalid token')
   const expected = createHmac('sha256', secret).update(`${header}.${body}`).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
   if (expected !== sig) throw new Error('Invalid signature')

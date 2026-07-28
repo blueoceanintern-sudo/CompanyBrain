@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
+import { validateAiConfig } from '@company-brain/ai-provider'
 import { authMiddleware, orgIsolationMiddleware } from './middleware/auth'
 import type { AuthVars } from './middleware/auth'
 import authRoute from './routes/auth'
@@ -13,6 +14,8 @@ import accessRoute from './routes/access'
 import paymentsRoute from './routes/payments'
 import analyticsRoute from './routes/analytics'
 import stripeWebhookRoute from './routes/stripe-webhook'
+
+validateAiConfig()
 
 const app = new Hono()
 

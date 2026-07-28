@@ -5,7 +5,7 @@ B2B enterprise knowledge operating system. Multi-tenant, org-agnostic. v1 pilot:
 ## Prerequisites
 
 - [Bun](https://bun.sh) >= 1.1
-- Docker (for Postgres 17 + pgvector)
+- Docker (for Postgres 16 + pgvector)
 - API keys: OpenAI, Anthropic, Stripe
 - SMTP credentials (user invite emails)
 

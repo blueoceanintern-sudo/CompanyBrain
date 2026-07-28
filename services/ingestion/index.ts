@@ -1,22 +1,33 @@
 import { createHash } from 'crypto'
-import OpenAI from 'openai'
 import { db } from '@company-brain/db'
-import { chunks, documents, ingestionJobs } from '@company-brain/db'
+import { chunks, documents } from '@company-brain/db'
 import { eq, and, sql } from 'drizzle-orm'
 import type {
   IngestParams,
   ServiceResult,
-  VisibilityPolicy,
 } from '@company-brain/shared'
-import {
-  CHUNK_SIZE_CHARS,
-  CHUNK_OVERLAP_CHARS,
-  EMBEDDING_MODEL,
-  EMBEDDING_DIMENSIONS,
-} from '@company-brain/shared'
+import { CHUNK_SIZE_CHARS, CHUNK_OVERLAP_CHARS } from '@company-brain/shared'
+import { getEmbeddingProvider, AiProviderError } from '@company-brain/ai-provider'
 
-function getOpenAI() {
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? '' })
+// Mirrors friendlyServiceError in services/retrieval: an embedding failure is
+// classified by AiProviderError.code rather than surfaced as a raw provider
+// message. Non-AI failures (PDF/Word parsing, DB) keep their own message, which
+// is genuinely useful to the admin who uploaded the document.
+function ingestionError(err: unknown): { code: string; message: string } {
+  if (err instanceof AiProviderError) {
+    switch (err.code) {
+      case 'AUTH':
+        return { code: 'EMBEDDING_ERROR', message: 'Embeddings are not configured. Please contact your administrator.' }
+      case 'RATE_LIMIT':
+        return { code: 'EMBEDDING_ERROR', message: 'The embedding service is rate limited. Please retry shortly.' }
+      case 'TIMEOUT':
+        return { code: 'EMBEDDING_ERROR', message: 'The embedding service timed out. Please retry.' }
+      default:
+        return { code: 'EMBEDDING_ERROR', message: 'The embedding service is temporarily unavailable. Please retry.' }
+    }
+  }
+  const message = err instanceof Error ? err.message : 'Unknown ingestion error'
+  return { code: 'INGESTION_ERROR', message }
 }
 
 // ─── Text extraction ──────────────────────────────────────────────────────────
@@ -96,12 +107,8 @@ export function stitchChunks(contents: string[]): string {
 // ─── Embedding ────────────────────────────────────────────────────────────────
 
 async function embedBatch(texts: string[]): Promise<number[][]> {
-  const response = await getOpenAI().embeddings.create({
-    model: EMBEDDING_MODEL,
-    input: texts,
-    dimensions: EMBEDDING_DIMENSIONS,
-  })
-  return response.data.map((d) => d.embedding)
+  const result = await getEmbeddingProvider().embed({ input: texts })
+  return result.embeddings
 }
 
 // ─── Main ingest function ─────────────────────────────────────────────────────
@@ -186,12 +193,12 @@ export async function ingestDocument(
 
     return { success: true, data: { chunksCreated: newChunks.length } }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown ingestion error'
+    console.error(`[ingestion] document ${documentId} failed:`, err)
     await db
       .update(documents)
       .set({ status: 'failed', updatedAt: new Date() })
       .where(eq(documents.id, documentId))
 
-    return { success: false, error: { code: 'INGESTION_ERROR', message } }
+    return { success: false, error: ingestionError(err) }
   }
 }

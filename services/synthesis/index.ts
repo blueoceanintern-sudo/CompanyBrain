@@ -1,20 +1,23 @@
-import Anthropic from '@anthropic-ai/sdk'
-import type { MessageCreateParamsBase } from '@anthropic-ai/sdk/resources/beta/prompt-caching/messages'
 import type { SynthesisParams, ServiceResult, Citation, ConversationTurn } from '@company-brain/shared'
-import { SYNTHESIS_MODEL, CITATION_EXCERPT_LENGTH } from '@company-brain/shared'
+import { CITATION_EXCERPT_LENGTH } from '@company-brain/shared'
+import { getChatProvider, AiProviderError } from '@company-brain/ai-provider'
+import type { ChatMessage } from '@company-brain/ai-provider'
 
-type BetaMessageParam = MessageCreateParamsBase['messages'][number]
-type BetaTextBlock = { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
-function friendlyServiceError(raw: string): string {
-  if (raw.includes('401') || /api.?key|authentication|unauthorized/i.test(raw))
-    return 'The answer service is not configured. Please contact your administrator.'
-  if (raw.includes('429') || /rate.?limit/i.test(raw))
-    return 'Too many requests. Please wait a moment and try again.'
-  if (/timeout|ETIMEDOUT|ECONNREFUSED/i.test(raw))
-    return 'Answer generation timed out. Please try again.'
+function friendlyServiceError(err: unknown): string {
+  if (err instanceof AiProviderError) {
+    switch (err.code) {
+      case 'AUTH':
+        return 'The answer service is not configured. Please contact your administrator.'
+      case 'RATE_LIMIT':
+        return 'Too many requests. Please wait a moment and try again.'
+      case 'TIMEOUT':
+        return 'Answer generation timed out. Please try again.'
+      default:
+        return 'Answer generation is temporarily unavailable. Please try again.'
+    }
+  }
+  const raw = err instanceof Error ? err.message : ''
+  if (/timeout|ETIMEDOUT|ECONNREFUSED/i.test(raw)) return 'Answer generation timed out. Please try again.'
   return 'Answer generation is temporarily unavailable. Please try again.'
 }
 
@@ -42,9 +45,8 @@ export async function contextualizeQuery(
     .join('\n')
 
   try {
-    const response = await anthropic.messages.create({
-      model: SYNTHESIS_MODEL,
-      max_tokens: 150,
+    const result = await getChatProvider().complete({
+      maxTokens: 150,
       messages: [
         {
           role: 'user',
@@ -52,8 +54,7 @@ export async function contextualizeQuery(
         },
       ],
     })
-    const block = response.content[0]
-    return block?.type === 'text' ? block.text.trim() : query
+    return result.text.trim()
   } catch {
     return query
   }
@@ -78,7 +79,7 @@ export async function synthesizeAnswer(
   }
 
   try {
-    const messages: BetaMessageParam[] = []
+    const messages: ChatMessage[] = []
 
     // Inject source documents as the opening turn so they can be cached independently
     // of the conversation history. Cache hits when the same docs are retrieved (same topic).
@@ -90,13 +91,8 @@ export async function synthesizeAnswer(
       messages.push(
         {
           role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Source documents for this session:\n\n${context}`,
-              cache_control: { type: 'ephemeral' },
-            } as BetaTextBlock,
-          ],
+          content: `Source documents for this session:\n\n${context}`,
+          cacheBoundary: true,
         },
         {
           role: 'assistant',
@@ -115,25 +111,21 @@ export async function synthesizeAnswer(
 
         messages.push({
           role: turn.role,
-          content: isLastAssistant
-            ? ([{ type: 'text', text: turn.content, cache_control: { type: 'ephemeral' } }] as BetaTextBlock[])
-            : turn.content,
+          content: turn.content,
+          ...(isLastAssistant ? { cacheBoundary: true } : {}),
         })
       }
     }
 
     messages.push({ role: 'user', content: query })
 
-    const message = await anthropic.beta.promptCaching.messages.create({
-      model: SYNTHESIS_MODEL,
-      max_tokens: 1024,
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+    const result = await getChatProvider().complete({
+      system: SYSTEM_PROMPT,
+      maxTokens: 1024,
       messages,
     })
 
-    const answerBlock = message.content[0]
-    const answerText =
-      answerBlock?.type === 'text' ? answerBlock.text : "I couldn't generate a response."
+    const answerText = result.text
 
     const citations: Citation[] = []
     for (let i = 0; i < chunks.length; i++) {
@@ -165,8 +157,7 @@ export async function synthesizeAnswer(
     return { success: true, data: { answer: answerText, citations, missing } }
   } catch (err) {
     console.error('[synthesis]', err)
-    const raw = err instanceof Error ? err.message : ''
-    const message = friendlyServiceError(raw)
+    const message = friendlyServiceError(err)
     return { success: false, error: { code: 'SYNTHESIS_ERROR', message } }
   }
 }

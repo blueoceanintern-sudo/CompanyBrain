@@ -8,6 +8,7 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "skipLibCheck": true,
+    "types": ["bun"],
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true

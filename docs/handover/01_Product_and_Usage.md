@@ -1,7 +1,6 @@
 # Company's Brain — Product & Usage Guide
 
 > **Audience:** anyone — BlueOcean staff, Equest admins, end users.
-> **Last verified:** 2026-07-20, commit `d18e218`.
 > Companion documents: `02_Technical_Handover.md` (developers), `03_Operations_and_Access.md` (successor + manager only).
 
 ## Contents
@@ -21,8 +20,8 @@ Company's Brain is a **B2B knowledge platform** built by BlueOcean. An organisat
 
 **Current status:**
 
-- All core flows are built and working: document ingestion, retrieval + AI answers, access control (roles, compartments, groups, grants), payments, audit logging, analytics, and automated data-retention purges.
-- v1 pilot customer: **Equest school network**. 
+- All core flows are built and working: document ingestion, retrieval and AI answers, access control (roles, compartments, groups, grants), payments, audit logging, analytics, and automated data-retention purges.
+- v1 pilot customer: **Equest school network**.
 - The platform is multi-tenant and org-agnostic — nothing is Equest-specific in the code.
 - Known limitations are tracked in `02_Technical_Handover.md`, Part III.
 
@@ -32,7 +31,7 @@ Company's Brain is a **B2B knowledge platform** built by BlueOcean. An organisat
 |---|---|
 | Source code | https://github.com/blueoceanintern-sudo/CompanyBrain |
 | Hosting | AWS Lightsail VPS (shared with the Automated Marketing Solution) — see `03_Operations_and_Access.md` |
-| Developer docs | `CLAUDE.md` and `README.md` in the repo root (verified accurate as of the commit above) |
+| Developer docs | `CLAUDE.md` and `README.md` in the repo root |
 | Design system | `DESIGN.md` in the repo root |
 
 > 📸 **[SCREENSHOT: the chat page answering a real question, with citations visible — the one image that explains the product]**
@@ -58,15 +57,15 @@ Many organisations share one deployment. Every piece of data is tagged with its 
 
 | Role | Can do |
 |---|---|
-| `super_admin` | Everything below, plus create/manage organisations (BlueOcean staff) |
-| `org_admin` | Manage documents, users, groups, compartments, billing, analytics for their org |
-| `dept_admin` | Manage documents + ask questions |
+| `super_admin` | Everything below, plus create and manage organisations (BlueOcean staff) |
+| `org_admin` | Manage documents, users, groups, compartments, billing, and analytics for their org |
+| `dept_admin` | Manage documents and ask questions |
 | `staff` | Ask questions |
-| `external_client` | Ask questions on the external plane; subscribe/pay for access |
+| `external_client` | Ask questions on the external plane; subscribe and pay for access |
 
 ## Compartments, groups, and grants
 
-Documents live in **compartments** (e.g. "HR", "Operations", "Client FAQs"). Compartments can have **sub-compartments** (one level deep only). A compartment can be marked **restricted**, in which case only users or **groups** with an explicit **grant** can see its documents — including in search results and AI answers. Access narrows down the tree: reaching a sub-compartment always requires access to its parent.
+Documents live in **compartments** (e.g. "HR", "Operations", "Client FAQs"). Each compartment belongs to a single knowledge plane — internal or external — and can have **sub-compartments** (one level deep only). A compartment can be marked **restricted**, in which case only users or **groups** with an explicit **grant** can see its documents — including in search results and AI answers. Access narrows down the tree: reaching a sub-compartment always requires access to its parent.
 
 > 📊 **[DIAGRAM: org → compartments (+ one restricted, with a grant arrow from a group) → documents → "who sees what". This is the concept people struggle with most — draw it, don't describe it.]**
 
@@ -77,9 +76,9 @@ Documents live in **compartments** (e.g. "HR", "Operations", "Client FAQs"). Com
 
 ## How answers are produced (plain-language version)
 
-1. Your question is compared against every document chunk two ways at once — by meaning and by keywords — and the best matches are combined.
+1. Your question is compared against every document passage two ways at once — by meaning and by keywords — and the best matches are combined.
 2. If nothing in the knowledge base is a confident match, you get *"I don't know, not in the knowledge base."* The AI is never asked to guess.
-3. Otherwise, an AI model (Claude) writes an answer **using only the retrieved passages**, and every answer carries citations back to the source documents.
+3. Otherwise, an AI model writes an answer **using only the retrieved passages**, and every answer carries citations back to the source documents.
 
 ---
 
@@ -91,14 +90,16 @@ Documents live in **compartments** (e.g. "HR", "Operations", "Client FAQs"). Com
 
 Go to the app URL and sign in with your email and password. Accounts are created by your administrator — there is no self-signup. If you've been invited, you'll have received an email with your login details.
 
+The first time you sign in with an invited account, you are required to set a new password before you can use the app. If you forget your password, use the **Forgot password** link on the login page; you'll receive an email with a single-use reset link. The login page also has a **Contact Administrator** link for help.
+
 > 📸 **[SCREENSHOT: login page]**
 
 ## Asking a question
 
 Open **Chat** from the sidebar. Type a question the way you'd ask a colleague — full natural sentences work better than keywords ("How many days of annual leave do new employees get?" rather than "annual leave policy").
 
-- The **Internal / External** switcher (top of page) controls which knowledge plane you're querying. Most staff will stay on Internal.
-- Answers stream in with **numbered citations**. Click a citation to see the source document and the exact passage the answer came from.
+- The **Internal / External** switcher (top of page) controls which knowledge plane you're querying. Most staff will stay on Internal. The External option is available only when the organisation is on the paid plan.
+- Each answer shows which plane it was drawn from, and carries **numbered citations**. Click a citation to open the source document and see the exact passage the answer came from.
 - **Always check citations for consequential decisions.** The AI can only use what's in the knowledge base, but the underlying document may be outdated.
 
 > 📸 **[SCREENSHOT: a query with the answer and citation panel expanded]**
@@ -111,11 +112,7 @@ Open **Chat** from the sidebar. Type a question the way you'd ask a colleague �
 
 ## Follow-up questions
 
-You can ask follow-ups in the same conversation ("summarise that", "what about part-time staff?"). The system rewrites your follow-up into a full question behind the scenes, so context carries over.
-
-## Not yet available
-
-The **Attach file**, **Web search**, and **AI settings** buttons in the chat toolbar are placeholders — clicking them shows a "coming soon" notice. Answers come from your organisation's uploaded documents only.
+You can ask follow-ups in the same conversation ("summarise that", "what about part-time staff?"). The system rewrites your follow-up into a full question behind the scenes, so context carries over. Answers still come only from your organisation's uploaded documents.
 
 ## For external clients
 
@@ -132,7 +129,8 @@ External clients see only the external plane. If your organisation charges for a
 **Uploading.** Documents → Upload. Choose the file (PDF, Word `.docx`/`.doc`, or plain text), a **compartment**, an **access tier** (Internal or External), and a **source type** (HR policy, SOP, FAQ, case note, compliance, product doc, other). The document is parsed, split into passages, and indexed — status moves `queued → processing → complete`. Large documents take longer; the upload waits until processing finishes.
 
 - Re-uploading an unchanged file is a no-op (the system detects identical content and skips it).
-- If a document shows **failed**, a nightly job retries it automatically (up to 3 attempts); you can also delete and re-upload.
+- Uploading a changed file with the same name to the same compartment creates a **new version** and archives the previous one automatically.
+- If a document shows **failed**, delete and re-upload it. (A nightly retry job exists but cannot re-process a failed upload on its own — see the known-issues section of `02_Technical_Handover.md`.)
 
 > 📊 **[DIAGRAM: small flowchart — uploaded → queued → processing → complete / failed → "what to do if failed"]**
 > 📸 **[SCREENSHOT: upload dialog with compartment/tier/source-type fields]**
@@ -147,7 +145,7 @@ External clients see only the external plane. If your organisation charges for a
 
 ## Users and groups
 
-**Inviting users.** Users → Invite. Enter an email and role; the person receives an invitation email with login details. You can change roles or remove users later.
+**Inviting users.** Users → Invite. Enter an email and role; the person receives an invitation email with login details and is required to set their own password on first sign-in. You can change roles or remove users later.
 
 **Groups.** Create groups ("Leadership", "HR team") on the Users page and assign members. Groups exist to make compartment grants manageable — grant a compartment to a group once instead of to ten individuals.
 
@@ -155,7 +153,7 @@ External clients see only the external plane. If your organisation charges for a
 
 ## Compartments and restricted access (Settings)
 
-Create compartments and one level of sub-compartments in **Settings**. Mark a compartment **Restricted** to hide its documents from everyone except granted users/groups. Manage grants from the compartment's grant editor — grants can target individual users or groups.
+Create compartments and one level of sub-compartments in **Settings**. Each compartment belongs to one plane (internal or external). Mark a compartment **Restricted** to hide its documents from everyone except granted users and groups. Manage grants from the compartment's grant editor — grants can target individual users or groups.
 
 Deleting a compartment **deletes all its documents and indexed content** and requires typed confirmation. Sub-compartments must be deleted before their parent.
 
