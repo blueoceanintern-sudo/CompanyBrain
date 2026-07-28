@@ -2,7 +2,14 @@ import { db } from '@company-brain/db'
 import { sql } from 'drizzle-orm'
 import type { VisibilityPolicy, UserRole, OrgPlan } from '@company-brain/shared'
 
-export { hasPermission } from '@company-brain/shared'
+// Per-org role → permission resolution, enforcement, and editing.
+export {
+  hasPermission,
+  getRolePermissions,
+  setRolePermissions,
+  invalidateRolePermissions,
+  seedRolePermissionsValues,
+} from './role-permissions'
 
 interface CanAccessParams {
   visibility: VisibilityPolicy

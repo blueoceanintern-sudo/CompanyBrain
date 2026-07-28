@@ -4,8 +4,7 @@ import { z } from 'zod'
 import { db } from '@company-brain/db'
 import { compartments, users, auditLogs, orgs, documents, chunks, groups, groupMembers, compartmentGrants, queries } from '@company-brain/db'
 import { eq, and, ne, count, inArray, sql, isNull } from 'drizzle-orm'
-import { hasPermission } from '@company-brain/shared'
-import { canPublishExternal } from '@company-brain/access-control'
+import { canPublishExternal, hasPermission } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
 import { sendOrgAdminWelcome, sendUserInvite } from '../lib/email'
 
@@ -38,7 +37,7 @@ adminRoute.patch('/', zValidator('json', orgProfileUpdateSchema), async (c) => {
   const userId = c.get('userId')
   const { name } = c.req.valid('json')
 
-  if (!hasPermission(role, 'users:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'users:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -185,7 +184,7 @@ adminRoute.post('/compartments', zValidator('json', compartmentCreateSchema), as
   const role = c.get('role')
   const body = c.req.valid('json')
 
-  if (!hasPermission(role, 'users:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'documents:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -264,7 +263,7 @@ adminRoute.patch('/compartments/:cId', zValidator('json', compartmentUpdateSchem
   const userId = c.get('userId')
   const updates = c.req.valid('json')
 
-  if (!hasPermission(role, 'users:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'documents:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -319,7 +318,7 @@ adminRoute.delete('/compartments/:cId', zValidator('json', deleteCompartmentSche
   const userId = c.get('userId')
   const { targetCompartmentId } = c.req.valid('json')
 
-  if (!hasPermission(role, 'users:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'documents:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -445,7 +444,7 @@ adminRoute.post('/users', zValidator('json', inviteUserSchema), async (c) => {
   const actorRole = c.get('role')
   const body = c.req.valid('json')
 
-  if (!hasPermission(actorRole, 'users:manage')) {
+  if (!(await hasPermission(c.get('orgId'), actorRole, 'users:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -531,7 +530,7 @@ adminRoute.patch('/users/:userId/role', zValidator('json', updateRoleSchema), as
   const role = c.get('role')
   const { role: newRole } = c.req.valid('json')
 
-  if (!hasPermission(role, 'users:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'users:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -559,7 +558,7 @@ adminRoute.delete('/users/:userId', async (c) => {
   const actorUserId = c.get('userId')
   const actorRole = c.get('role')
 
-  if (!hasPermission(actorRole, 'users:manage')) {
+  if (!(await hasPermission(c.get('orgId'), actorRole, 'users:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
   if (targetUserId === actorUserId) {

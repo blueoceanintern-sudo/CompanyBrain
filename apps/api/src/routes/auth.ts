@@ -8,6 +8,7 @@ import { db } from '@company-brain/db'
 import { users, orgs, passwordResetTokens } from '@company-brain/db'
 import { eq } from 'drizzle-orm'
 import { sendPasswordReset } from '../lib/email'
+import { getRolePermissions } from '@company-brain/access-control'
 
 const authRoute = new Hono()
 
@@ -72,6 +73,10 @@ authRoute.post('/login', zValidator('json', loginSchema), async (c) => {
     .where(eq(orgs.id, user.orgId))
     .limit(1)
 
+  // Resolve the effective permissions for this user's role so the web client can
+  // gate UI without a second request. Enforcement still happens server-side.
+  const permissions = (await getRolePermissions(user.orgId))[user.role] ?? []
+
   return c.json({
     success: true,
     data: {
@@ -83,6 +88,7 @@ authRoute.post('/login', zValidator('json', loginSchema), async (c) => {
         orgId: user.orgId,
         orgName: orgRows[0]?.name ?? '',
         mustChangePassword: user.mustChangePassword,
+        permissions,
       },
     },
   })

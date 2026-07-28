@@ -15,8 +15,7 @@ import {
 import { db } from '@company-brain/db'
 import { orgs, users } from '@company-brain/db'
 import { eq } from 'drizzle-orm'
-import { hasPermission } from '@company-brain/shared'
-import { canPublishExternal } from '@company-brain/access-control'
+import { canPublishExternal, hasPermission } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
 
 const paymentsRoute = new Hono<AuthVars>()
@@ -40,7 +39,7 @@ paymentsRoute.post(
     const orgId = c.req.param('id')
     if (!orgId) return c.json(BAD_ORG, 400)
     const role = c.get('role')
-    if (!hasPermission(role, 'billing:manage')) {
+    if (!(await hasPermission(c.get('orgId'), role, 'billing:manage'))) {
       return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
     }
     const userId = c.get('userId')
@@ -82,7 +81,7 @@ paymentsRoute.get('/subscriptions', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
-  if (!hasPermission(role, 'billing:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'billing:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
   const result = await getSubscriptionStatus(orgId)
@@ -95,7 +94,7 @@ paymentsRoute.delete('/subscriptions', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
-  if (!hasPermission(role, 'billing:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'billing:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
   const result = await cancelOrgSubscription(orgId)
@@ -111,7 +110,7 @@ paymentsRoute.post('/connect-account', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
-  if (!hasPermission(role, 'billing:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'billing:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
   const result = await ensureConnectOnboardingLink(orgId)
@@ -124,7 +123,7 @@ paymentsRoute.get('/connect-account', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
-  if (!hasPermission(role, 'billing:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'billing:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
   const result = await getConnectStatus(orgId)
@@ -137,7 +136,7 @@ paymentsRoute.patch('/external-pricing', zValidator('json', externalPricingSchem
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
-  if (!hasPermission(role, 'billing:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'billing:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -164,7 +163,7 @@ paymentsRoute.get('/external-pricing', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
-  if (!hasPermission(role, 'queries:submit')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'queries:submit'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -181,7 +180,7 @@ paymentsRoute.post('/upgrade', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
-  if (!hasPermission(role, 'billing:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'billing:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
   const userId = c.get('userId')
@@ -201,7 +200,7 @@ paymentsRoute.post('/billing-portal', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
-  if (!hasPermission(role, 'billing:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'billing:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
   const result = await createBillingPortalSession(orgId)
@@ -214,7 +213,7 @@ paymentsRoute.post('/checkout', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
   const role = c.get('role')
-  if (!hasPermission(role, 'external-access:subscribe')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'external-access:subscribe'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 

@@ -14,7 +14,7 @@ The repo shares a VPS and Postgres instance with the Automated Marketing Solutio
 |---|---|
 | Repo layout | `apps/web`, `apps/api`, `services/*`, `workers/`, `db/`, `shared/`, `scripts/` |
 | Backend routes | `/api/v1/*` — auth, orgs, documents, query, admin (compartments/users), access (groups/grants), payments, analytics, Stripe webhook |
-| Auth | JWT (HS256, HttpOnly cookie) issued by `/api/v1/auth/login`; role-based permissions in `shared/constants.ts` |
+| Auth | JWT (HS256, HttpOnly cookie) issued by `/api/v1/auth/login`; role-based permissions default in `shared/constants.ts` (`ROLE_PERMISSIONS`), editable per-org via the `role_permissions` table (resolved + enforced in `services/access-control`) |
 | Document ingestion | PDF (`pdf-parse`) and Word (`mammoth`) → chunk (2000 chars, 200 overlap) → embed → store; retry via ingestion_jobs |
 | Vector search | pgvector HNSW + tsvector parallel retrieval, RRF fusion, golden-set eval harness |
 | AI provider layer | `services/ai-provider` abstracts chat + embedding calls behind capability interfaces (`ChatProvider`, `EmbeddingProvider`); adapters for Anthropic and OpenAI-compatible (OpenAI or any local runtime — Ollama, vLLM, LM Studio, llama.cpp — via `baseURL`); provider/model selection is env-driven, defaults unchanged from the previous hardcoded values |
@@ -441,14 +441,16 @@ GET    /orgs/:id/query                      # query history
 
 ```
 GET    /orgs/:id/compartments               # list compartments (with grant counts)
-POST   /orgs/:id/compartments               # create compartment / sub-compartment
-PATCH  /orgs/:id/compartments/:cId          # update name / description / restricted
-DELETE /orgs/:id/compartments/:cId          # delete compartment + its documents/chunks (typed confirmation)
+POST   /orgs/:id/compartments               # create compartment / sub-compartment — documents:manage
+PATCH  /orgs/:id/compartments/:cId          # update name / description / restricted — documents:manage
+DELETE /orgs/:id/compartments/:cId          # delete compartment + its documents/chunks (typed confirmation) — documents:manage
 GET    /orgs/:id/users                      # list users
-POST   /orgs/:id/users                      # invite user (sends email)
-PATCH  /orgs/:id/users/:userId/role         # update role
-DELETE /orgs/:id/users/:userId              # remove user
+POST   /orgs/:id/users                      # invite user (sends email) — users:manage
+PATCH  /orgs/:id/users/:userId/role         # update role — users:manage
+DELETE /orgs/:id/users/:userId              # remove user — users:manage
 ```
+
+Permissions: `users:manage` = invite/roles/remove users; `access:manage` = role permissions + groups + grants; `documents:manage` = document + folder (compartment) CRUD; `documents:view` / `queries:submit` = enforced at `GET /documents` and `POST /query` respectively (not just nav gating); `analytics:view` = dashboards; `audit:view` = audit log + export.
 
 ### Account (self-service, any authenticated role)
 
@@ -456,7 +458,7 @@ DELETE /orgs/:id/users/:userId              # remove user
 PATCH  /orgs/:id/account/password           # { currentPassword, newPassword } — operates on the caller's own userId; no permission check needed
 ```
 
-### Access (groups + grants) — `users:manage` permission
+### Access (groups + grants + role permissions) — `access:manage` permission
 
 ```
 GET    /orgs/:id/groups                     # list groups
@@ -468,6 +470,8 @@ PUT    /orgs/:id/groups/:gId/members        # replace member list
 PUT    /orgs/:id/users/:userId/groups       # replace a user's group memberships
 GET    /orgs/:id/compartments/:cId/grants
 PUT    /orgs/:id/compartments/:cId/grants   # replace grant list (users and/or groups)
+GET    /orgs/:id/roles                       # per-org role→permission matrix + editable roles/permissions
+PUT    /orgs/:id/roles/:role                 # replace one role's permission set (super_admin locked; orgs:manage not grantable; cannot strip access:manage from your own role)
 ```
 
 ### Payments
@@ -486,13 +490,13 @@ POST   /orgs/:id/billing-portal             # Stripe billing portal session
 POST   /webhooks/stripe                     # Stripe webhook (public; signature-verified; idempotent via stripe_events)
 ```
 
-### Analytics
+### Analytics (`analytics:view`) + Audit (`audit:view`)
 
 ```
-GET    /orgs/:id/analytics/overview         # KB coverage, query volume, citation hit rate
-GET    /orgs/:id/analytics/queries          # top unanswered, low-confidence queries
-GET    /orgs/:id/analytics/audit-logs       # paginated audit log
-GET    /orgs/:id/analytics/export           # export audit log (CSV)
+GET    /orgs/:id/analytics/overview         # KB coverage, query volume, citation hit rate — analytics:view
+GET    /orgs/:id/analytics/queries          # top unanswered, low-confidence queries — analytics:view
+GET    /orgs/:id/analytics/audit-logs       # paginated audit log — audit:view
+GET    /orgs/:id/analytics/export           # export audit log (CSV) — audit:view
 ```
 
 ---
@@ -627,7 +631,7 @@ Response: { answer, citations, confidence, missing }
 | `services/ingestion` | Parse PDF/Word → chunk → tag with org_id, compartment, access_tier, visibility → embed via OpenAI → store |
 | `services/retrieval` | pgvector semantic + tsvector full-text in parallel; deterministic RRF fusion; confidence gate; small-to-big expansion |
 | `services/synthesis` | Claude Haiku RAG generation; citation assembly; enforces no-freeform rule |
-| `services/access-control` | Visibility JSONB evaluation; restricted-compartment grant checks (user/group); role-to-chunk permission resolution at query time |
+| `services/access-control` | Visibility JSONB evaluation; restricted-compartment grant checks (user/group); role-to-chunk permission resolution at query time; per-org role→permission matrix (`role-permissions.ts`) — cached `hasPermission(orgId, role, perm)`, editable via `/orgs/:id/roles`, seeded from `ROLE_PERMISSIONS` defaults |
 | `services/ai-provider` | `ChatProvider`/`EmbeddingProvider` interfaces; Anthropic and OpenAI-compatible adapters; env-driven provider/model selection, config validation, error normalization. Only place that constructs an AI SDK client — `services/retrieval`, `services/ingestion`, `services/synthesis`, and `workers/re-embed-worker` consume it, never the SDKs directly |
 | `services/payments` | Stripe Connect subscription management; platform fee routing |
 | `workers/` | node-cron only — ingestion retry, query-log purge (90d), org-data purge (30d quarantine); manual re-embed script |
