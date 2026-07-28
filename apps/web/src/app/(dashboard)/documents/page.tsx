@@ -18,8 +18,7 @@ import { useCompartments, useCreateCompartment, useDeleteCompartment } from '@/h
 import { useSubscription } from '@/hooks/use-payments'
 import { useGroups, useCompartmentGrants } from '@/hooks/use-groups'
 import { useUsers } from '@/hooks/use-users'
-import { getAuthUser } from '@/lib/auth'
-import { hasPermission } from '@company-brain/shared'
+import { getAuthUser, userCan } from '@/lib/auth'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { DocumentPreview } from '@/components/document-preview'
 import { FolderAccessPanel } from '@/components/documents/folder-access'
@@ -884,8 +883,8 @@ type DocItem = Awaited<ReturnType<typeof useDocuments>>['data'] extends Array<in
 export default function DocumentsPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
-  const canManageFolders = !!user?.role && hasPermission(user.role, 'users:manage')
-  const canManageDocs = !!user?.role && hasPermission(user.role, 'documents:manage')
+  const canManageFolders = userCan(user, 'documents:manage')
+  const canManageDocs = userCan(user, 'documents:manage')
   const searchParams = useSearchParams()
   const router = useRouter()
 
