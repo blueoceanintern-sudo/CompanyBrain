@@ -58,7 +58,7 @@ When implementing anything in this project:
 | Runtime | Bun | Use Bun, not Node, for all scripts and server; verify npm package Bun compatibility before adding |
 | Backend | Hono | TypeScript; runs on Bun |
 | Frontend | Next.js | v15+; server components preferred; shadcn/ui for all UI |
-| Database | PostgreSQL 17 + pgvector + pg_trgm | `pgvector/pgvector:pg17` Docker image; pgvector for HNSW semantic search; pg_trgm for fuzzy text |
+| Database | PostgreSQL 16 + pgvector + pg_trgm | `pgvector/pgvector:pg16` Docker image; pgvector for HNSW semantic search; pg_trgm for fuzzy text |
 | Auth | Hand-rolled JWT (HS256) | `apps/api/src/lib/jwt.ts` via `node:crypto`; HttpOnly cookie; no auth library |
 | Email | nodemailer over SMTP | Invite + welcome emails; templates in `apps/api/src/email-templates/` |
 | ORM | Drizzle + postgres.js | Close to raw SQL; no heavy abstraction |
@@ -114,7 +114,7 @@ Workspace packages are named `@company-brain/*` — use those names with `--filt
 ### Database
 
 ```bash
-docker compose up -d db                        # local Postgres 17 + pgvector (applies db/init.sql on first run)
+docker compose up -d db                        # local Postgres 16 + pgvector (applies db/init.sql on first run)
 bun db:generate                                # generate migration from schema
 bun db:migrate                                 # apply migrations
 bun db:studio                                  # Drizzle Studio
