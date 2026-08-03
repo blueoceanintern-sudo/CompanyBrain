@@ -2,9 +2,9 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { db } from '@company-brain/db'
-import { orgs, users, auditLogs } from '@company-brain/db'
+import { orgs, users, auditLogs, rolePermissions } from '@company-brain/db'
 import { eq, desc, sql } from 'drizzle-orm'
-import { hasPermission } from '@company-brain/shared'
+import { hasPermission, seedRolePermissionsValues } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
 
 const orgsRoute = new Hono<AuthVars>()
@@ -18,7 +18,7 @@ const createOrgSchema = z.object({
 // GET /api/v1/orgs — list orgs (platform-level, not org-scoped)
 orgsRoute.get('/', async (c) => {
   const role = c.get('role')
-  if (!hasPermission(role, 'orgs:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'orgs:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -42,7 +42,7 @@ orgsRoute.get('/', async (c) => {
 // POST /api/v1/orgs — provisions a new org and its first org_admin
 orgsRoute.post('/', zValidator('json', createOrgSchema), async (c) => {
   const role = c.get('role')
-  if (!hasPermission(role, 'orgs:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'orgs:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -73,6 +73,9 @@ orgsRoute.post('/', zValidator('json', createOrgSchema), async (c) => {
       .insert(users)
       .values({ orgId: org.id, email: adminEmail, passwordHash, role: 'org_admin' })
       .returning({ id: users.id, email: users.email, role: users.role })
+
+    // Seed the org's editable role → permission matrix from the code defaults.
+    await tx.insert(rolePermissions).values(seedRolePermissionsValues(org.id))
 
     // Audit trails are org-scoped, so record provisioning twice: once in the
     // platform operator's own trail, once as the new org's founding event.

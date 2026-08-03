@@ -25,7 +25,6 @@ type LoginForm = z.infer<typeof loginSchema>
 function LoginForm() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
 
   const {
     register,
@@ -34,7 +33,7 @@ function LoginForm() {
   } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) })
 
   const onSubmit = async (data: LoginForm) => {
-    const result = await login(data.email, data.password, rememberMe)
+    const result = await login(data.email, data.password)
     if (!result.success) {
       toast.error(result.error.message)
       return
@@ -124,18 +123,6 @@ function LoginForm() {
                 </button>
               </div>
               {errors.password && <p style={{ fontSize: 12, color: '#ba1a1a', margin: 0 }}>{errors.password.message}</p>}
-            </div>
-
-            {/* Remember */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input
-                type="checkbox"
-                id="remember"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                style={{ width: 16, height: 16, borderRadius: 4, borderColor: '#c3c6d7', cursor: 'pointer', accentColor: '#2563eb' }}
-              />
-              <label htmlFor="remember" style={{ fontSize: 14, color: '#434655', cursor: 'pointer' }}>Remember this device</label>
             </div>
 
             {/* Submit */}

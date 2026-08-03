@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { isSuperAdminCrossOrgAllowed } from './auth'
+import { isSuperAdminCrossOrgAllowed, isSessionRevoked } from './auth'
 
 const ORG = '/api/v1/orgs/11111111-2222-3333-4444-555555555555'
 
@@ -31,5 +31,35 @@ describe('isSuperAdminCrossOrgAllowed', () => {
   test('does not match look-alike paths', () => {
     expect(isSuperAdminCrossOrgAllowed('GET', `${ORG}/users-export`)).toBe(false)
     expect(isSuperAdminCrossOrgAllowed('GET', `${ORG}/subscriptions/history`)).toBe(false)
+  })
+})
+
+describe('isSessionRevoked', () => {
+  // A token issued at this instant (seconds).
+  const iat = 1_700_000_000
+
+  test('is not revoked when the account has never invalidated a session', () => {
+    expect(isSessionRevoked(iat, null)).toBe(false)
+  })
+
+  test('revokes a token issued before the invalidation instant', () => {
+    const invalidatedAt = new Date((iat + 60) * 1000) // 60s after the token
+    expect(isSessionRevoked(iat, invalidatedAt)).toBe(true)
+  })
+
+  test('keeps a token issued after the invalidation instant (fresh re-login)', () => {
+    const invalidatedAt = new Date((iat - 60) * 1000) // 60s before the token
+    expect(isSessionRevoked(iat, invalidatedAt)).toBe(false)
+  })
+
+  test('keeps a token minted in the same second as the invalidation (re-issued cookie)', () => {
+    // The password-change route bumps sessionInvalidatedAt and hands back a
+    // fresh token in the same second; sub-second precision must not revoke it.
+    const invalidatedAt = new Date(iat * 1000 + 500)
+    expect(isSessionRevoked(iat, invalidatedAt)).toBe(false)
+  })
+
+  test('treats a token with no iat as not revoked (nothing to compare)', () => {
+    expect(isSessionRevoked(undefined, new Date())).toBe(false)
   })
 })

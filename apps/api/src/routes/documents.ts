@@ -6,9 +6,8 @@ import { db } from '@company-brain/db'
 import { documents, ingestionJobs, chunks, orgs, compartments, auditLogs } from '@company-brain/db'
 import { eq, and, desc, sql, getTableColumns } from 'drizzle-orm'
 import { ingestDocument, stitchChunks } from '@company-brain/ingestion'
-import { hasPermission } from '@company-brain/shared'
 import type { VisibilityPolicy } from '@company-brain/shared'
-import { canAccessChunk, canPublishExternal, canUseCompartment } from '@company-brain/access-control'
+import { canAccessChunk, canPublishExternal, canUseCompartment, hasPermission } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
 
 const documentsRoute = new Hono<AuthVars>()
@@ -44,6 +43,10 @@ documentsRoute.get('/', async (c) => {
   if (!orgId) return c.json(BAD_ORG, 400)
   const userId = c.get('userId')
   const role = c.get('role')
+
+  if (!(await hasPermission(c.get('orgId'), role, 'documents:view'))) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
 
   // Non-admins only see documents in unrestricted compartments or ones they
   // hold a grant for (directly or via a group). Sub-compartments also require
@@ -108,7 +111,9 @@ documentsRoute.post('/', async (c) => {
   const userId = c.get('userId')
   const role = c.get('role')
 
-  if (!hasPermission(role, 'documents:manage')) {
+  // Uploading is a contributor action, gated separately from full document
+  // management (edit/archive/delete, below, stay on documents:manage).
+  if (!(await hasPermission(c.get('orgId'), role, 'documents:upload'))) {
     return c.json(
       { success: false, error: { code: 'FORBIDDEN', message: 'Insufficient role to upload documents' } },
       403
@@ -273,6 +278,12 @@ documentsRoute.get('/:docId/content', async (c) => {
   const userId = c.get('userId')
   const role = c.get('role')
 
+  // External clients reach cited content through the external tier rules below;
+  // internal roles need documents:view.
+  if (role !== 'external_client' && !(await hasPermission(c.get('orgId'), role, 'documents:view'))) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
+
   const docRows = await db
     .select({
       id: documents.id,
@@ -343,7 +354,7 @@ documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) =
   const role = c.get('role')
   const updates = c.req.valid('json')
 
-  if (!hasPermission(role, 'documents:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'documents:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -433,7 +444,7 @@ documentsRoute.post('/:docId/archive', async (c) => {
   const userId = c.get('userId')
   const role = c.get('role')
 
-  if (!hasPermission(role, 'documents:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'documents:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -468,7 +479,7 @@ documentsRoute.post('/:docId/unarchive', async (c) => {
   const userId = c.get('userId')
   const role = c.get('role')
 
-  if (!hasPermission(role, 'documents:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'documents:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -510,7 +521,7 @@ documentsRoute.delete('/:docId', async (c) => {
   const userId = c.get('userId')
   const role = c.get('role')
 
-  if (!hasPermission(role, 'documents:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'documents:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 

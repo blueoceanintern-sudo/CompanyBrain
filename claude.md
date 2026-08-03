@@ -14,7 +14,7 @@ The repo shares a VPS and Postgres instance with the Automated Marketing Solutio
 |---|---|
 | Repo layout | `apps/web`, `apps/api`, `services/*`, `workers/`, `db/`, `shared/`, `scripts/` |
 | Backend routes | `/api/v1/*` — auth, orgs, documents, query, admin (compartments/users), access (groups/grants), payments, analytics, Stripe webhook |
-| Auth | JWT (HS256, HttpOnly cookie) issued by `/api/v1/auth/login`; role-based permissions in `shared/constants.ts` |
+| Auth | JWT (HS256, HttpOnly cookie) issued by `/api/v1/auth/login`; role-based permissions default in `shared/constants.ts` (`ROLE_PERMISSIONS`), editable per-org via the `role_permissions` table (resolved + enforced in `services/access-control`). Sessions are 8h for all roles; `authMiddleware` re-checks the user every request (existence + `users.session_invalidated_at` + live role), so removal/role-change/password-reset revoke sessions immediately. Cookies are `secure` in production; login is rate-limited (per email + per IP) |
 | Document ingestion | PDF (`pdf-parse`) and Word (`mammoth`) → chunk (2000 chars, 200 overlap) → embed → store; retry via ingestion_jobs |
 | Vector search | pgvector HNSW + tsvector parallel retrieval, RRF fusion, golden-set eval harness |
 | AI provider layer | `services/ai-provider` abstracts chat + embedding calls behind capability interfaces (`ChatProvider`, `EmbeddingProvider`); adapters for Anthropic and OpenAI-compatible (OpenAI or any local runtime — Ollama, vLLM, LM Studio, llama.cpp — via `baseURL`); provider/model selection is env-driven, defaults unchanged from the previous hardcoded values |
@@ -312,6 +312,8 @@ created_at, updated_at
 // users
 id, org_id (FK), name (nullable),        # collected on invite; null for users predating this field
 email (UNIQUE), password_hash, role (user_role),
+must_change_password,                    # forces a password change on first login for invited users
+session_invalidated_at (nullable),       # JWTs issued before this instant are rejected; bumped on role change / password reset / password change
 stripe_customer_id, stripe_subscription_id, subscription_status,   # external-client billing
 created_at, updated_at
 
@@ -405,7 +407,7 @@ Prefix: `/api/v1`. All routes except `/auth/*` and `/webhooks/stripe` require th
 ### Auth (public)
 
 ```
-POST   /auth/login                          # email + password (+ optional rememberMe) → sets HttpOnly JWT cookie
+POST   /auth/login                          # email + password → sets 8h HttpOnly JWT cookie; rate-limited per email + per IP
 POST   /auth/logout                         # clears cookie
 POST   /auth/forgot-password                # { email } → always returns a generic response; emails a reset link if the account exists
 POST   /auth/reset-password                 # { token, newPassword } → consumes a single-use password_reset_tokens row
@@ -422,7 +424,7 @@ POST   /orgs                                # create org + first org_admin
 
 ```
 GET    /orgs/:id/documents                  # list documents (paginated; filtered by caller's access)
-POST   /orgs/:id/documents                  # upload document (multipart form: file, compartmentId, accessTier, sourceType)
+POST   /orgs/:id/documents                  # upload document (multipart form: file, compartmentId, accessTier, sourceType) — documents:upload
 GET    /orgs/:id/documents/:docId/content   # stitched document text for preview
 PATCH  /orgs/:id/documents/:docId           # update compartment / access tier / source type
 POST   /orgs/:id/documents/:docId/archive   # archive (chunks excluded from retrieval)
@@ -441,14 +443,16 @@ GET    /orgs/:id/query                      # query history
 
 ```
 GET    /orgs/:id/compartments               # list compartments (with grant counts)
-POST   /orgs/:id/compartments               # create compartment / sub-compartment
-PATCH  /orgs/:id/compartments/:cId          # update name / description / restricted
-DELETE /orgs/:id/compartments/:cId          # delete compartment + its documents/chunks (typed confirmation)
+POST   /orgs/:id/compartments               # create compartment / sub-compartment — documents:manage
+PATCH  /orgs/:id/compartments/:cId          # update name / description / restricted — documents:manage
+DELETE /orgs/:id/compartments/:cId          # delete compartment + its documents/chunks (typed confirmation) — documents:manage
 GET    /orgs/:id/users                      # list users
-POST   /orgs/:id/users                      # invite user (sends email)
-PATCH  /orgs/:id/users/:userId/role         # update role
-DELETE /orgs/:id/users/:userId              # remove user
+POST   /orgs/:id/users                      # invite user (sends email) — users:manage
+PATCH  /orgs/:id/users/:userId/role         # update role — users:manage
+DELETE /orgs/:id/users/:userId              # remove user — users:manage
 ```
+
+Permissions: `users:manage` = invite/roles/remove users (role assignment is additionally bounded by `ROLE_RANK` — you can only assign/modify a role strictly below your own, never your own role or a super_admin); `access:manage` = groups + group membership only; `roles:manage` = edit the role→permission matrix (a locked permission like `orgs:manage`: never grantable, resolver-pinned to super_admin + org_admin); `documents:manage` = document + folder (compartment) CRUD **including folder access — restriction flag + compartment grants** (managing a folder includes controlling who can reach it); `documents:upload` = upload new documents only (a contributor capability, separate from full management — the default `dept_admin` gets this, not `documents:manage`); `documents:view` / `queries:submit` = enforced at `GET /documents` and `POST /query` respectively (not just nav gating); `analytics:view` = dashboards; `audit:view` = audit log + export.
 
 ### Account (self-service, any authenticated role)
 
@@ -456,7 +460,7 @@ DELETE /orgs/:id/users/:userId              # remove user
 PATCH  /orgs/:id/account/password           # { currentPassword, newPassword } — operates on the caller's own userId; no permission check needed
 ```
 
-### Access (groups + grants) — `users:manage` permission
+### Access — groups: `access:manage`; folder grants: `documents:manage`; role matrix: `roles:manage`
 
 ```
 GET    /orgs/:id/groups                     # list groups
@@ -466,8 +470,10 @@ DELETE /orgs/:id/groups/:gId
 GET    /orgs/:id/groups/:gId/members
 PUT    /orgs/:id/groups/:gId/members        # replace member list
 PUT    /orgs/:id/users/:userId/groups       # replace a user's group memberships
-GET    /orgs/:id/compartments/:cId/grants
-PUT    /orgs/:id/compartments/:cId/grants   # replace grant list (users and/or groups)
+GET    /orgs/:id/compartments/:cId/grants   # documents:manage (folder access is part of managing the folder)
+PUT    /orgs/:id/compartments/:cId/grants   # replace grant list (users and/or groups) — documents:manage
+GET    /orgs/:id/roles                       # per-org role→permission matrix + editable roles/permissions — roles:manage
+PUT    /orgs/:id/roles/:role                 # replace one role's permission set — roles:manage (super_admin locked; locked perms orgs:manage/roles:manage not grantable, resolver-pinned)
 ```
 
 ### Payments
@@ -486,13 +492,13 @@ POST   /orgs/:id/billing-portal             # Stripe billing portal session
 POST   /webhooks/stripe                     # Stripe webhook (public; signature-verified; idempotent via stripe_events)
 ```
 
-### Analytics
+### Analytics (`analytics:view`) + Audit (`audit:view`)
 
 ```
-GET    /orgs/:id/analytics/overview         # KB coverage, query volume, citation hit rate
-GET    /orgs/:id/analytics/queries          # top unanswered, low-confidence queries
-GET    /orgs/:id/analytics/audit-logs       # paginated audit log
-GET    /orgs/:id/analytics/export           # export audit log (CSV)
+GET    /orgs/:id/analytics/overview         # KB coverage, query volume, citation hit rate — analytics:view
+GET    /orgs/:id/analytics/queries          # top unanswered, low-confidence queries — analytics:view
+GET    /orgs/:id/analytics/audit-logs       # paginated audit log — audit:view
+GET    /orgs/:id/analytics/export           # export audit log (CSV) — audit:view
 ```
 
 ---
@@ -580,6 +586,21 @@ Non-negotiable:
 8. **External publishing locked to paid tier** — `org_plan = free` cannot expose external knowledge plane
 9. **Stripe platform fee** — BlueOcean automatically takes 15% via Stripe Connect; no manual payout logic
 
+### Admin data-access invariant (Layer-2)
+
+`org_admin` and `super_admin` always have full data reach within their org —
+every compartment and both access tiers — **regardless of the role→permission
+matrix**. This is enforced by hardcoded role-name checks ("Layer-2"), not by the
+matrix, at four sites: `services/access-control/index.ts` `canUseCompartment`,
+`services/retrieval/index.ts` `compartmentGrantFilter`, and the document/folder
+list filters in `apps/api/src/routes/documents.ts` + `admin.ts`. Consequence:
+removing a data permission (e.g. `documents:view`) from `org_admin` in the
+matrix does **not** restrict what an org admin can retrieve — the matrix gates
+*actions/UI*, not an admin's *data reach*. Do not present the matrix as a way to
+sandbox an org admin's data access. (Cross-org isolation is separate and absolute
+— see constraint 1; a super_admin's cross-org reach is limited to the break-glass
+routes in `middleware/auth.ts`.)
+
 ---
 
 ## AI Usage Rules
@@ -627,7 +648,7 @@ Response: { answer, citations, confidence, missing }
 | `services/ingestion` | Parse PDF/Word → chunk → tag with org_id, compartment, access_tier, visibility → embed via OpenAI → store |
 | `services/retrieval` | pgvector semantic + tsvector full-text in parallel; deterministic RRF fusion; confidence gate; small-to-big expansion |
 | `services/synthesis` | Claude Haiku RAG generation; citation assembly; enforces no-freeform rule |
-| `services/access-control` | Visibility JSONB evaluation; restricted-compartment grant checks (user/group); role-to-chunk permission resolution at query time |
+| `services/access-control` | Visibility JSONB evaluation; restricted-compartment grant checks (user/group); role-to-chunk permission resolution at query time; per-org role→permission matrix (`role-permissions.ts`) — cached `hasPermission(orgId, role, perm)`, editable via `/orgs/:id/roles`, seeded from `ROLE_PERMISSIONS` defaults |
 | `services/ai-provider` | `ChatProvider`/`EmbeddingProvider` interfaces; Anthropic and OpenAI-compatible adapters; env-driven provider/model selection, config validation, error normalization. Only place that constructs an AI SDK client — `services/retrieval`, `services/ingestion`, `services/synthesis`, and `workers/re-embed-worker` consume it, never the SDKs directly |
 | `services/payments` | Stripe Connect subscription management; platform fee routing |
 | `workers/` | node-cron only — ingestion retry, query-log purge (90d), org-data purge (30d quarantine); manual re-embed script |

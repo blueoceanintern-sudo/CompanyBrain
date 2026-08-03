@@ -7,6 +7,7 @@ import type {
   UserSummary,
   QueryHistoryItem,
   UserRole,
+  Permission,
   ConversationTurn,
 } from '@company-brain/shared'
 
@@ -97,14 +98,18 @@ export interface AuthUser {
   // forces a password change before granting access. Absent on sessions cached
   // before this field existed (treated as false).
   mustChangePassword?: boolean
+  // Effective permissions for this user's role, resolved server-side at login.
+  // Absent on sessions cached before this field existed; consumers that gate on
+  // it should still fall back to a role check until the user next logs in.
+  permissions?: Permission[]
 }
 
-export async function login(email: string, password: string, rememberMe?: boolean) {
+export async function login(email: string, password: string) {
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, rememberMe }),
+      body: JSON.stringify({ email, password }),
       credentials: 'include',
     })
     return parseResult<{ user: AuthUser }>(res)
@@ -307,6 +312,25 @@ export async function deleteCompartment(orgId: string, cId: string, targetCompar
     method: 'DELETE',
     body: JSON.stringify(targetCompartmentId ? { targetCompartmentId } : {}),
   })
+}
+
+// ─── Roles & permissions ────────────────────────────────────────────────────────
+
+export interface RoleMatrixData {
+  matrix: Record<UserRole, Permission[]>
+  editableRoles: UserRole[]
+  editablePermissions: Permission[]
+}
+
+export async function getRoles(orgId: string) {
+  return apiFetch<RoleMatrixData>(`/api/v1/orgs/${orgId}/roles`)
+}
+
+export async function updateRolePermissions(orgId: string, role: string, permissions: Permission[]) {
+  return apiFetch<{ role: UserRole; permissions: Permission[] }>(
+    `/api/v1/orgs/${orgId}/roles/${role}`,
+    { method: 'PUT', body: JSON.stringify({ permissions }) }
+  )
 }
 
 export async function getUsers(orgId: string) {

@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
+import type { Context, Next } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { db } from '@company-brain/db'
 import { groups, groupMembers, compartmentGrants, compartments, users, auditLogs } from '@company-brain/db'
 import { eq, and, count, inArray, ne } from 'drizzle-orm'
-import { hasPermission } from '@company-brain/shared'
+import { hasPermission } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
 
 // Groups + compartment grants — the org admin's "who can access what" surface
@@ -13,12 +14,31 @@ const accessRoute = new Hono<AuthVars>()
 const BAD_ORG = { success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } } as const
 const FORBIDDEN = { success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } } as const
 
-accessRoute.use('*', async (c, next) => {
-  if (!hasPermission(c.get('role'), 'users:manage')) {
+// Guard bound to this router's own paths. This router is mounted at '/', so a
+// `use('*')` guard would also run for sibling routers registered after it
+// (roles, payments, analytics) and wrongly gate them behind access:manage — the
+// route-shadowing bug that let analytics:view holders be blocked. Binding the
+// guard to the specific access-management paths keeps it scoped to them.
+const requireAccessManage = async (c: Context<AuthVars>, next: Next) => {
+  if (!(await hasPermission(c.get('orgId'), c.get('role'), 'access:manage'))) {
     return c.json(FORBIDDEN, 403)
   }
   await next()
-})
+}
+// Folder grants (who can access a restricted compartment) are part of managing
+// that folder, so they gate on documents:manage — same as creating/restricting
+// the folder in admin.ts. Groups themselves are a separate roster primitive
+// under access:manage.
+const requireDocumentsManage = async (c: Context<AuthVars>, next: Next) => {
+  if (!(await hasPermission(c.get('orgId'), c.get('role'), 'documents:manage'))) {
+    return c.json(FORBIDDEN, 403)
+  }
+  await next()
+}
+accessRoute.use('/groups', requireAccessManage)
+accessRoute.use('/groups/*', requireAccessManage)
+accessRoute.use('/users/:userId/groups', requireAccessManage)
+accessRoute.use('/compartments/:cId/grants', requireDocumentsManage)
 
 // ─── Groups ───────────────────────────────────────────────────────────────────
 
