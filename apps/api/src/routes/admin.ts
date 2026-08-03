@@ -4,8 +4,8 @@ import { z } from 'zod'
 import { db } from '@company-brain/db'
 import { compartments, users, auditLogs, orgs, documents, chunks, groups, groupMembers, compartmentGrants, queries } from '@company-brain/db'
 import { eq, and, ne, count, inArray, sql, isNull } from 'drizzle-orm'
-import { hasPermission } from '@company-brain/shared'
-import { canPublishExternal } from '@company-brain/access-control'
+import { canPublishExternal, hasPermission } from '@company-brain/access-control'
+import { validateRoleAssignment } from '@company-brain/shared'
 import type { AuthVars } from '../middleware/auth'
 import { sendOrgAdminWelcome, sendUserInvite } from '../lib/email'
 
@@ -38,7 +38,7 @@ adminRoute.patch('/', zValidator('json', orgProfileUpdateSchema), async (c) => {
   const userId = c.get('userId')
   const { name } = c.req.valid('json')
 
-  if (!hasPermission(role, 'users:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'users:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -185,7 +185,8 @@ adminRoute.post('/compartments', zValidator('json', compartmentCreateSchema), as
   const role = c.get('role')
   const body = c.req.valid('json')
 
-  if (!hasPermission(role, 'users:manage')) {
+  // Folder management — including whether it's restricted — is documents:manage.
+  if (!(await hasPermission(c.get('orgId'), role, 'documents:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -264,7 +265,9 @@ adminRoute.patch('/compartments/:cId', zValidator('json', compartmentUpdateSchem
   const userId = c.get('userId')
   const updates = c.req.valid('json')
 
-  if (!hasPermission(role, 'users:manage')) {
+  // Folder management — rename, description, and restriction — is all
+  // documents:manage; controlling a folder's access is part of managing it.
+  if (!(await hasPermission(c.get('orgId'), role, 'documents:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -319,7 +322,7 @@ adminRoute.delete('/compartments/:cId', zValidator('json', deleteCompartmentSche
   const userId = c.get('userId')
   const { targetCompartmentId } = c.req.valid('json')
 
-  if (!hasPermission(role, 'users:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'documents:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -414,6 +417,15 @@ const updateRoleSchema = z.object({
   role: z.enum(['org_admin', 'dept_admin', 'staff', 'external_client']),
 })
 
+// HTTP status per role-assignment guard violation. Changing your own role is a
+// request-shape problem (400); everything else is an authorisation refusal (403).
+const ROLE_ASSIGN_STATUS: Record<string, 400 | 403> = {
+  SELF_ROLE_CHANGE: 400,
+  TARGET_PROTECTED: 403,
+  FORBIDDEN_TARGET: 403,
+  FORBIDDEN_ASSIGN: 403,
+}
+
 adminRoute.get('/users', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
@@ -445,8 +457,15 @@ adminRoute.post('/users', zValidator('json', inviteUserSchema), async (c) => {
   const actorRole = c.get('role')
   const body = c.req.valid('json')
 
-  if (!hasPermission(actorRole, 'users:manage')) {
+  if (!(await hasPermission(c.get('orgId'), actorRole, 'users:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
+
+  // An actor may only invite a user into a role strictly below their own — this
+  // stops a users:manage holder minting peers or superiors (e.g. org_admin).
+  const assignViolation = validateRoleAssignment({ actorRole, newRole: body.role })
+  if (assignViolation) {
+    return c.json({ success: false, error: assignViolation }, ROLE_ASSIGN_STATUS[assignViolation.code] ?? 403)
   }
 
   const groupIds = [...new Set(body.groupIds ?? [])]
@@ -478,7 +497,7 @@ adminRoute.post('/users', zValidator('json', inviteUserSchema), async (c) => {
   try {
     ;[newUser] = await db
       .insert(users)
-      .values({ orgId, name: body.name, email: body.email, passwordHash, role: body.role })
+      .values({ orgId, name: body.name, email: body.email, passwordHash, role: body.role, mustChangePassword: true })
       .returning({ id: users.id, email: users.email, role: users.role })
   } catch (err) {
     const pg = err as { code?: string }
@@ -531,22 +550,60 @@ adminRoute.patch('/users/:userId/role', zValidator('json', updateRoleSchema), as
   const role = c.get('role')
   const { role: newRole } = c.req.valid('json')
 
-  if (!hasPermission(role, 'users:manage')) {
+  if (!(await hasPermission(c.get('orgId'), role, 'users:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
-  await db
-    .update(users)
-    .set({ role: newRole, updatedAt: new Date() })
+  const [target] = await db
+    .select({ role: users.role })
+    .from(users)
     .where(and(eq(users.id, targetUserId), eq(users.orgId, orgId)))
+    .limit(1)
 
-  await db.insert(auditLogs).values({
-    orgId,
-    userId: actorUserId,
-    action: 'user.role_update',
-    resourceType: 'user',
-    resourceId: targetUserId,
-    metadata: { newRole },
+  if (!target) {
+    return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } }, 404)
+  }
+
+  // Bound both the target and the new role by the actor's rank, and block
+  // self-changes and super_admin targets. Without this, a users:manage holder
+  // could promote their own account (or anyone else) to org_admin.
+  const violation = validateRoleAssignment({
+    actorRole: role,
+    newRole,
+    targetCurrentRole: target.role,
+    isSelf: targetUserId === actorUserId,
+  })
+  if (violation) {
+    return c.json({ success: false, error: violation }, ROLE_ASSIGN_STATUS[violation.code] ?? 403)
+  }
+
+  const demotedToExternal = newRole === 'external_client' && target.role !== 'external_client'
+
+  await db.transaction(async (tx) => {
+    // Revoke the target's existing sessions so a demotion (or promotion) takes
+    // effect on their next request instead of lingering until their token expires.
+    await tx
+      .update(users)
+      .set({ role: newRole, sessionInvalidatedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(users.id, targetUserId), eq(users.orgId, orgId)))
+
+    // External clients cannot belong to groups or hold internal folder grants
+    // (the invite / group-membership paths forbid it). Demoting an internal user
+    // to external_client strips both so the removed internal access can't linger
+    // in group/member lists or silently reactivate if they're later promoted back.
+    if (demotedToExternal) {
+      await tx.delete(groupMembers).where(and(eq(groupMembers.userId, targetUserId), eq(groupMembers.orgId, orgId)))
+      await tx.delete(compartmentGrants).where(and(eq(compartmentGrants.userId, targetUserId), eq(compartmentGrants.orgId, orgId)))
+    }
+
+    await tx.insert(auditLogs).values({
+      orgId,
+      userId: actorUserId,
+      action: 'user.role_update',
+      resourceType: 'user',
+      resourceId: targetUserId,
+      metadata: { previousRole: target.role, newRole, ...(demotedToExternal ? { strippedGroupsAndGrants: true } : {}) },
+    })
   })
 
   return c.json({ success: true, data: null })
@@ -559,7 +616,7 @@ adminRoute.delete('/users/:userId', async (c) => {
   const actorUserId = c.get('userId')
   const actorRole = c.get('role')
 
-  if (!hasPermission(actorRole, 'users:manage')) {
+  if (!(await hasPermission(c.get('orgId'), actorRole, 'users:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
   if (targetUserId === actorUserId) {

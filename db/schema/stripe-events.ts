@@ -9,7 +9,7 @@ export const stripeEvents = pgTable(
     orgId: uuid('org_id').references(() => orgs.id, { onDelete: 'set null' }),
     stripeEventId: text('stripe_event_id').notNull(),
     eventType: text('event_type').notNull(),
-    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    payload: jsonb('payload').$type<unknown>().notNull(),
     processedAt: timestamp('processed_at', { withTimezone: true }),
   },
   (t) => ({

@@ -18,8 +18,7 @@ import { useCompartments, useCreateCompartment, useDeleteCompartment } from '@/h
 import { useSubscription } from '@/hooks/use-payments'
 import { useGroups, useCompartmentGrants } from '@/hooks/use-groups'
 import { useUsers } from '@/hooks/use-users'
-import { getAuthUser } from '@/lib/auth'
-import { hasPermission } from '@company-brain/shared'
+import { getAuthUser, userCan } from '@/lib/auth'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { DocumentPreview } from '@/components/document-preview'
 import { FolderAccessPanel } from '@/components/documents/folder-access'
@@ -472,10 +471,11 @@ function UploadDialog({ orgId, folder, onClose }: { orgId: string; folder: Compa
 
 // ─── Create folder dialog ──────────────────────────────────────────────────────
 
-function CreateFolderDialog({ orgId, parent, tier, onClose }: {
+function CreateFolderDialog({ orgId, parent, tier, canManage, onClose }: {
   orgId: string
   parent: CompartmentSummary | null
   tier: 'internal' | 'external'
+  canManage: boolean
   onClose: () => void
 }) {
   const [name, setName] = useState('')
@@ -507,12 +507,14 @@ function CreateFolderDialog({ orgId, parent, tier, onClose }: {
         <input autoFocus value={name} onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') onClose() }}
           placeholder={parent ? 'e.g. Payroll' : 'e.g. HR Department'} style={{ ...inputStyle, marginBottom: 16 }} />
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 24 }}>
-          <input type="checkbox" checked={restricted} onChange={(e) => setRestricted(e.target.checked)} style={{ accentColor: '#2563eb' }} />
-          <Lock size={14} color={restricted ? '#9a3412' : '#585f67'} />
-          <span style={{ fontSize: 13, color: '#0b1c30' }}>Restricted</span>
-          <span style={{ fontSize: 12, color: '#585f67' }}>— limit view and query access.</span>
-        </label>
+        {canManage && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 24 }}>
+            <input type="checkbox" checked={restricted} onChange={(e) => setRestricted(e.target.checked)} style={{ accentColor: '#2563eb' }} />
+            <Lock size={14} color={restricted ? '#9a3412' : '#585f67'} />
+            <span style={{ fontSize: 13, color: '#0b1c30' }}>Restricted</span>
+            <span style={{ fontSize: 12, color: '#585f67' }}>— limit view and query access.</span>
+          </label>
+        )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
           <button type="button" onClick={onClose} style={{ height: 44, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>Cancel</button>
           <button type="button" disabled={!name.trim() || createComp.isPending} onClick={submit}
@@ -583,11 +585,12 @@ function DeleteFolderDialog({ orgId, folder, compartments, onCancel, onDeleted }
 
 // ─── Manage access dialog ──────────────────────────────────────────────────────
 
-function FolderAccessDialog({ orgId, folder, parent, initialEdit, onClose, onRequestDelete }: {
+function FolderAccessDialog({ orgId, folder, parent, initialEdit, canManage, onClose, onRequestDelete }: {
   orgId: string
   folder: CompartmentSummary
   parent: CompartmentSummary | null
   initialEdit: boolean
+  canManage: boolean
   onClose: () => void
   onRequestDelete: () => void
 }) {
@@ -603,7 +606,7 @@ function FolderAccessDialog({ orgId, folder, parent, initialEdit, onClose, onReq
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}><X size={18} /></button>
         </div>
         <div style={{ padding: 24, overflowY: 'auto' }}>
-          <FolderAccessPanel orgId={orgId} compartment={folder} parent={parent} initialEdit={initialEdit} onRequestDelete={() => { onClose(); onRequestDelete() }} />
+          <FolderAccessPanel orgId={orgId} compartment={folder} parent={parent} initialEdit={initialEdit} canManage={canManage} onRequestDelete={() => { onClose(); onRequestDelete() }} />
         </div>
       </div>
     </div>
@@ -884,8 +887,11 @@ type DocItem = Awaited<ReturnType<typeof useDocuments>>['data'] extends Array<in
 export default function DocumentsPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
-  const canManageFolders = !!user?.role && hasPermission(user.role, 'users:manage')
-  const canManageDocs = !!user?.role && hasPermission(user.role, 'documents:manage')
+  // Full document + folder management, including folder access (restrict + grants).
+  const canManageFolders = userCan(user, 'documents:manage')
+  const canManageDocs = userCan(user, 'documents:manage')
+  // Uploading is a lighter contributor capability, separate from management.
+  const canUploadDocs = userCan(user, 'documents:upload')
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -1126,7 +1132,7 @@ export default function DocumentsPage() {
                     style={{ padding: '0 14px', border: 'none', borderLeft: '1px solid #c3c6d7', background: viewMode === 'list' ? '#eff4ff' : 'transparent', color: viewMode === 'list' ? '#004ac6' : '#585f67', cursor: 'pointer', display: 'flex', alignItems: 'center', height: 40 }}
                   ><ListIcon size={16} /></button>
                 </div>
-                {canManageDocs && (
+                {canUploadDocs && (
                 <button
                   onClick={() => setShowUpload(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 12, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
@@ -1304,11 +1310,12 @@ export default function DocumentsPage() {
       )}
 
       {createFolder && (
-        <CreateFolderDialog orgId={orgId} parent={createFolder.parent} tier={createFolder.tier} onClose={() => setCreateFolder(null)} />
+        <CreateFolderDialog orgId={orgId} parent={createFolder.parent} tier={createFolder.tier} canManage={canManageFolders} onClose={() => setCreateFolder(null)} />
       )}
       {accessPanel && accessPanelFolder && (
         <FolderAccessDialog
           orgId={orgId}
+          canManage={canManageFolders}
           folder={accessPanelFolder}
           parent={compartments.find((c) => c.id === accessPanelFolder.parentCompartmentId) ?? null}
           initialEdit={accessPanel.edit}

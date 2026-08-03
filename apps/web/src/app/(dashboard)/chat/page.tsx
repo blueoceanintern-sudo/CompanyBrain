@@ -10,11 +10,10 @@ import {
 import { toast } from 'sonner'
 import { submitQuery as apiSubmitQuery } from '@/lib/api'
 import { useExternalPricing, useStartCheckout, useSubscription } from '@/hooks/use-payments'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, userCan } from '@/lib/auth'
 import { generateId } from '@/lib/utils'
 import { useChatHistory } from '@/lib/chat-history-context'
 import { DocumentPreview } from '@/components/document-preview'
-import { hasPermission } from '@company-brain/shared'
 import type { ConversationTurn } from '@company-brain/shared'
 import type { HistoryEntry, Plane } from '@/lib/chat-history-context'
 
@@ -238,7 +237,7 @@ function SourcePill({ filename, tier, onClick }: { filename: string; tier: strin
 
 function ActiveChat({
   history, input, onChange, onSubmit, disabled, textareaRef,
-  onToggle, onRetry, onNew, onPreviewDoc, plane,
+  onRetry, onPreviewDoc, plane,
 }: {
   history: HistoryEntry[]
   input: string
@@ -246,9 +245,7 @@ function ActiveChat({
   onSubmit: () => void
   disabled: boolean
   textareaRef: React.RefObject<HTMLTextAreaElement>
-  onToggle: (id: string) => void
   onRetry: (id: string, q: string) => void
-  onNew: () => void
   onPreviewDoc: (docId: string) => void
   plane: Plane
 }) {
@@ -319,14 +316,13 @@ function ActiveChat({
                     <span style={{ fontSize: 14, fontWeight: 700, color: '#004ac6' }}>Brain AI</span>
                   </div>
 
-                  <div style={{ fontSize: 16, color: '#0b1c30', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
                   {/* Answer */}
-                  <div style={{ fontSize: 16, color: '#0b1c30', lineHeight: 1.7 }}>
+                  <div style={{ fontSize: 16, color: '#0b1c30', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
                     {entry.response.answer}
                   </div>
 
                   {entry.response.citations && entry.response.citations.length > 0 && (
-                    <div style={{ borderTop: '1px solid #c3c6d7', paddingTop: 24 }}>
+                    <div style={{ borderTop: '1px solid #c3c6d7', paddingTop: 8 }}>
                       <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#737686', marginBottom: 12 }}>Sources</p>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                         {entry.response.citations.map((c) => (
@@ -336,7 +332,7 @@ function ActiveChat({
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', gap: 16 }}>
+                  <div style={{ display: 'flex', gap: 16}}>
                     {[
                       { icon: Copy, label: 'Copy', onClick: () => { navigator.clipboard.writeText(entry.response?.answer ?? '').then(() => toast.success('Copied to clipboard')) } },
                       { icon: RefreshCw, label: 'Regenerate', onClick: () => onRetry(entry.id, entry.question) },
@@ -351,7 +347,6 @@ function ActiveChat({
                         <Icon size={16} /> {label}
                       </button>
                     ))}
-                  </div>
                 </div>
                 </div>
               )}
@@ -395,7 +390,7 @@ export default function ChatPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
   const isExternalClient = user?.role === 'external_client'
-  const canPreviewPlanes = !!user?.role && hasPermission(user.role, 'documents:manage')
+  const canPreviewPlanes = userCan(user, 'documents:manage')
 
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -559,7 +554,6 @@ export default function ChatPage() {
           onSubmit={handleSubmit}
           disabled={isPending}
           textareaRef={textareaRef}
-          onToggle={(id) => setHistory((prev) => prev.map((h) => h.id === id ? { ...h, expanded: !h.expanded } : h))}
           onRetry={(id, q) => {
             const priorHistory = history
               .slice(0, history.findIndex((h) => h.id === id))
@@ -569,7 +563,6 @@ export default function ChatPage() {
               ] : [])
             submitQuery(q, id, priorHistory)
           }}
-          onNew={handleNewChat}
           onPreviewDoc={setPreviewDocId}
           plane={plane}
         />

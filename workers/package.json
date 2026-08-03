@@ -9,6 +9,11 @@
     "@company-brain/db": "workspace:*",
     "@company-brain/shared": "workspace:*",
     "@company-brain/ingestion": "workspace:*",
+    "@company-brain/ai-provider": "workspace:*",
+    "drizzle-orm": "^0.31.4",
     "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "@types/node-cron": "^3.0.11"
   }
 }

@@ -5,9 +5,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Sidebar, MobileMenuButton } from '@/components/sidebar'
 import { Providers } from '@/app/providers'
 import { ChatHistoryProvider, useChatHistory } from '@/lib/chat-history-context'
-import { getAuthUser, isAuthenticated } from '@/lib/auth'
+import { getAuthUser, isAuthenticated, userCanAny } from '@/lib/auth'
 import { routePermission } from '@/lib/nav'
-import { hasPermission } from '@company-brain/shared'
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -30,10 +29,17 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       return
     }
 
+    // Invited users must set a real password before reaching any dashboard
+    // route; blocks direct navigation around the login redirect.
+    if (getAuthUser()?.mustChangePassword) {
+      router.replace('/change-password')
+      return
+    }
+
     const permission = routePermission(pathname)
     if (permission) {
       const user = getAuthUser()
-      if (!user || !hasPermission(user.role, permission)) {
+      if (!userCanAny(user, permission)) {
         router.replace('/chat')
         return
       }

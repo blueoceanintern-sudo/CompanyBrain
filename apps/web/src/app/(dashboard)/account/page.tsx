@@ -1,31 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { Pencil, X } from 'lucide-react'
 import { getAuthUser } from '@/lib/auth'
 import { useOrgProfile } from '@/hooks/use-orgs'
-import { useChangePassword } from '@/hooks/use-account'
+import { ChangePasswordForm } from '@/components/change-password-form'
 
 const PASSWORD_MASK = '•'.repeat(10)
-
-const changePasswordSchema = z
-  .object({
-    currentPassword: z.string().min(8, 'At least 8 characters'),
-    newPassword: z.string().min(8, 'At least 8 characters'),
-    confirmPassword: z.string().min(8, 'At least 8 characters'),
-  })
-  .refine((data) => data.newPassword !== data.currentPassword, {
-    message: 'New password must be different from your current password',
-    path: ['newPassword'],
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ['confirmPassword'],
-  })
-type ChangePasswordForm = z.infer<typeof changePasswordSchema>
 
 function ProfileRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -37,60 +18,15 @@ function ProfileRow({ label, value }: { label: string; value: React.ReactNode })
 }
 
 function ChangePasswordDialog({ orgId, onClose }: { orgId: string; onClose: () => void }) {
-  const changePassword = useChangePassword(orgId)
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<ChangePasswordForm>({ resolver: zodResolver(changePasswordSchema) })
-
-  const onSubmit = (data: ChangePasswordForm) => {
-    changePassword.mutate(
-      { currentPassword: data.currentPassword, newPassword: data.newPassword },
-      { onSuccess: onClose }
-    )
-  }
-
-  const inputBase: React.CSSProperties = {
-    width: '100%', height: 44, padding: '0 16px', border: '1px solid #c3c6d7', borderRadius: 8,
-    background: '#ffffff', fontSize: 14, color: '#0b1c30', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const,
-  }
-
   return (
-    <div role="dialog" onClick={(e) => e.target === e.currentTarget && !changePassword.isPending && onClose()}
+    <div role="dialog" onClick={(e) => e.target === e.currentTarget && onClose()}
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 16 }}>
       <div style={{ background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 12, width: 'min(440px, 100%)', boxShadow: '0 10px 30px rgba(0,0,0,0.12)', overflow: 'hidden' }}>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #c3c6d7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0b1c30', margin: 0 }}>Change Password</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}><X size={20} /></button>
         </div>
-        <form onSubmit={handleSubmit(onSubmit)} style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <label style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>Current Password</label>
-            <input type="password" {...register('currentPassword')} style={{ ...inputBase, borderColor: errors.currentPassword ? '#ba1a1a' : '#c3c6d7' }} />
-            {errors.currentPassword && <p style={{ fontSize: 12, color: '#ba1a1a', margin: 0 }}>{errors.currentPassword.message}</p>}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <label style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>New Password</label>
-            <input type="password" {...register('newPassword')} placeholder="Min. 8 characters" style={{ ...inputBase, borderColor: errors.newPassword ? '#ba1a1a' : '#c3c6d7' }} />
-            {errors.newPassword && <p style={{ fontSize: 12, color: '#ba1a1a', margin: 0 }}>{errors.newPassword.message}</p>}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <label style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>Confirm New Password</label>
-            <input type="password" {...register('confirmPassword')} style={{ ...inputBase, borderColor: errors.confirmPassword ? '#ba1a1a' : '#c3c6d7' }} />
-            {errors.confirmPassword && <p style={{ fontSize: 12, color: '#ba1a1a', margin: 0 }}>{errors.confirmPassword.message}</p>}
-          </div>
-          <div style={{ display: 'flex', gap: 12, paddingTop: 4 }}>
-            <button type="button" onClick={onClose} style={{ flex: 1, height: 44, border: '1px solid #c3c6d7', borderRadius: 12, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#585f67', fontFamily: 'inherit' }}>Cancel</button>
-            <button
-              type="submit"
-              disabled={isSubmitting || changePassword.isPending}
-              style={{ flex: 1, height: 44, border: 'none', borderRadius: 12, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: (isSubmitting || changePassword.isPending) ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
-            >
-              {changePassword.isPending ? 'Saving…' : 'Update Password'}
-            </button>
-          </div>
-        </form>
+        <ChangePasswordForm orgId={orgId} onCancel={onClose} />
       </div>
     </div>
   )

@@ -5,15 +5,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { CreditCard } from 'lucide-react'
-import { GroupsSection } from '@/components/settings/groups-section'
 
 import { useSubscription, useConnectStatus, useStartConnectOnboarding, useExternalPricing, useSetExternalPricing, useStartOrgUpgrade, useOpenBillingPortal } from '@/hooks/use-payments'
 import { useOrgProfile, useUpdateOrgProfile } from '@/hooks/use-orgs'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, userCan } from '@/lib/auth'
 import { cancelSubscription } from '@/lib/api'
-import { hasPermission } from '@company-brain/shared'
 
-type Tab = 'general' | 'groups' | 'subscription' | 'danger'
+type Tab = 'general' | 'subscription' | 'danger'
 
 function useCancelSubscription(orgId: string) {
   return useMutation({
@@ -125,7 +123,7 @@ export default function SettingsPage() {
     const connect = searchParams.get('connect')
     const upgrade = searchParams.get('upgrade')
     const tabParam = searchParams.get('tab')
-    if (tabParam && ['general', 'groups', 'subscription', 'danger'].includes(tabParam)) {
+    if (tabParam && ['general', 'subscription', 'danger'].includes(tabParam)) {
       setTab(tabParam as Tab)
       router.replace('/settings')
     }
@@ -150,9 +148,8 @@ export default function SettingsPage() {
   const cancelSub = useCancelSubscription(orgId)
   const orgUpgrade = useStartOrgUpgrade(orgId)
   const billingPortal = useOpenBillingPortal(orgId)
-  const canManageBilling = !!user?.role && hasPermission(user.role, 'billing:manage')
-  const canManageGroups = !!user?.role && hasPermission(user.role, 'users:manage')
-  const canManageOrgProfile = !!user?.role && hasPermission(user.role, 'users:manage')
+  const canManageBilling = userCan(user, 'billing:manage')
+  const canManageOrgProfile = userCan(user, 'users:manage')
 
   const { data: orgProfile } = useOrgProfile(orgId)
   const updateOrgProfile = useUpdateOrgProfile(orgId)
@@ -169,7 +166,6 @@ export default function SettingsPage() {
 
   const TABS: { key: Tab; label: string }[] = [
     { key: 'general', label: 'General' },
-    { key: 'groups', label: 'Groups' },
     { key: 'subscription', label: 'Subscription' },
     { key: 'danger', label: 'Danger Zone' },
   ]
@@ -241,11 +237,6 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
-          )}
-
-          {/* ── Groups ── */}
-          {tab === 'groups' && (
-            <GroupsSection orgId={orgId} canManage={canManageGroups} inputBase={inputBase} />
           )}
 
           {/* ── Subscription ── */}

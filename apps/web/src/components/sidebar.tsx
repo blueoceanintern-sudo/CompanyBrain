@@ -12,9 +12,8 @@ import {
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useChatHistory } from '@/lib/chat-history-context'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { getAuthUser, clearAuth } from '@/lib/auth'
+import { getAuthUser, clearAuth, userCanAny } from '@/lib/auth'
 import { NAV } from '@/lib/nav'
-import { hasPermission } from '@company-brain/shared'
 
 const NAV_ICONS: Record<string, React.ElementType> = {
   '/chat':      MessageCircle,
@@ -48,7 +47,7 @@ function SidebarContent({
 
   const { sessions, loadSession, saveCurrentAsSession } = useChatHistory()
 
-  const visible = NAV.filter((n) => user?.role && hasPermission(user.role, n.permission))
+  const visible = NAV.filter((n) => userCanAny(user, n.permission))
   const initial = ((user?.name || user?.email)?.[0] ?? '?').toUpperCase()
   const handleLogout = async () => {
     clearAuth()
