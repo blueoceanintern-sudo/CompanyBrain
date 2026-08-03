@@ -471,10 +471,11 @@ function UploadDialog({ orgId, folder, onClose }: { orgId: string; folder: Compa
 
 // ─── Create folder dialog ──────────────────────────────────────────────────────
 
-function CreateFolderDialog({ orgId, parent, tier, onClose }: {
+function CreateFolderDialog({ orgId, parent, tier, canManageAccess, onClose }: {
   orgId: string
   parent: CompartmentSummary | null
   tier: 'internal' | 'external'
+  canManageAccess: boolean
   onClose: () => void
 }) {
   const [name, setName] = useState('')
@@ -506,12 +507,14 @@ function CreateFolderDialog({ orgId, parent, tier, onClose }: {
         <input autoFocus value={name} onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') onClose() }}
           placeholder={parent ? 'e.g. Payroll' : 'e.g. HR Department'} style={{ ...inputStyle, marginBottom: 16 }} />
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 24 }}>
-          <input type="checkbox" checked={restricted} onChange={(e) => setRestricted(e.target.checked)} style={{ accentColor: '#2563eb' }} />
-          <Lock size={14} color={restricted ? '#9a3412' : '#585f67'} />
-          <span style={{ fontSize: 13, color: '#0b1c30' }}>Restricted</span>
-          <span style={{ fontSize: 12, color: '#585f67' }}>— limit view and query access.</span>
-        </label>
+        {canManageAccess && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 24 }}>
+            <input type="checkbox" checked={restricted} onChange={(e) => setRestricted(e.target.checked)} style={{ accentColor: '#2563eb' }} />
+            <Lock size={14} color={restricted ? '#9a3412' : '#585f67'} />
+            <span style={{ fontSize: 13, color: '#0b1c30' }}>Restricted</span>
+            <span style={{ fontSize: 12, color: '#585f67' }}>— limit view and query access.</span>
+          </label>
+        )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
           <button type="button" onClick={onClose} style={{ height: 44, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>Cancel</button>
           <button type="button" disabled={!name.trim() || createComp.isPending} onClick={submit}
@@ -582,11 +585,13 @@ function DeleteFolderDialog({ orgId, folder, compartments, onCancel, onDeleted }
 
 // ─── Manage access dialog ──────────────────────────────────────────────────────
 
-function FolderAccessDialog({ orgId, folder, parent, initialEdit, onClose, onRequestDelete }: {
+function FolderAccessDialog({ orgId, folder, parent, initialEdit, canManageFolders, canManageAccess, onClose, onRequestDelete }: {
   orgId: string
   folder: CompartmentSummary
   parent: CompartmentSummary | null
   initialEdit: boolean
+  canManageFolders: boolean
+  canManageAccess: boolean
   onClose: () => void
   onRequestDelete: () => void
 }) {
@@ -602,7 +607,7 @@ function FolderAccessDialog({ orgId, folder, parent, initialEdit, onClose, onReq
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', display: 'flex' }}><X size={18} /></button>
         </div>
         <div style={{ padding: 24, overflowY: 'auto' }}>
-          <FolderAccessPanel orgId={orgId} compartment={folder} parent={parent} initialEdit={initialEdit} onRequestDelete={() => { onClose(); onRequestDelete() }} />
+          <FolderAccessPanel orgId={orgId} compartment={folder} parent={parent} initialEdit={initialEdit} canManageFolders={canManageFolders} canManageAccess={canManageAccess} onRequestDelete={() => { onClose(); onRequestDelete() }} />
         </div>
       </div>
     </div>
@@ -611,17 +616,18 @@ function FolderAccessDialog({ orgId, folder, parent, initialEdit, onClose, onReq
 
 // ─── Folder card ────────────────────────────────────────────────────────────────
 
-function FolderCard({ folder, docCount, canManage, parentRestricted = false, onOpen, onManageAccess, onDelete }: {
+function FolderCard({ folder, docCount, canManage, canManageAccess, parentRestricted = false, onOpen, onManageAccess, onDelete }: {
   folder: CompartmentSummary
   docCount: number
   canManage: boolean
+  canManageAccess: boolean
   parentRestricted?: boolean
   onOpen: () => void
   onManageAccess: (initialEdit: boolean) => void
   onDelete: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const showLock = canManage && (folder.restricted || parentRestricted)
+  const showLock = canManageAccess && (folder.restricted || parentRestricted)
   const iconBtn: React.CSSProperties = { padding: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 6, display: 'flex', flexShrink: 0 }
 
   return (
@@ -662,7 +668,7 @@ function FolderCard({ folder, docCount, canManage, parentRestricted = false, onO
         )}
       </div>
 
-      {canManage && folder.restricted && folder.grantCount === 0 && (
+      {canManageAccess && folder.restricted && folder.grantCount === 0 && (
         <button
           onClick={() => onManageAccess(true)}
           title="Grant access to users or groups"
@@ -747,11 +753,12 @@ function DocumentListRow({ doc, docIcon, onOpen }: {
   )
 }
 
-function SubfolderListGroup({ folder, docs, docIcon, canManage, parentRestricted = false, expanded, onToggle, onOpenDoc, onManageAccess, onDelete }: {
+function SubfolderListGroup({ folder, docs, docIcon, canManage, canManageAccess, parentRestricted = false, expanded, onToggle, onOpenDoc, onManageAccess, onDelete }: {
   folder: CompartmentSummary
   docs: Array<{ id: string; filename: string; status: string; sourceType: string; createdAt: string }>
   docIcon: (sourceType: string) => React.ReactNode
   canManage: boolean
+  canManageAccess: boolean
   parentRestricted?: boolean
   expanded: boolean
   onToggle: () => void
@@ -760,7 +767,7 @@ function SubfolderListGroup({ folder, docs, docIcon, canManage, parentRestricted
   onDelete: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const showLock = canManage && (folder.restricted || parentRestricted)
+  const showLock = canManageAccess && (folder.restricted || parentRestricted)
   const iconBtn: React.CSSProperties = { padding: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#585f67', borderRadius: 6, display: 'flex', flexShrink: 0 }
 
   return (
@@ -885,6 +892,9 @@ export default function DocumentsPage() {
   const orgId = user?.orgId ?? ''
   const canManageFolders = userCan(user, 'documents:manage')
   const canManageDocs = userCan(user, 'documents:manage')
+  // Folder access-control (restriction lock, grants) is a "manage permissions &
+  // groups" concern, gated separately from folder lifecycle (documents:manage).
+  const canManageAccess = userCan(user, 'access:manage')
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -1029,6 +1039,7 @@ export default function DocumentsPage() {
                 folder={c}
                 docCount={docCount(c.id)}
                 canManage={canManageFolders}
+                canManageAccess={canManageAccess}
                 onOpen={() => setOpenCompartmentId(c.id)}
                 onManageAccess={(edit) => setAccessPanel({ folderId: c.id, edit })}
                 onDelete={() => requestDeleteFolder(c)}
@@ -1093,7 +1104,7 @@ export default function DocumentsPage() {
                 )}
                 <ChevronRight size={14} color="#c3c6d7" />
                 <span style={{ color: '#0b1c30', fontWeight: 600 }}>{openCompartment.name}</span>
-                {canManageFolders && (openCompartment.restricted || openParent?.restricted) && (
+                {canManageAccess && (openCompartment.restricted || openParent?.restricted) && (
                   <RestrictedAccessBadge
                     orgId={orgId}
                     compartment={openCompartment.restricted ? openCompartment : openParent!}
@@ -1151,6 +1162,7 @@ export default function DocumentsPage() {
                     folder={c}
                     docCount={docCount(c.id)}
                     canManage={canManageFolders}
+                    canManageAccess={canManageAccess}
                     parentRestricted={openCompartment.restricted}
                     onOpen={() => setOpenCompartmentId(c.id)}
                     onManageAccess={(edit) => setAccessPanel({ folderId: c.id, edit })}
@@ -1211,6 +1223,7 @@ export default function DocumentsPage() {
                       docs={subDocs}
                       docIcon={docIcon}
                       canManage={canManageFolders}
+                      canManageAccess={canManageAccess}
                       parentRestricted={openCompartment.restricted}
                       expanded={expanded}
                       onToggle={() => setExpandedSubfolders((prev) => {
@@ -1303,11 +1316,13 @@ export default function DocumentsPage() {
       )}
 
       {createFolder && (
-        <CreateFolderDialog orgId={orgId} parent={createFolder.parent} tier={createFolder.tier} onClose={() => setCreateFolder(null)} />
+        <CreateFolderDialog orgId={orgId} parent={createFolder.parent} tier={createFolder.tier} canManageAccess={canManageAccess} onClose={() => setCreateFolder(null)} />
       )}
       {accessPanel && accessPanelFolder && (
         <FolderAccessDialog
           orgId={orgId}
+          canManageFolders={canManageFolders}
+          canManageAccess={canManageAccess}
           folder={accessPanelFolder}
           parent={compartments.find((c) => c.id === accessPanelFolder.parentCompartmentId) ?? null}
           initialEdit={accessPanel.edit}

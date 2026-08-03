@@ -102,7 +102,7 @@ function EditRoleDialog({
             const locked = p === 'access:manage' && isOwnRole
             return (
               <label key={p} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 12px', borderRadius: 8, cursor: locked ? 'not-allowed' : 'pointer', background: checked ? '#eff4ff' : 'transparent' }}>
-                <input type="checkbox" checked={checked} disabled={locked} onChange={() => toggle(p)} style={{ accentColor: '#2563eb', marginTop: 2 }} />
+                <input type="checkbox" checked={checked} disabled={locked} onChange={() => toggle(p)} style={{ accentColor: '#2563eb', marginTop: 5 }} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <span style={{ fontSize: 14, fontWeight: 500, color: '#0b1c30' }}>{label}</span>
                   <span style={{ fontSize: 12, color: '#585f67' }}>{description}</span>

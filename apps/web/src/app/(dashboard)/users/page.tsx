@@ -460,7 +460,7 @@ export default function UsersPage() {
                                 <>
                                   <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setMenuOpenId(null)} />
                                   <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', zIndex: 50, minWidth: 160, overflow: 'hidden' }}>
-                                    {u.role !== 'external_client' && (
+                                    {u.role !== 'external_client' && canManageAccess && (
                                       <button
                                         onClick={() => { setMenuOpenId(null); setGroupsFor(u) }}
                                         style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 14, color: '#0b1c30', cursor: 'pointer', fontFamily: 'inherit', display: 'block' }}
