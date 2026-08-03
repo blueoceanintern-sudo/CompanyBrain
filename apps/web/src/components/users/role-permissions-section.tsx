@@ -25,7 +25,7 @@ const ROLE_STYLE: Record<UserRole, { bg: string; color: string }> = {
 }
 
 const PERMISSION_LABEL: Record<string, { label: string; description: string }> = {
-  'documents:manage': { label: 'Manage documents & folders', description: 'Organise folders and documents, control folder access (restrict & grant), edit, archive and delete' },
+  'documents:manage': { label: 'Manage documents & folders', description: 'Organise folders and documents, restrict folder access, edit, archive and delete' },
   'documents:upload': { label: 'Upload documents', description: 'Add new documents to existing folders' },
   'documents:view': { label: 'View documents', description: 'Browse and preview the knowledge base' },
   'analytics:view': { label: 'View analytics', description: 'See usage, coverage and query dashboards' },
