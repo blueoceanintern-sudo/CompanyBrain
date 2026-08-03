@@ -63,6 +63,14 @@ export function useDeleteUser(orgId: string) {
     onSuccess: () => {
       toast.success('User removed')
       qc.invalidateQueries({ queryKey: ['users', orgId] })
+      // Deleting a user cascades their group memberships and folder grants in the
+      // DB (ON DELETE CASCADE); refresh every view that reflects them so the
+      // removal shows up immediately, not on the next incidental refetch. These
+      // keys prefix-match, so the per-group / per-compartment queries are covered.
+      qc.invalidateQueries({ queryKey: ['groups', orgId] })              // member counts
+      qc.invalidateQueries({ queryKey: ['group-members', orgId] })       // per-group member lists
+      qc.invalidateQueries({ queryKey: ['compartment-grants', orgId] })  // per-folder granted users
+      qc.invalidateQueries({ queryKey: ['compartments', orgId] })        // grant counts + "no access" nudge
     },
     onError: (err: Error) => toast.error(err.message),
   })
