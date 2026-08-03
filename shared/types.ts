@@ -23,6 +23,7 @@ export type UserRole =
 export type Permission =
   | 'orgs:manage'
   | 'documents:manage'
+  | 'documents:upload'
   | 'documents:view'
   | 'analytics:view'
   | 'audit:view'

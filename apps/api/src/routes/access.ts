@@ -25,10 +25,20 @@ const requireAccessManage = async (c: Context<AuthVars>, next: Next) => {
   }
   await next()
 }
+// Folder grants (who can access a restricted compartment) are part of managing
+// that folder, so they gate on documents:manage — same as creating/restricting
+// the folder in admin.ts. Groups themselves are a separate roster primitive
+// under access:manage.
+const requireDocumentsManage = async (c: Context<AuthVars>, next: Next) => {
+  if (!(await hasPermission(c.get('orgId'), c.get('role'), 'documents:manage'))) {
+    return c.json(FORBIDDEN, 403)
+  }
+  await next()
+}
 accessRoute.use('/groups', requireAccessManage)
 accessRoute.use('/groups/*', requireAccessManage)
 accessRoute.use('/users/:userId/groups', requireAccessManage)
-accessRoute.use('/compartments/:cId/grants', requireAccessManage)
+accessRoute.use('/compartments/:cId/grants', requireDocumentsManage)
 
 // ─── Groups ───────────────────────────────────────────────────────────────────
 

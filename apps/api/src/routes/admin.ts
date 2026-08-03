@@ -185,11 +185,8 @@ adminRoute.post('/compartments', zValidator('json', compartmentCreateSchema), as
   const role = c.get('role')
   const body = c.req.valid('json')
 
+  // Folder management — including whether it's restricted — is documents:manage.
   if (!(await hasPermission(c.get('orgId'), role, 'documents:manage'))) {
-    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
-  }
-  // Creating a folder restricted from the outset is an access-control decision.
-  if (body.restricted && !(await hasPermission(c.get('orgId'), role, 'access:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
@@ -268,14 +265,9 @@ adminRoute.patch('/compartments/:cId', zValidator('json', compartmentUpdateSchem
   const userId = c.get('userId')
   const updates = c.req.valid('json')
 
-  // Renaming a folder is lifecycle (documents:manage); changing its restriction
-  // is access control (access:manage).
-  const changingMeta = updates.name !== undefined || updates.description !== undefined
-  const changingRestricted = updates.restricted !== undefined
-  if (changingMeta && !(await hasPermission(c.get('orgId'), role, 'documents:manage'))) {
-    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
-  }
-  if (changingRestricted && !(await hasPermission(c.get('orgId'), role, 'access:manage'))) {
+  // Folder management — rename, description, and restriction — is all
+  // documents:manage; controlling a folder's access is part of managing it.
+  if (!(await hasPermission(c.get('orgId'), role, 'documents:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 

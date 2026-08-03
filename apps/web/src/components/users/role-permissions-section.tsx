@@ -25,12 +25,13 @@ const ROLE_STYLE: Record<UserRole, { bg: string; color: string }> = {
 }
 
 const PERMISSION_LABEL: Record<string, { label: string; description: string }> = {
-  'documents:manage': { label: 'Manage documents & folders', description: 'Upload, edit, archive and delete documents; create and manage folders' },
+  'documents:manage': { label: 'Manage documents & folders', description: 'Organise folders and documents, control folder access (restrict & grant), edit, archive and delete' },
+  'documents:upload': { label: 'Upload documents', description: 'Add new documents to existing folders' },
   'documents:view': { label: 'View documents', description: 'Browse and preview the knowledge base' },
   'analytics:view': { label: 'View analytics', description: 'See usage, coverage and query dashboards' },
   'audit:view': { label: 'View audit log', description: 'Read and export the compliance audit trail' },
   'users:manage': { label: 'Manage users', description: 'Invite users, assign roles, and remove members' },
-  'access:manage': { label: 'Manage groups & access', description: 'Manage groups and grant access to restricted folders' },
+  'access:manage': { label: 'Manage groups', description: 'Create groups and manage their members' },
   'roles:manage': { label: 'Manage roles & permissions', description: 'Edit the role → permission matrix' },
   'billing:manage': { label: 'Manage billing', description: 'Subscriptions, payouts and external pricing' },
   'queries:submit': { label: 'Ask questions', description: 'Submit queries to the knowledge base' },

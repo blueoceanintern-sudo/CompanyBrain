@@ -1,9 +1,11 @@
 import type { UserRole, Permission } from './types'
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  super_admin:     ['orgs:manage', 'documents:manage', 'documents:view', 'analytics:view', 'audit:view', 'users:manage', 'access:manage', 'roles:manage', 'billing:manage', 'queries:submit'],
-  org_admin:       ['documents:manage', 'documents:view', 'analytics:view', 'audit:view', 'users:manage', 'access:manage', 'roles:manage', 'billing:manage', 'queries:submit'],
-  dept_admin:      ['documents:manage', 'documents:view', 'queries:submit'],
+  super_admin:     ['orgs:manage', 'documents:manage', 'documents:upload', 'documents:view', 'analytics:view', 'audit:view', 'users:manage', 'access:manage', 'roles:manage', 'billing:manage', 'queries:submit'],
+  org_admin:       ['documents:manage', 'documents:upload', 'documents:view', 'analytics:view', 'audit:view', 'users:manage', 'access:manage', 'roles:manage', 'billing:manage', 'queries:submit'],
+  // dept_admin is a contributor by default: upload + view + ask, but not full
+  // document/folder management (which now includes controlling folder access).
+  dept_admin:      ['documents:upload', 'documents:view', 'queries:submit'],
   staff:           ['documents:view', 'queries:submit'],
   external_client: ['queries:submit', 'external-access:subscribe'],
 }
@@ -16,6 +18,7 @@ export function hasPermission(role: UserRole, permission: Permission): boolean {
 export const ALL_PERMISSIONS: Permission[] = [
   'orgs:manage',
   'documents:manage',
+  'documents:upload',
   'documents:view',
   'analytics:view',
   'audit:view',

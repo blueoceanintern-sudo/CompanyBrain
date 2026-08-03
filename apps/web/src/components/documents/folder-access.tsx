@@ -19,17 +19,16 @@ export function FolderAccessPanel({
   compartment,
   parent = null,
   initialEdit = false,
-  canManageFolders,
-  canManageAccess,
+  canManage,
   onRequestDelete,
 }: {
   orgId: string
   compartment: CompartmentSummary
   parent?: CompartmentSummary | null
   initialEdit?: boolean
-  // Folder lifecycle (name, delete). Grants + restriction are canManageAccess.
-  canManageFolders: boolean
-  canManageAccess: boolean
+  // Managing a folder — rename, restrict, grant access, delete — is all one
+  // capability (documents:manage).
+  canManage: boolean
   onRequestDelete: () => void
 }) {
   const { data: groups = [], isLoading: groupsLoading } = useGroups(orgId)
@@ -60,11 +59,9 @@ export function FolderAccessPanel({
   const grantsDirty = !sameSet(currentGroups, savedGroupIds) || !sameSet(currentUsers, savedUserIds)
   const nameDirty = localName.trim().length > 0 && localName.trim() !== compartment.name
   const restrictedDirty = localRestricted !== compartment.restricted
-  // Renaming is folder lifecycle (documents:manage); restriction + grants are
-  // access control (access:manage). Only count changes the caller may actually make.
+  // Only count changes the caller may actually make.
   const dirty =
-    (canManageFolders && nameDirty) ||
-    (canManageAccess && (restrictedDirty || (localRestricted && grantsDirty)))
+    canManage && (nameDirty || restrictedDirty || (localRestricted && grantsDirty))
   const saving = setGrants.isPending || updateComp.isPending
 
   // Grants only matter for non-admin internal users
@@ -120,12 +117,12 @@ export function FolderAccessPanel({
 
   const save = async () => {
     const compData: { name?: string; restricted?: boolean } = {}
-    if (nameDirty && canManageFolders) compData.name = localName.trim()
-    if (restrictedDirty && canManageAccess) compData.restricted = localRestricted
+    if (nameDirty && canManage) compData.name = localName.trim()
+    if (restrictedDirty && canManage) compData.restricted = localRestricted
     if (Object.keys(compData).length > 0) {
       await updateComp.mutateAsync({ cId: compartment.id, data: compData })
     }
-    if (localRestricted && grantsDirty && canManageAccess) {
+    if (localRestricted && grantsDirty && canManage) {
       await setGrants.mutateAsync({
         cId: compartment.id,
         grants: { userIds: [...currentUsers], groupIds: [...currentGroups] },
@@ -206,7 +203,7 @@ export function FolderAccessPanel({
             )}
           </>
         )}
-        {(canManageFolders || canManageAccess) && (
+        {canManage && (
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
               onClick={() => { resetStaged(); setEditing(true) }}
@@ -230,8 +227,8 @@ export function FolderAccessPanel({
           value={localName}
           onChange={(e) => setLocalName(e.target.value)}
           placeholder={compartment.name}
-          disabled={!canManageFolders}
-          style={{ width: '100%', height: 40, padding: '0 12px', border: '1px solid #c3c6d7', borderRadius: 8, background: canManageFolders ? '#ffffff' : '#f8f9ff', fontSize: 14, color: '#0b1c30', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+          disabled={!canManage}
+          style={{ width: '100%', height: 40, padding: '0 12px', border: '1px solid #c3c6d7', borderRadius: 8, background: canManage ? '#ffffff' : '#f8f9ff', fontSize: 14, color: '#0b1c30', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
         />
       </div>
       {parentRestricted && (
@@ -239,8 +236,8 @@ export function FolderAccessPanel({
           Grants here can only narrow further.
         </p>
       )}
-      <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: canManageAccess ? 'pointer' : 'not-allowed' }}>
-        <input type="checkbox" checked={localRestricted} disabled={!canManageAccess} onChange={(e) => setLocalRestricted(e.target.checked)} style={{ accentColor: '#2563eb' }} />
+      <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: canManage ? 'pointer' : 'not-allowed' }}>
+        <input type="checkbox" checked={localRestricted} disabled={!canManage} onChange={(e) => setLocalRestricted(e.target.checked)} style={{ accentColor: '#2563eb' }} />
         <Lock size={14} color={localRestricted ? '#9a3412' : '#585f67'} />
         <span style={{ fontSize: 13, color: '#0b1c30', fontWeight: 500 }}>Restricted</span>
         <span style={{ fontSize: 12, color: '#585f67' }}>
@@ -270,7 +267,7 @@ export function FolderAccessPanel({
                     {groupLacksParentAccess(g) && (
                       <span style={{ ...parentWarnBadge, marginLeft: 8 }}>only members with access to &ldquo;{parent?.name}&rdquo;</span>
                     )}
-                    {canManageAccess && (
+                    {canManage && (
                       <button onClick={() => toggleGroup(g.id)} aria-label={`Remove ${g.name}`} style={removeBtn}
                         onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ba1a1a' }}
                         onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#585f67' }}
@@ -286,7 +283,7 @@ export function FolderAccessPanel({
                     {userLacksParentAccess(u) && (
                       <span style={{ ...parentWarnBadge, marginLeft: 8 }}>no access to &ldquo;{parent?.name}&rdquo;</span>
                     )}
-                    {canManageAccess && (
+                    {canManage && (
                       <button onClick={() => toggleUser(u.id)} aria-label={`Remove ${u.email}`} style={removeBtn}
                         onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ba1a1a' }}
                         onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#585f67' }}
@@ -298,7 +295,7 @@ export function FolderAccessPanel({
             )}
           </div>
 
-          {canManageAccess && (
+          {canManage && (
           <div>
             <p style={{ fontSize: 12, fontWeight: 600, color: '#434655', margin: '0 0 6px' }}>Add groups or users</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -356,7 +353,7 @@ export function FolderAccessPanel({
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
-        {canManageFolders ? (
+        {canManage ? (
           <button
             onClick={onRequestDelete}
             style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 12px', border: 'none', borderRadius: 8, background: 'none', fontSize: 13, fontWeight: 500, color: '#ba1a1a', cursor: 'pointer', fontFamily: 'inherit' }}

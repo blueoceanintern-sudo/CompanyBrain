@@ -111,7 +111,9 @@ documentsRoute.post('/', async (c) => {
   const userId = c.get('userId')
   const role = c.get('role')
 
-  if (!(await hasPermission(c.get('orgId'), role, 'documents:manage'))) {
+  // Uploading is a contributor action, gated separately from full document
+  // management (edit/archive/delete, below, stay on documents:manage).
+  if (!(await hasPermission(c.get('orgId'), role, 'documents:upload'))) {
     return c.json(
       { success: false, error: { code: 'FORBIDDEN', message: 'Insufficient role to upload documents' } },
       403
