@@ -123,6 +123,11 @@ export const RRF_K = 60
 export const TOP_K_CHUNKS = 5
 export const CHUNK_SIZE_CHARS = 2000
 export const CHUNK_OVERLAP_CHARS = 200
+// Auth session lifetime. All tokens expire within 8 hours regardless of role —
+// short-lived sessions bound the blast radius of a stolen token, and combined
+// with per-request session-invalidation checks (users.session_invalidated_at)
+// give timely deprovisioning without a stateful session store.
+export const SESSION_TTL_SECONDS = 8 * 60 * 60
 export const QUERY_LOG_RETENTION_DAYS = 90
 export const ORG_QUARANTINE_DAYS = 30
 export const STRIPE_PLATFORM_FEE_PERCENT = 15

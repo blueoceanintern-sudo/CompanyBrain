@@ -9,12 +9,11 @@ import { users, orgs, passwordResetTokens } from '@company-brain/db'
 import { eq } from 'drizzle-orm'
 import { sendPasswordReset } from '../lib/email'
 import { getRolePermissions } from '@company-brain/access-control'
+import { SESSION_TTL_SECONDS } from '@company-brain/shared'
 
 const authRoute = new Hono()
 
 const COOKIE_NAME = 'auth_token'
-const SHORT_SESSION_SECONDS = 8 * 60 * 60
-const REMEMBER_SESSION_SECONDS = 30 * 24 * 60 * 60
 const RESET_TOKEN_TTL_SECONDS = 60 * 60
 
 function hashToken(token: string): string {
@@ -24,12 +23,12 @@ function hashToken(token: string): string {
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  rememberMe: z.boolean().optional(),
 })
 
 authRoute.post('/login', zValidator('json', loginSchema), async (c) => {
-  const { email, password, rememberMe } = c.req.valid('json')
-  const sessionSeconds = rememberMe ? REMEMBER_SESSION_SECONDS : SHORT_SESSION_SECONDS
+  const { email, password } = c.req.valid('json')
+  // Every session is short-lived (8h) regardless of role — see SESSION_TTL_SECONDS.
+  const sessionSeconds = SESSION_TTL_SECONDS
 
   const rows = await db
     .select()
@@ -64,7 +63,7 @@ authRoute.post('/login', zValidator('json', loginSchema), async (c) => {
     sameSite: 'Lax',
     path: '/',
     maxAge: sessionSeconds,
-    secure: false,
+    secure: process.env.NODE_ENV === 'production',
   })
 
   const orgRows = await db
@@ -162,7 +161,12 @@ authRoute.post('/reset-password', zValidator('json', resetPasswordSchema), async
   }
 
   const passwordHash = await Bun.password.hash(newPassword)
-  await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, resetRow.userId))
+  // Revoke every existing session for this account — a reset often follows a
+  // suspected compromise, so any tokens already out there must stop working.
+  await db
+    .update(users)
+    .set({ passwordHash, sessionInvalidatedAt: new Date(), updatedAt: new Date() })
+    .where(eq(users.id, resetRow.userId))
   await db.update(passwordResetTokens).set({ usedAt: new Date() }).where(eq(passwordResetTokens.id, resetRow.id))
 
   return c.json({ success: true, data: null })

@@ -48,9 +48,8 @@ export async function POST(request: Request) {
     // so Next.js middleware can read it on localhost:3000
     const cookieHeader = apiRes.headers.get('set-cookie') ?? ''
     const match = cookieHeader.match(/auth_token=([^;]+)/)
-    // The API already picked the real duration based on rememberMe — read its
-    // Max-Age back off the same Set-Cookie header instead of hardcoding one,
-    // so a remembered session actually outlives the default 8h here too.
+    // Read the session duration back off the API's Set-Cookie rather than
+    // hardcoding it, so the two stay in sync (all sessions are 8h).
     const maxAgeMatch = cookieHeader.match(/Max-Age=(\d+)/i)
     const maxAge = maxAgeMatch?.[1] ? Number(maxAgeMatch[1]) : DEFAULT_COOKIE_MAX_AGE
     if (match?.[1]) {
@@ -59,7 +58,7 @@ export async function POST(request: Request) {
         sameSite: 'lax',
         path: '/',
         maxAge,
-        secure: false,
+        secure: process.env.NODE_ENV === 'production',
       })
     }
   }

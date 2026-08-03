@@ -585,9 +585,11 @@ adminRoute.patch('/users/:userId/role', zValidator('json', updateRoleSchema), as
     return c.json({ success: false, error: violation }, ROLE_ASSIGN_STATUS[violation.code] ?? 403)
   }
 
+  // Revoke the target's existing sessions so a demotion (or promotion) takes
+  // effect on their next request instead of lingering until their token expires.
   await db
     .update(users)
-    .set({ role: newRole, updatedAt: new Date() })
+    .set({ role: newRole, sessionInvalidatedAt: new Date(), updatedAt: new Date() })
     .where(and(eq(users.id, targetUserId), eq(users.orgId, orgId)))
 
   await db.insert(auditLogs).values({

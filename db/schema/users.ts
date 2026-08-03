@@ -20,6 +20,11 @@ export const users = pgTable(
     // (see PATCH /orgs/:id/account/password). Users provisioned via POST /orgs
     // keep the default false.
     mustChangePassword: boolean('must_change_password').notNull().default(false),
+    // Any JWT issued before this instant is rejected by authMiddleware. Bumped
+    // to now() on role change, password reset, and password change so those
+    // events revoke existing sessions immediately (JWTs are otherwise stateless
+    // and valid until expiry). Null means no session has ever been invalidated.
+    sessionInvalidatedAt: timestamp('session_invalidated_at', { withTimezone: true }),
     stripeCustomerId: text('stripe_customer_id'),
     stripeSubscriptionId: text('stripe_subscription_id'),
     subscriptionStatus: text('subscription_status'),

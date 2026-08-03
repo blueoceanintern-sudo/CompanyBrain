@@ -104,12 +104,12 @@ export interface AuthUser {
   permissions?: Permission[]
 }
 
-export async function login(email: string, password: string, rememberMe?: boolean) {
+export async function login(email: string, password: string) {
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, rememberMe }),
+      body: JSON.stringify({ email, password }),
       credentials: 'include',
     })
     return parseResult<{ user: AuthUser }>(res)
