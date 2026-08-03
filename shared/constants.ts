@@ -38,6 +38,73 @@ export const EDITABLE_PERMISSIONS: Permission[] = ALL_PERMISSIONS.filter(
 // not a tenant role, so its permissions are fixed to the defaults.
 export const EDITABLE_ROLES: UserRole[] = ['org_admin', 'dept_admin', 'staff', 'external_client']
 
+// Privilege ordering used to bound role assignment. An actor may only assign or
+// modify roles *strictly below* their own — this is what stops a user who holds
+// `users:manage` (a permission the matrix now lets org admins grant to lower
+// roles) from promoting themselves or anyone else up to or past their own
+// level. A single rank comparison is deliberately used instead of scattered
+// role-name special-casing, which is how the role-change route's guard came to
+// be missing in the first place.
+export const ROLE_RANK: Record<UserRole, number> = {
+  super_admin: 4,
+  org_admin: 3,
+  dept_admin: 2,
+  staff: 1,
+  external_client: 0,
+}
+
+interface RoleAssignment {
+  actorRole: UserRole
+  // The role being assigned (on invite) or changed to (on a role update).
+  newRole: UserRole
+  // The target's existing role. Omitted when inviting a brand-new user.
+  targetCurrentRole?: UserRole
+  // True when the actor is acting on their own account.
+  isSelf?: boolean
+}
+
+// Guards role assignment on both invite and role-change. Pure so it can be
+// tested without a DB and reused across both routes. Returns an error to
+// surface, or null when the assignment is allowed. Enforces:
+//  (c) an actor can never change their own role
+//  (d) super_admin accounts cannot be modified through tenant routes
+//  (a) an actor can only modify a target ranked strictly below them
+//  (a)/(b) an actor can only assign a role ranked strictly below them
+//          (so only super_admin — the sole role above org_admin — may
+//           create or modify an org_admin)
+export function validateRoleAssignment({
+  actorRole,
+  newRole,
+  targetCurrentRole,
+  isSelf = false,
+}: RoleAssignment): { code: string; message: string } | null {
+  if (isSelf) {
+    return { code: 'SELF_ROLE_CHANGE', message: 'You cannot change your own role' }
+  }
+
+  if (targetCurrentRole === 'super_admin') {
+    return { code: 'TARGET_PROTECTED', message: 'Super admin accounts cannot be modified' }
+  }
+
+  const actorRank = ROLE_RANK[actorRole]
+
+  if (targetCurrentRole !== undefined && ROLE_RANK[targetCurrentRole] >= actorRank) {
+    return {
+      code: 'FORBIDDEN_TARGET',
+      message: 'You cannot modify a user whose role is equal to or above your own',
+    }
+  }
+
+  if (ROLE_RANK[newRole] >= actorRank) {
+    return {
+      code: 'FORBIDDEN_ASSIGN',
+      message: 'You cannot assign a role equal to or above your own',
+    }
+  }
+
+  return null
+}
+
 // Confidence = best cosine similarity among top-k candidates. On
 // text-embedding-3-large, on-topic paraphrases score ~0.28–0.55 and clearly
 // off-topic queries < 0.25. Borderline queries pass through to synthesis,

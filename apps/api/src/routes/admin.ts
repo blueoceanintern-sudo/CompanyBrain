@@ -5,6 +5,7 @@ import { db } from '@company-brain/db'
 import { compartments, users, auditLogs, orgs, documents, chunks, groups, groupMembers, compartmentGrants, queries } from '@company-brain/db'
 import { eq, and, ne, count, inArray, sql, isNull } from 'drizzle-orm'
 import { canPublishExternal, hasPermission } from '@company-brain/access-control'
+import { validateRoleAssignment } from '@company-brain/shared'
 import type { AuthVars } from '../middleware/auth'
 import { sendOrgAdminWelcome, sendUserInvite } from '../lib/email'
 
@@ -424,6 +425,15 @@ const updateRoleSchema = z.object({
   role: z.enum(['org_admin', 'dept_admin', 'staff', 'external_client']),
 })
 
+// HTTP status per role-assignment guard violation. Changing your own role is a
+// request-shape problem (400); everything else is an authorisation refusal (403).
+const ROLE_ASSIGN_STATUS: Record<string, 400 | 403> = {
+  SELF_ROLE_CHANGE: 400,
+  TARGET_PROTECTED: 403,
+  FORBIDDEN_TARGET: 403,
+  FORBIDDEN_ASSIGN: 403,
+}
+
 adminRoute.get('/users', async (c) => {
   const orgId = c.req.param('id')
   if (!orgId) return c.json(BAD_ORG, 400)
@@ -457,6 +467,13 @@ adminRoute.post('/users', zValidator('json', inviteUserSchema), async (c) => {
 
   if (!(await hasPermission(c.get('orgId'), actorRole, 'users:manage'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
+
+  // An actor may only invite a user into a role strictly below their own — this
+  // stops a users:manage holder minting peers or superiors (e.g. org_admin).
+  const assignViolation = validateRoleAssignment({ actorRole, newRole: body.role })
+  if (assignViolation) {
+    return c.json({ success: false, error: assignViolation }, ROLE_ASSIGN_STATUS[assignViolation.code] ?? 403)
   }
 
   const groupIds = [...new Set(body.groupIds ?? [])]
@@ -545,6 +562,29 @@ adminRoute.patch('/users/:userId/role', zValidator('json', updateRoleSchema), as
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
   }
 
+  const [target] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(and(eq(users.id, targetUserId), eq(users.orgId, orgId)))
+    .limit(1)
+
+  if (!target) {
+    return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } }, 404)
+  }
+
+  // Bound both the target and the new role by the actor's rank, and block
+  // self-changes and super_admin targets. Without this, a users:manage holder
+  // could promote their own account (or anyone else) to org_admin.
+  const violation = validateRoleAssignment({
+    actorRole: role,
+    newRole,
+    targetCurrentRole: target.role,
+    isSelf: targetUserId === actorUserId,
+  })
+  if (violation) {
+    return c.json({ success: false, error: violation }, ROLE_ASSIGN_STATUS[violation.code] ?? 403)
+  }
+
   await db
     .update(users)
     .set({ role: newRole, updatedAt: new Date() })
@@ -556,7 +596,7 @@ adminRoute.patch('/users/:userId/role', zValidator('json', updateRoleSchema), as
     action: 'user.role_update',
     resourceType: 'user',
     resourceId: targetUserId,
-    metadata: { newRole },
+    metadata: { previousRole: target.role, newRole },
   })
 
   return c.json({ success: true, data: null })
