@@ -28,6 +28,7 @@ export type Permission =
   | 'audit:view'
   | 'users:manage'
   | 'access:manage'
+  | 'roles:manage'
   | 'billing:manage'
   | 'queries:submit'
   | 'external-access:subscribe'

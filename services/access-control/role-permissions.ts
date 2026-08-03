@@ -3,6 +3,7 @@ import {
   ROLE_PERMISSIONS,
   EDITABLE_ROLES,
   EDITABLE_PERMISSIONS,
+  LOCKED_PERMISSIONS,
   type UserRole,
   type Permission,
   type ServiceResult,
@@ -27,19 +28,37 @@ export function invalidateRolePermissions(orgId: string): void {
   cache.delete(orgId)
 }
 
+// Locked permissions are resolver-controlled: they are never stored as editable
+// rows and are pinned by fixed policy so editing a role's editable permissions
+// can neither grant nor strip a locked capability. A role's locked set is
+// derived from its code defaults (e.g. org_admin keeps `roles:manage`;
+// dept_admin gets none), so editing org_admin's matrix — an editable role —
+// can't accidentally remove its non-editable `roles:manage`.
+function pinLockedPermissions(role: UserRole, perms: Permission[]): Permission[] {
+  const editable = perms.filter((p) => !LOCKED_PERMISSIONS.includes(p))
+  const lockedForRole = ROLE_PERMISSIONS[role].filter((p) => LOCKED_PERMISSIONS.includes(p))
+  return [...editable, ...lockedForRole]
+}
+
 // Builds a matrix from stored rows. An org with no rows is treated as unseeded
 // and falls back to the code defaults; once seeded, a role with zero rows
 // genuinely has no permissions. super_admin is always pinned to the defaults
-// regardless of stored rows (platform-operator invariant). Pure — no DB.
+// regardless of stored rows (platform-operator invariant); every other role has
+// its locked permissions pinned by fixed policy. Pure — no DB.
 export function buildMatrix(rows: { role: UserRole; permission: string }[]): RoleMatrix {
-  if (rows.length === 0) return defaultsCopy()
-
-  const matrix = Object.fromEntries(ALL_ROLES.map((r) => [r, [] as Permission[]])) as RoleMatrix
+  const matrix = rows.length === 0 ? defaultsCopy() : emptyMatrix()
   for (const row of rows) {
     if (matrix[row.role]) matrix[row.role].push(row.permission as Permission)
   }
   matrix.super_admin = [...ROLE_PERMISSIONS.super_admin]
+  for (const role of EDITABLE_ROLES) {
+    matrix[role] = pinLockedPermissions(role, matrix[role])
+  }
   return matrix
+}
+
+function emptyMatrix(): RoleMatrix {
+  return Object.fromEntries(ALL_ROLES.map((r) => [r, [] as Permission[]])) as RoleMatrix
 }
 
 // Resolves the effective role → permission matrix for an org, cached.
@@ -69,19 +88,18 @@ export async function hasPermission(
 interface RoleUpdate {
   role: UserRole
   permissions: Permission[]
-  actorRole: UserRole
 }
 
 // The editing guardrails, factored out so they are testable without a DB:
 //  - super_admin (and any non-editable role) is locked
-//  - only EDITABLE_PERMISSIONS may be assigned (orgs:manage stays super-admin-only)
-//  - the actor may not strip access:manage from their own role (self-lockout) —
-//    access:manage is what gates editing this matrix
+//  - only EDITABLE_PERMISSIONS may be assigned (locked permissions —
+//    orgs:manage, roles:manage — are resolver-pinned, never editable)
+// No self-lockout guard is needed: editing the matrix is gated by the locked,
+// non-editable `roles:manage`, which an actor can neither grant nor strip here.
 // Returns an error object to surface, or null when the update is allowed.
 export function validateRoleUpdate({
   role,
   permissions,
-  actorRole,
 }: RoleUpdate): { code: string; message: string } | null {
   if (!EDITABLE_ROLES.includes(role)) {
     return { code: 'ROLE_LOCKED', message: 'This role is not editable' }
@@ -90,13 +108,6 @@ export function validateRoleUpdate({
   const invalid = permissions.filter((p) => !EDITABLE_PERMISSIONS.includes(p))
   if (invalid.length > 0) {
     return { code: 'INVALID_PERMISSION', message: `Not editable: ${invalid.join(', ')}` }
-  }
-
-  if (role === actorRole && !permissions.includes('access:manage')) {
-    return {
-      code: 'SELF_LOCKOUT',
-      message: 'You cannot remove "Manage permissions & groups" from your own role',
-    }
   }
 
   return null
@@ -114,9 +125,8 @@ export async function setRolePermissions({
   role,
   permissions,
   actorUserId,
-  actorRole,
 }: SetRolePermissionsParams): Promise<ServiceResult<{ role: UserRole; permissions: Permission[] }>> {
-  const violation = validateRoleUpdate({ role, permissions, actorRole })
+  const violation = validateRoleUpdate({ role, permissions })
   if (violation) {
     return { success: false, error: violation }
   }
@@ -147,10 +157,13 @@ export async function setRolePermissions({
   return { success: true, data: { role, permissions: deduped } }
 }
 
-// Seeds the default permission rows for a freshly-provisioned org. Call inside
-// the org-creation transaction (pass the tx as `runner`).
+// Seeds the default permission rows for a freshly-provisioned org. Only editable
+// permissions are stored — locked permissions (orgs:manage, roles:manage) are
+// resolver-pinned, never rows. Call inside the org-creation transaction.
 export function seedRolePermissionsValues(orgId: string) {
   return EDITABLE_ROLES.flatMap((role) =>
-    ROLE_PERMISSIONS[role].map((permission) => ({ orgId, role, permission }))
+    ROLE_PERMISSIONS[role]
+      .filter((permission) => EDITABLE_PERMISSIONS.includes(permission))
+      .map((permission) => ({ orgId, role, permission }))
   )
 }

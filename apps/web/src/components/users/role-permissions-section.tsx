@@ -30,7 +30,8 @@ const PERMISSION_LABEL: Record<string, { label: string; description: string }> =
   'analytics:view': { label: 'View analytics', description: 'See usage, coverage and query dashboards' },
   'audit:view': { label: 'View audit log', description: 'Read and export the compliance audit trail' },
   'users:manage': { label: 'Manage users', description: 'Invite users, assign roles, and remove members' },
-  'access:manage': { label: 'Manage permissions & groups', description: 'Edit role permissions, groups, and compartment access' },
+  'access:manage': { label: 'Manage groups & access', description: 'Manage groups and grant access to restricted folders' },
+  'roles:manage': { label: 'Manage roles & permissions', description: 'Edit the role → permission matrix' },
   'billing:manage': { label: 'Manage billing', description: 'Subscriptions, payouts and external pricing' },
   'queries:submit': { label: 'Ask questions', description: 'Submit queries to the knowledge base' },
   'external-access:subscribe': { label: 'Subscribe to external access', description: 'Purchase access to the external knowledge plane' },
@@ -52,14 +53,12 @@ function EditRoleDialog({
   role,
   current,
   editablePermissions,
-  isOwnRole,
   onClose,
 }: {
   orgId: string
   role: UserRole
   current: Permission[]
   editablePermissions: Permission[]
-  isOwnRole: boolean
   onClose: () => void
 }) {
   const update = useUpdateRolePermissions(orgId)
@@ -70,9 +69,6 @@ function EditRoleDialog({
     selected.size !== initial.size || [...selected].some((p) => !initial.has(p))
 
   const toggle = (p: Permission) => {
-    // Guard: the actor can't strip access:manage from their own role (it's what
-    // grants access to this editor).
-    if (p === 'access:manage' && isOwnRole) return
     setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(p)) next.delete(p)
@@ -99,14 +95,12 @@ function EditRoleDialog({
           {editablePermissions.map((p) => {
             const { label, description } = permLabel(p)
             const checked = selected.has(p)
-            const locked = p === 'access:manage' && isOwnRole
             return (
-              <label key={p} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 12px', borderRadius: 8, cursor: locked ? 'not-allowed' : 'pointer', background: checked ? '#eff4ff' : 'transparent' }}>
-                <input type="checkbox" checked={checked} disabled={locked} onChange={() => toggle(p)} style={{ accentColor: '#2563eb', marginTop: 5 }} />
+              <label key={p} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 12px', borderRadius: 8, cursor: 'pointer', background: checked ? '#eff4ff' : 'transparent' }}>
+                <input type="checkbox" checked={checked} onChange={() => toggle(p)} style={{ accentColor: '#2563eb', marginTop: 5 }} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <span style={{ fontSize: 14, fontWeight: 500, color: '#0b1c30' }}>{label}</span>
                   <span style={{ fontSize: 12, color: '#585f67' }}>{description}</span>
-                  {locked && <span style={{ fontSize: 11, color: '#c2410c' }}>You can’t remove this from your own role.</span>}
                 </div>
               </label>
             )
@@ -130,7 +124,7 @@ function EditRoleDialog({
 
 // ─── Section ──────────────────────────────────────────────────────────────────
 
-export function RolePermissionsSection({ orgId, canManage, currentRole }: { orgId: string; canManage: boolean; currentRole?: UserRole | undefined }) {
+export function RolePermissionsSection({ orgId, canManage }: { orgId: string; canManage: boolean }) {
   const { data, isLoading } = useRoles(orgId)
   const [editing, setEditing] = useState<UserRole | null>(null)
 
@@ -197,7 +191,6 @@ export function RolePermissionsSection({ orgId, canManage, currentRole }: { orgI
           role={editing}
           current={data.matrix[editing] ?? []}
           editablePermissions={data.editablePermissions}
-          isOwnRole={editing === currentRole}
           onClose={() => setEditing(null)}
         />
       )}

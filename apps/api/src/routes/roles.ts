@@ -9,13 +9,15 @@ import {
 import { EDITABLE_ROLES, EDITABLE_PERMISSIONS, type UserRole } from '@company-brain/shared'
 import type { AuthVars } from '../middleware/auth'
 
-// Per-org role → permission matrix editing. Read/write both require access:manage.
+// Per-org role → permission matrix editing. Read/write both require
+// roles:manage — a locked, non-editable capability held only by super_admin and
+// org_admin, kept separate from access:manage (groups + compartment grants).
 const rolesRoute = new Hono<AuthVars>()
 
 const FORBIDDEN = { success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } } as const
 
 rolesRoute.use('*', async (c, next) => {
-  if (!(await hasPermission(c.get('orgId'), c.get('role'), 'access:manage'))) {
+  if (!(await hasPermission(c.get('orgId'), c.get('role'), 'roles:manage'))) {
     return c.json(FORBIDDEN, 403)
   }
   await next()
@@ -34,9 +36,8 @@ const updateSchema = z.object({
   permissions: z.array(z.string()),
 })
 
-const STATUS: Record<string, 400 | 403 | 409> = {
+const STATUS: Record<string, 400 | 403> = {
   ROLE_LOCKED: 403,
-  SELF_LOCKOUT: 409,
   INVALID_PERMISSION: 400,
 }
 
@@ -50,7 +51,6 @@ rolesRoute.put('/:role', zValidator('json', updateSchema), async (c) => {
     role,
     permissions: permissions as Parameters<typeof setRolePermissions>[0]['permissions'],
     actorUserId: c.get('userId'),
-    actorRole: c.get('role'),
   })
 
   if (!result.success) {

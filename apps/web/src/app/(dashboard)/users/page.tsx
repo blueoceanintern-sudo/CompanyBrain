@@ -281,7 +281,12 @@ export default function UsersPage() {
 
   const canManageUsers = userCan(user, 'users:manage')
   const canManageAccess = userCan(user, 'access:manage')
-  const [tab, setTab] = useState<UsersTab>(canManageUsers ? 'members' : 'groups')
+  // Editing the role→permission matrix is gated by roles:manage, separate from
+  // access:manage (groups + folder grants).
+  const canManageRoles = userCan(user, 'roles:manage')
+  const [tab, setTab] = useState<UsersTab>(
+    canManageUsers ? 'members' : canManageAccess ? 'groups' : 'roles'
+  )
 
   const inputBase: React.CSSProperties = {
     width: '100%', height: 48, padding: '0 16px', border: '1px solid #c3c6d7', borderRadius: 8,
@@ -291,7 +296,7 @@ export default function UsersPage() {
   const TABS = ([
     canManageUsers ? { key: 'members' as const, label: 'Members' } : null,
     canManageAccess ? { key: 'groups' as const, label: 'Groups' } : null,
-    canManageAccess ? { key: 'roles' as const, label: 'Roles & Permissions' } : null,
+    canManageRoles ? { key: 'roles' as const, label: 'Roles & Permissions' } : null,
   ].filter(Boolean)) as { key: UsersTab; label: string }[]
 
   const { data: users = [], isLoading } = useUsers(orgId)
@@ -526,7 +531,7 @@ export default function UsersPage() {
 
           {tab === 'roles' && (
             <div style={{ maxWidth: 860, width: '100%', margin: '0 auto' }}>
-              <RolePermissionsSection orgId={orgId} canManage={canManageAccess} currentRole={user?.role} />
+              <RolePermissionsSection orgId={orgId} canManage={canManageRoles} />
             </div>
           )}
         </div>

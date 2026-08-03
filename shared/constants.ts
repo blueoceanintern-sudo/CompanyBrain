@@ -1,8 +1,8 @@
 import type { UserRole, Permission } from './types'
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  super_admin:     ['orgs:manage', 'documents:manage', 'documents:view', 'analytics:view', 'audit:view', 'users:manage', 'access:manage', 'billing:manage', 'queries:submit'],
-  org_admin:       ['documents:manage', 'documents:view', 'analytics:view', 'audit:view', 'users:manage', 'access:manage', 'billing:manage', 'queries:submit'],
+  super_admin:     ['orgs:manage', 'documents:manage', 'documents:view', 'analytics:view', 'audit:view', 'users:manage', 'access:manage', 'roles:manage', 'billing:manage', 'queries:submit'],
+  org_admin:       ['documents:manage', 'documents:view', 'analytics:view', 'audit:view', 'users:manage', 'access:manage', 'roles:manage', 'billing:manage', 'queries:submit'],
   dept_admin:      ['documents:manage', 'documents:view', 'queries:submit'],
   staff:           ['documents:view', 'queries:submit'],
   external_client: ['queries:submit', 'external-access:subscribe'],
@@ -21,17 +21,25 @@ export const ALL_PERMISSIONS: Permission[] = [
   'audit:view',
   'users:manage',
   'access:manage',
+  'roles:manage',
   'billing:manage',
   'queries:submit',
   'external-access:subscribe',
 ]
 
-// Permissions an org admin may toggle per role. `orgs:manage` is excluded: it is
-// the platform-operator capability (create/list orgs across tenants) and stays
-// bound to super_admin only — granting it to a tenant role would be privilege
-// escalation.
+// Locked permissions are never toggleable per role and are not stored as
+// editable rows — the resolver pins them by fixed policy (see buildMatrix).
+//  - `orgs:manage`: platform-operator capability (create/list orgs across
+//    tenants); stays bound to super_admin only.
+//  - `roles:manage`: edits the role→permission matrix itself; bound to
+//    super_admin + org_admin so a lower role can never be granted the ability
+//    to rewrite the matrix (and thereby grant itself anything).
+export const LOCKED_PERMISSIONS: Permission[] = ['orgs:manage', 'roles:manage']
+
+// Permissions an org admin may toggle per role. Locked permissions are excluded
+// — granting them to a tenant role would be privilege escalation.
 export const EDITABLE_PERMISSIONS: Permission[] = ALL_PERMISSIONS.filter(
-  (p) => p !== 'orgs:manage'
+  (p) => !LOCKED_PERMISSIONS.includes(p)
 )
 
 // Roles whose permission set is editable. super_admin is a platform operator,

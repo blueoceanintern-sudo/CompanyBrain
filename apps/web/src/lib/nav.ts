@@ -12,7 +12,7 @@ export const NAV: NavItem[] = [
   { label: 'Documents',     href: '/documents', permission: 'documents:view'   },
   { label: 'Analytics',     href: '/analytics', permission: 'analytics:view'   },
   { label: 'Audit Log',     href: '/audit',     permission: 'audit:view'       },
-  { label: 'Users',         href: '/users',     permission: ['users:manage', 'access:manage'] },
+  { label: 'Users',         href: '/users',     permission: ['users:manage', 'access:manage', 'roles:manage'] },
   { label: 'Organisations', href: '/orgs',      permission: 'orgs:manage'      },
   { label: 'Settings',      href: '/settings',  permission: 'users:manage'     },
 ]
