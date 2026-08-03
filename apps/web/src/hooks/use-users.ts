@@ -44,9 +44,18 @@ export function useUpdateUserRole(orgId: string) {
       if (!result.success) throw new Error(result.error.message)
       return null
     },
-    onSuccess: () => {
+    onSuccess: (_data, { role }) => {
       toast.success('Role updated')
       qc.invalidateQueries({ queryKey: ['users', orgId] })
+      // Demoting to external_client strips the user's group memberships and
+      // folder grants server-side; refresh the views that reflect them so the
+      // change appears immediately (prefix-matched keys cover per-group / folder).
+      if (role === 'external_client') {
+        qc.invalidateQueries({ queryKey: ['groups', orgId] })
+        qc.invalidateQueries({ queryKey: ['group-members', orgId] })
+        qc.invalidateQueries({ queryKey: ['compartment-grants', orgId] })
+        qc.invalidateQueries({ queryKey: ['compartments', orgId] })
+      }
     },
     onError: () => toast.error('Role update failed'),
   })

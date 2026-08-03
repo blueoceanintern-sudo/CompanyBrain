@@ -64,6 +64,11 @@ function RoleConfirmDialog({ pending, onConfirm, onCancel }: { pending: PendingR
           <strong style={{ color: '#0b1c30' }}>{pending.currentRole.replace(/_/g, ' ')}</strong> to{' '}
           <strong style={{ color: '#0b1c30' }}>{pending.pendingRole.replace(/_/g, ' ')}</strong>?
         </p>
+        {pending.pendingRole === 'external_client' && (
+          <p style={{ fontSize: 13, color: '#9a3412', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 12px', margin: '0 0 24px', lineHeight: 1.6 }}>
+            External clients can&rsquo;t belong to groups. This will remove them from all groups and revoke their folder access.
+          </p>
+        )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
           <button type="button" onClick={onCancel} style={{ height: 40, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>Cancel</button>
           <button type="button" onClick={onConfirm} style={{ height: 40, padding: '0 20px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Confirm</button>

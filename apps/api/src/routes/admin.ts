@@ -577,20 +577,33 @@ adminRoute.patch('/users/:userId/role', zValidator('json', updateRoleSchema), as
     return c.json({ success: false, error: violation }, ROLE_ASSIGN_STATUS[violation.code] ?? 403)
   }
 
-  // Revoke the target's existing sessions so a demotion (or promotion) takes
-  // effect on their next request instead of lingering until their token expires.
-  await db
-    .update(users)
-    .set({ role: newRole, sessionInvalidatedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(users.id, targetUserId), eq(users.orgId, orgId)))
+  const demotedToExternal = newRole === 'external_client' && target.role !== 'external_client'
 
-  await db.insert(auditLogs).values({
-    orgId,
-    userId: actorUserId,
-    action: 'user.role_update',
-    resourceType: 'user',
-    resourceId: targetUserId,
-    metadata: { previousRole: target.role, newRole },
+  await db.transaction(async (tx) => {
+    // Revoke the target's existing sessions so a demotion (or promotion) takes
+    // effect on their next request instead of lingering until their token expires.
+    await tx
+      .update(users)
+      .set({ role: newRole, sessionInvalidatedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(users.id, targetUserId), eq(users.orgId, orgId)))
+
+    // External clients cannot belong to groups or hold internal folder grants
+    // (the invite / group-membership paths forbid it). Demoting an internal user
+    // to external_client strips both so the removed internal access can't linger
+    // in group/member lists or silently reactivate if they're later promoted back.
+    if (demotedToExternal) {
+      await tx.delete(groupMembers).where(and(eq(groupMembers.userId, targetUserId), eq(groupMembers.orgId, orgId)))
+      await tx.delete(compartmentGrants).where(and(eq(compartmentGrants.userId, targetUserId), eq(compartmentGrants.orgId, orgId)))
+    }
+
+    await tx.insert(auditLogs).values({
+      orgId,
+      userId: actorUserId,
+      action: 'user.role_update',
+      resourceType: 'user',
+      resourceId: targetUserId,
+      metadata: { previousRole: target.role, newRole, ...(demotedToExternal ? { strippedGroupsAndGrants: true } : {}) },
+    })
   })
 
   return c.json({ success: true, data: null })
