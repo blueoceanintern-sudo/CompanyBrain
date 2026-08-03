@@ -10,11 +10,20 @@ import { eq } from 'drizzle-orm'
 import { sendPasswordReset } from '../lib/email'
 import { getRolePermissions } from '@company-brain/access-control'
 import { SESSION_TTL_SECONDS } from '@company-brain/shared'
+import { isRateLimited, recordFailure, clearRateLimit, pruneRateLimit, type RateWindow } from '../lib/rate-limit'
 
 const authRoute = new Hono()
 
 const COOKIE_NAME = 'auth_token'
 const RESET_TOKEN_TTL_SECONDS = 60 * 60
+
+// Login brute-force / password-spraying guard. Failed attempts are counted per
+// account (email) and per source IP over a fixed window; a successful login
+// clears the account counter. In-memory, single-instance (see CLAUDE.md).
+const loginAttempts = new Map<string, RateWindow>()
+const LOGIN_WINDOW_MS = 15 * 60 * 1000
+const LOGIN_MAX_PER_EMAIL = 10
+const LOGIN_MAX_PER_IP = 30
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
@@ -25,10 +34,30 @@ const loginSchema = z.object({
   password: z.string().min(8),
 })
 
+const RATE_LIMITED = {
+  success: false,
+  error: { code: 'RATE_LIMITED', message: 'Too many login attempts. Please try again later.' },
+} as const
+
 authRoute.post('/login', zValidator('json', loginSchema), async (c) => {
   const { email, password } = c.req.valid('json')
   // Every session is short-lived (8h) regardless of role — see SESSION_TTL_SECONDS.
   const sessionSeconds = SESSION_TTL_SECONDS
+
+  // The client IP is forwarded by the Next.js login proxy via x-forwarded-for;
+  // fall back to a shared bucket when it is absent (e.g. local dev).
+  const now = Date.now()
+  pruneRateLimit(loginAttempts, now)
+  const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  const emailKey = `email:${email.toLowerCase()}`
+  const ipKey = `ip:${ip}`
+
+  const emailCheck = isRateLimited(loginAttempts, emailKey, now, LOGIN_MAX_PER_EMAIL)
+  const ipCheck = isRateLimited(loginAttempts, ipKey, now, LOGIN_MAX_PER_IP)
+  if (emailCheck.limited || ipCheck.limited) {
+    c.header('Retry-After', String(Math.max(emailCheck.retryAfterSeconds, ipCheck.retryAfterSeconds)))
+    return c.json(RATE_LIMITED, 429)
+  }
 
   const rows = await db
     .select()
@@ -38,6 +67,8 @@ authRoute.post('/login', zValidator('json', loginSchema), async (c) => {
 
   const user = rows[0]
   if (!user) {
+    recordFailure(loginAttempts, emailKey, now, LOGIN_WINDOW_MS)
+    recordFailure(loginAttempts, ipKey, now, LOGIN_WINDOW_MS)
     return c.json(
       { success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' } },
       401
@@ -46,11 +77,17 @@ authRoute.post('/login', zValidator('json', loginSchema), async (c) => {
 
   const valid = await Bun.password.verify(password, user.passwordHash)
   if (!valid) {
+    recordFailure(loginAttempts, emailKey, now, LOGIN_WINDOW_MS)
+    recordFailure(loginAttempts, ipKey, now, LOGIN_WINDOW_MS)
     return c.json(
       { success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' } },
       401
     )
   }
+
+  // Successful login — clear the account counter so earlier typos don't count
+  // against a legitimate user. The IP counter is kept (spraying protection).
+  clearRateLimit(loginAttempts, emailKey)
 
   const token = signJwt(
     { sub: user.id, orgId: user.orgId, role: user.role },

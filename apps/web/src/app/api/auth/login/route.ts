@@ -15,11 +15,18 @@ export async function POST(request: Request) {
     )
   }
 
+  // Forward the client IP so the API can rate-limit login by source, not by the
+  // proxy's own address (all API traffic originates from this server).
+  const forwardedFor = request.headers.get('x-forwarded-for')
+
   let apiRes: Response
   try {
     apiRes = await fetch(`${BACKEND_URL}/api/v1/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(forwardedFor ? { 'x-forwarded-for': forwardedFor } : {}),
+      },
       body: JSON.stringify(body),
       cache: 'no-store',
     })
