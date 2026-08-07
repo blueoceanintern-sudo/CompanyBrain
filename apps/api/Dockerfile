@@ -12,6 +12,7 @@ COPY services/retrieval/package.json ./services/retrieval/
 COPY services/synthesis/package.json ./services/synthesis/
 COPY services/access-control/package.json ./services/access-control/
 COPY services/payments/package.json ./services/payments/
+COPY services/ai-provider/package.json ./services/ai-provider/
 COPY workers/package.json ./workers/
 COPY apps/api/package.json ./apps/api/
 
