@@ -5,6 +5,7 @@ import { db } from '@company-brain/db'
 import { compartments, users, auditLogs, orgs, documents, chunks, groups, groupMembers, compartmentGrants, queries } from '@company-brain/db'
 import { eq, and, ne, count, inArray, sql, isNull } from 'drizzle-orm'
 import { canPublishExternal, hasPermission } from '@company-brain/access-control'
+import { deleteObject } from '@company-brain/storage'
 import { validateRoleAssignment } from '@company-brain/shared'
 import type { AuthVars } from '../middleware/auth'
 import { sendOrgAdminWelcome, sendUserInvite } from '../lib/email'
@@ -380,7 +381,16 @@ adminRoute.delete('/compartments/:cId', zValidator('json', deleteCompartmentSche
       .where(and(eq(chunks.compartmentId, cId), eq(chunks.orgId, orgId)))
   } else {
     await db.delete(chunks).where(and(eq(chunks.compartmentId, cId), eq(chunks.orgId, orgId)))
-    await db.delete(documents).where(and(eq(documents.compartmentId, cId), eq(documents.orgId, orgId)))
+    // Deleting the rows would otherwise strand every original file in this
+    // compartment — nothing else ever revisits them.
+    const removed = await db
+      .delete(documents)
+      .where(and(eq(documents.compartmentId, cId), eq(documents.orgId, orgId)))
+      .returning({ storageKey: documents.storageKey })
+
+    for (const row of removed) {
+      if (row.storageKey) await deleteObject(row.storageKey)
+    }
   }
 
   const [deleted] = await db

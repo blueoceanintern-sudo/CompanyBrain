@@ -18,6 +18,13 @@ export const documents = pgTable(
     accessTier: accessTierEnum('access_tier').notNull().default('internal'),
     sourceType: sourceTypeEnum('source_type').notNull().default('other'),
     contentHash: text('content_hash').notNull(),
+    // Original file in object storage. Relative key ({orgId}/{documentId}) so
+    // it stays valid across storage backends — see services/storage. Null for
+    // documents uploaded before original-file storage existed; those fall back
+    // to the stitched-chunk text preview.
+    storageKey: text('storage_key'),
+    mimeType: text('mime_type'),
+    sizeBytes: integer('size_bytes'),
     status: ingestionStatusEnum('status').notNull().default('queued'),
     uploadedBy: uuid('uploaded_by')
       .references(() => users.id, { onDelete: 'set null' }),

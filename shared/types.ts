@@ -104,6 +104,11 @@ export interface DocumentSummary {
   accessTier: AccessTier
   sourceType: SourceType
   contentHash: string
+  // Null for documents uploaded before original-file storage existed — those
+  // have only the extracted-text preview, no downloadable original.
+  storageKey: string | null
+  mimeType: string | null
+  sizeBytes: number | null
   status: IngestionStatus
   uploadedBy: string
   version: number

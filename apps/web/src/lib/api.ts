@@ -184,10 +184,19 @@ export interface DocumentContent {
   content: string
   totalChunks: number
   accessibleChunks: number
+  hasOriginal: boolean
+  mimeType: string | null
 }
 
 export async function getDocumentContent(orgId: string, docId: string) {
   return apiFetch<DocumentContent>(`/api/v1/orgs/${orgId}/documents/${docId}/content`)
+}
+
+// The original file is streamed by the API, not parsed as JSON — this is the
+// URL an <iframe> or a download link points at. Access is re-checked server
+// side on every request, so the URL is not a capability by itself.
+export function documentFileUrl(orgId: string, docId: string) {
+  return `/api/v1/orgs/${orgId}/documents/${docId}/file`
 }
 
 export async function unarchiveDocument(orgId: string, docId: string) {

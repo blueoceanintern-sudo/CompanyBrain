@@ -11,3 +11,6 @@ build/
 *.log
 *.tsbuildinfo
 .DS_Store
+
+# Uploaded originals (services/storage, local driver default)
+.storage/

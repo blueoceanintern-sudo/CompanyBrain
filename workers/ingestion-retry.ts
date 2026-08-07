@@ -1,6 +1,9 @@
 import { db } from '@company-brain/db'
-import { ingestionJobs, documents } from '@company-brain/db'
+import { ingestionJobs, documents, chunks } from '@company-brain/db'
 import { eq, and, lt } from 'drizzle-orm'
+import { ingestDocument } from '@company-brain/ingestion'
+import { getObjectBuffer } from '@company-brain/storage'
+import { visibilityForTier } from '@company-brain/shared'
 
 export async function runIngestionRetry(): Promise<void> {
   console.log('[ingestion-retry] Starting retry pass')
@@ -46,16 +49,72 @@ export async function runIngestionRetry(): Promise<void> {
       continue
     }
 
-    // Re-ingestion requires the original file. In v1 we skip if no file is cached.
-    // In production, store the file in object storage and retrieve it here.
-    console.log(`[ingestion-retry] Skipping job ${job.jobId} — file re-fetch not implemented in v1`)
+    // Documents uploaded before original-file storage existed have no bytes to
+    // re-parse — those still need a manual re-upload.
+    if (!doc.storageKey) {
+      console.log(`[ingestion-retry] Skipping job ${job.jobId} — no stored original`)
+      await db
+        .update(ingestionJobs)
+        .set({
+          status: 'failed',
+          retryCount: job.retryCount + 1,
+          errorMessage: 'No original file stored for this document; manual re-upload required',
+        })
+        .where(eq(ingestionJobs.id, job.jobId))
+      continue
+    }
 
+    const stored = await getObjectBuffer(doc.storageKey)
+    if (!stored.success) {
+      console.error(`[ingestion-retry] Job ${job.jobId} could not read original:`, stored.error.message)
+      await db
+        .update(ingestionJobs)
+        .set({
+          status: 'failed',
+          retryCount: job.retryCount + 1,
+          errorMessage: `Could not read the stored original: ${stored.error.message}`,
+        })
+        .where(eq(ingestionJobs.id, job.jobId))
+      continue
+    }
+
+    // A previous attempt may have stored some chunks before failing; clear them
+    // so a retry cannot leave the document with a partial, duplicated set.
+    await db.delete(chunks).where(eq(chunks.documentId, doc.id))
+
+    const result = await ingestDocument({
+      orgId: doc.orgId,
+      documentId: doc.id,
+      compartmentId: doc.compartmentId,
+      accessTier: doc.accessTier,
+      sourceType: doc.sourceType,
+      visibility: visibilityForTier(doc.accessTier),
+      fileBuffer: stored.data,
+      filename: doc.filename,
+      uploadedBy: doc.uploadedBy ?? '',
+    })
+
+    if (!result.success) {
+      console.error(`[ingestion-retry] Job ${job.jobId} failed again:`, result.error.message)
+      await db
+        .update(ingestionJobs)
+        .set({
+          status: 'failed',
+          retryCount: job.retryCount + 1,
+          errorMessage: result.error.message,
+        })
+        .where(eq(ingestionJobs.id, job.jobId))
+      continue
+    }
+
+    console.log(`[ingestion-retry] Job ${job.jobId} succeeded — ${result.data.chunksCreated} chunks`)
     await db
       .update(ingestionJobs)
       .set({
-        status: 'failed',
+        status: 'complete',
         retryCount: job.retryCount + 1,
-        errorMessage: 'File re-fetch not available in v1; manual re-upload required',
+        errorMessage: null,
+        completedAt: new Date(),
       })
       .where(eq(ingestionJobs.id, job.jobId))
   }

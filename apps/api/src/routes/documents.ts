@@ -1,12 +1,20 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
+import { extname } from 'node:path'
 import { db } from '@company-brain/db'
 import { documents, ingestionJobs, chunks, orgs, compartments, auditLogs } from '@company-brain/db'
 import { eq, and, desc, sql, getTableColumns } from 'drizzle-orm'
 import { ingestDocument, stitchChunks } from '@company-brain/ingestion'
-import type { VisibilityPolicy } from '@company-brain/shared'
+import { deleteObject, documentKey, getObject, putObject } from '@company-brain/storage'
+import type { UserRole, VisibilityPolicy } from '@company-brain/shared'
+import {
+  INLINE_VIEWABLE_MIME_TYPES,
+  MAX_UPLOAD_BYTES,
+  UPLOAD_MIME_TYPES,
+  visibilityForTier,
+} from '@company-brain/shared'
 import { canAccessChunk, canPublishExternal, canUseCompartment, hasPermission } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
 
@@ -20,22 +28,6 @@ const updateDocSchema = z.object({
 })
 
 const BAD_ORG = { success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } } as const
-
-export function visibilityForTier(accessTier: 'internal' | 'external'): VisibilityPolicy {
-  return accessTier === 'external'
-    ? {
-        allowedRoles: ['super_admin', 'org_admin', 'dept_admin', 'staff', 'external_client'],
-        deniedRoles: [],
-        allowedPrincipals: [],
-        classification: 'public',
-      }
-    : {
-        allowedRoles: ['super_admin', 'org_admin', 'dept_admin', 'staff'],
-        deniedRoles: [],
-        allowedPrincipals: [],
-        classification: 'restricted',
-      }
-}
 
 // GET /orgs/:id/documents
 documentsRoute.get('/', async (c) => {
@@ -132,6 +124,37 @@ documentsRoute.post('/', async (c) => {
     )
   }
 
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'FILE_TOO_LARGE',
+          message: `File exceeds the ${Math.floor(MAX_UPLOAD_BYTES / (1024 * 1024))} MB upload limit`,
+        },
+      },
+      413
+    )
+  }
+
+  // The extension drives both parsing and the Content-Type the file is later
+  // served under, so anything outside the allowlist is rejected before a byte
+  // is written.
+  const extension = extname(file.name).toLowerCase()
+  const mimeType = UPLOAD_MIME_TYPES[extension]
+  if (!mimeType) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'UNSUPPORTED_FILE_TYPE',
+          message: `Unsupported file type "${extension || file.name}". Accepted: ${Object.keys(UPLOAD_MIME_TYPES).join(', ')}`,
+        },
+      },
+      400
+    )
+  }
+
   const compartmentRow = await db
     .select({ id: compartments.id, accessTier: compartments.accessTier })
     .from(compartments)
@@ -198,6 +221,20 @@ documentsRoute.post('/', async (c) => {
 
   const visibilityPolicy: VisibilityPolicy = visibilityForTier(accessTier)
 
+  // The ID is generated here rather than by the DB default so the storage key
+  // is known before the row exists: the original is written first, and the row
+  // that points at it is only created once the bytes are safely stored.
+  const documentId = randomUUID()
+  const storageKey = documentKey(orgId, documentId)
+
+  const stored = await putObject(storageKey, buffer, mimeType)
+  if (!stored.success) {
+    return c.json(
+      { success: false, error: { code: 'STORAGE_ERROR', message: 'Could not store the uploaded file' } },
+      500
+    )
+  }
+
   // Archive previous version's chunks before creating the new record
   if (previousDoc[0]) {
     await db.update(chunks).set({ status: 'archived' }).where(eq(chunks.documentId, previousDoc[0].id))
@@ -208,12 +245,16 @@ documentsRoute.post('/', async (c) => {
   const [doc] = await db
     .insert(documents)
     .values({
+      id: documentId,
       orgId,
       compartmentId,
       filename: file.name,
       accessTier,
       sourceType,
       contentHash,
+      storageKey,
+      mimeType,
+      sizeBytes: buffer.byteLength,
       status: 'running',
       uploadedBy: userId,
       version: previousDoc[0] ? previousDoc[0].version + 1 : 1,
@@ -222,6 +263,9 @@ documentsRoute.post('/', async (c) => {
     .returning()
 
   if (!doc) {
+    // Nothing references the stored bytes now — drop them rather than leak an
+    // object no row will ever point at.
+    await deleteObject(storageKey)
     return c.json({ success: false, error: { code: 'DB_ERROR', message: 'Failed to create document' } }, 500)
   }
 
@@ -266,6 +310,49 @@ documentsRoute.post('/', async (c) => {
   return c.json({ success: true, data: { documentId: doc.id, chunksCreated: result.data.chunksCreated } }, 201)
 })
 
+// Read access to one document's contents, shared by the text preview and the
+// original-file download. External clients reach cited content through the
+// external tier rules; internal roles need documents:view. Restricted
+// compartments need a grant either way.
+type DocumentReadResult =
+  | { ok: true; doc: typeof documents.$inferSelect }
+  | { ok: false; status: 403 | 404; code: string; message: string }
+
+async function authorizeDocumentRead(params: {
+  orgId: string
+  docId: string
+  userId: string
+  role: UserRole
+  permissionOrgId: string
+}): Promise<DocumentReadResult> {
+  const { orgId, docId, userId, role, permissionOrgId } = params
+
+  if (role !== 'external_client' && !(await hasPermission(permissionOrgId, role, 'documents:view'))) {
+    return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Insufficient permissions' }
+  }
+
+  const [doc] = await db
+    .select()
+    .from(documents)
+    .where(and(eq(documents.id, docId), eq(documents.orgId, orgId)))
+    .limit(1)
+
+  if (!doc) {
+    return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Document not found' }
+  }
+
+  if (role === 'external_client' && doc.accessTier !== 'external') {
+    return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Access denied to this document' }
+  }
+
+  const compartmentOk = await canUseCompartment({ orgId, compartmentId: doc.compartmentId, userId, userRole: role })
+  if (!compartmentOk) {
+    return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Access denied to this document' }
+  }
+
+  return { ok: true, doc }
+}
+
 // GET /orgs/:id/documents/:docId/content — stitched full text for preview.
 // Any org member may call it (chat citations link here), so access is enforced
 // per document and per chunk, mirroring the retrieval pipeline: external
@@ -278,37 +365,17 @@ documentsRoute.get('/:docId/content', async (c) => {
   const userId = c.get('userId')
   const role = c.get('role')
 
-  // External clients reach cited content through the external tier rules below;
-  // internal roles need documents:view.
-  if (role !== 'external_client' && !(await hasPermission(c.get('orgId'), role, 'documents:view'))) {
-    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  const access = await authorizeDocumentRead({
+    orgId,
+    docId,
+    userId,
+    role,
+    permissionOrgId: c.get('orgId'),
+  })
+  if (!access.ok) {
+    return c.json({ success: false, error: { code: access.code, message: access.message } }, access.status)
   }
-
-  const docRows = await db
-    .select({
-      id: documents.id,
-      filename: documents.filename,
-      accessTier: documents.accessTier,
-      sourceType: documents.sourceType,
-      compartmentId: documents.compartmentId,
-    })
-    .from(documents)
-    .where(and(eq(documents.id, docId), eq(documents.orgId, orgId)))
-    .limit(1)
-
-  const doc = docRows[0]
-  if (!doc) {
-    return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Document not found' } }, 404)
-  }
-
-  if (role === 'external_client' && doc.accessTier !== 'external') {
-    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied to this document' } }, 403)
-  }
-
-  const compartmentOk = await canUseCompartment({ orgId, compartmentId: doc.compartmentId, userId, userRole: role })
-  if (!compartmentOk) {
-    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied to this document' } }, 403)
-  }
+  const doc = access.doc
 
   const chunkRows = await db
     .select({
@@ -341,7 +408,94 @@ documentsRoute.get('/:docId/content', async (c) => {
       content: stitchChunks(accessible.map((ch) => ch.content)),
       totalChunks: chunkRows.length,
       accessibleChunks: accessible.length,
+      hasOriginal: doc.storageKey !== null,
+      mimeType: doc.mimeType,
     },
+  })
+})
+
+// A filename becomes a response header, so anything that could terminate the
+// header or escape the quoted string is stripped before it gets there.
+export function contentDispositionHeader(filename: string, inline: boolean): string {
+  const ascii = filename.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_')
+  const encoded = encodeURIComponent(filename)
+  return `${inline ? 'inline' : 'attachment'}; filename="${ascii}"; filename*=UTF-8''${encoded}`
+}
+
+// GET /orgs/:id/documents/:docId/file — the original uploaded file, byte for
+// byte. Same access rules as the text preview above.
+//
+// Unlike /content there is no per-chunk filtering here: an original file cannot
+// be partially redacted. That is equivalent today because every chunk of a
+// document carries visibilityForTier(doc.accessTier) — identical across the
+// document. If per-chunk visibility ever diverges from the document tier, this
+// route must require access to *every* chunk, not just the document.
+documentsRoute.get('/:docId/file', async (c) => {
+  const orgId = c.req.param('id')
+  const docId = c.req.param('docId')
+  if (!orgId || !docId) return c.json(BAD_ORG, 400)
+  const userId = c.get('userId')
+  const role = c.get('role')
+
+  const access = await authorizeDocumentRead({
+    orgId,
+    docId,
+    userId,
+    role,
+    permissionOrgId: c.get('orgId'),
+  })
+  if (!access.ok) {
+    return c.json({ success: false, error: { code: access.code, message: access.message } }, access.status)
+  }
+  const doc = access.doc
+
+  if (
+    !canAccessChunk({ visibility: visibilityForTier(doc.accessTier), userRole: role, userId })
+  ) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied to this document' } }, 403)
+  }
+
+  if (!doc.storageKey) {
+    return c.json(
+      {
+        success: false,
+        error: { code: 'NO_ORIGINAL', message: 'No original file is stored for this document' },
+      },
+      404
+    )
+  }
+
+  const stored = await getObject(doc.storageKey)
+  if (!stored.success) {
+    return c.json(
+      { success: false, error: { code: stored.error.code, message: 'Could not read the stored file' } },
+      stored.error.code === 'NOT_FOUND' ? 404 : 500
+    )
+  }
+
+  // The Content-Type comes from our own allowlist keyed by the validated
+  // extension, never from the upload's declared type — and only PDF is allowed
+  // to render inline. Everything else downloads, so an uploaded file can never
+  // execute as markup against this origin.
+  const mimeType = UPLOAD_MIME_TYPES[extname(doc.filename).toLowerCase()] ?? 'application/octet-stream'
+  const inline = INLINE_VIEWABLE_MIME_TYPES.includes(mimeType)
+
+  await db.insert(auditLogs).values({
+    orgId,
+    userId,
+    action: 'document.view_original',
+    resourceType: 'document',
+    resourceId: docId,
+    metadata: { filename: doc.filename, mimeType },
+  })
+
+  return c.body(stored.data.body, 200, {
+    'Content-Type': mimeType,
+    'Content-Length': String(stored.data.sizeBytes),
+    'Content-Disposition': contentDispositionHeader(doc.filename, inline),
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "sandbox; default-src 'none'; object-src 'self'",
+    'Cache-Control': 'private, no-store',
   })
 })
 
@@ -427,7 +581,7 @@ documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) =
 // would let a cross-org docId mutate another tenant's data.
 async function findOrgDocument(orgId: string, docId: string) {
   const rows = await db
-    .select({ filename: documents.filename, status: documents.status })
+    .select({ filename: documents.filename, status: documents.status, storageKey: documents.storageKey })
     .from(documents)
     .where(and(eq(documents.id, docId), eq(documents.orgId, orgId)))
     .limit(1)
@@ -529,6 +683,11 @@ documentsRoute.delete('/:docId', async (c) => {
   if (!doc) return c.json(NOT_FOUND, 404)
 
   await db.delete(documents).where(and(eq(documents.id, docId), eq(documents.orgId, orgId)))
+
+  // Row first, then bytes: a failed object delete leaves an unreferenced file
+  // (logged, harmless), whereas the reverse would leave a row pointing at
+  // nothing. Chunks cascade from the document row.
+  if (doc.storageKey) await deleteObject(doc.storageKey)
 
   await db.insert(auditLogs).values({
     orgId, userId,

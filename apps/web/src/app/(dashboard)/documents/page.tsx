@@ -8,8 +8,9 @@ import { z } from 'zod'
 import {
   Search, Plus, Paperclip, X, FileText, Table2, Link, File, FolderPlus, Trash2,
   Archive, ArchiveRestore, MoreHorizontal, Folder, Lock, AlertTriangle, ChevronRight,
-  ChevronDown, Move, Shield, LayoutGrid, List as ListIcon,
+  ChevronDown, Move, Shield, LayoutGrid, List as ListIcon, Download,
 } from 'lucide-react'
+import { documentFileUrl } from '@/lib/api'
 import {
   useDocuments, useUploadDocument, useDeleteDocument, useArchiveDocument,
   useUnarchiveDocument, useMoveDocument,
@@ -23,6 +24,9 @@ import { formatDate, formatDateTime } from '@/lib/utils'
 import { DocumentPreview } from '@/components/document-preview'
 import { FolderAccessPanel } from '@/components/documents/folder-access'
 import type { CompartmentSummary } from '@company-brain/shared'
+import { MAX_UPLOAD_BYTES, UPLOAD_MIME_TYPES } from '@company-brain/shared'
+
+const MAX_UPLOAD_MB = Math.floor(MAX_UPLOAD_BYTES / (1024 * 1024))
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   hr_policy: 'HR Policy', sop: 'SOP', faq: 'FAQ',
@@ -57,9 +61,10 @@ function TierBadge({ tier }: { tier: string }) {
 
 // ─── Detail panel ─────────────────────────────────────────────────────────────
 
-function DetailPanel({ doc, compartmentName, canMove, canManage, onClose, onDelete, onArchive, onUnarchive, onMove, onPreview }: {
-  doc: { id: string; filename: string; accessTier: string; status: string; sourceType: string; createdAt: string; ingestionStartedAt: string | null; ingestionCompletedAt: string | null; ingestionError: string | null } | null
+function DetailPanel({ doc, compartmentName, orgId, canMove, canManage, onClose, onDelete, onArchive, onUnarchive, onMove, onPreview }: {
+  doc: { id: string; filename: string; accessTier: string; status: string; sourceType: string; createdAt: string; storageKey: string | null; ingestionStartedAt: string | null; ingestionCompletedAt: string | null; ingestionError: string | null } | null
   compartmentName: string
+  orgId: string
   canMove: boolean
   canManage: boolean
   onClose: () => void
@@ -90,8 +95,17 @@ function DetailPanel({ doc, compartmentName, canMove, canManage, onClose, onDele
           {/* Preview */}
           <div style={{ aspectRatio: '4/3', width: '100%', background: '#eff4ff', borderRadius: 12, border: '1px solid #c3c6d7', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
             <FileText size={48} color="#c3c6d7" />
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <button onClick={() => onPreview(doc!.id)} style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid #c3c6d7', borderRadius: 8, padding: '8px 16px', fontSize: 14, fontWeight: 700, color: '#004ac6', cursor: 'pointer', fontFamily: 'inherit' }}>Full Preview</button>
+              {doc.storageKey && (
+                <a
+                  href={documentFileUrl(orgId, doc.id)}
+                  download={doc.filename}
+                  style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid #c3c6d7', borderRadius: 8, padding: '8px 16px', fontSize: 14, fontWeight: 700, color: '#004ac6', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Download size={14} /> Original
+                </a>
+              )}
             </div>
           </div>
 
@@ -413,12 +427,25 @@ type UploadFormValues = z.infer<typeof uploadSchema>
 
 function UploadDialog({ orgId, folder, onClose }: { orgId: string; folder: CompartmentSummary; onClose: () => void }) {
   const [file, setFile] = useState<File | null>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const upload = useUploadDocument(orgId)
   const { register, handleSubmit } = useForm<UploadFormValues>({
     resolver: zodResolver(uploadSchema),
     defaultValues: { sourceType: 'other' },
   })
+
+  // Caught here as well as on the server so an oversized file fails instantly
+  // instead of after a long upload the API will reject anyway.
+  const onFileChosen = (chosen: File | null) => {
+    if (chosen && chosen.size > MAX_UPLOAD_BYTES) {
+      setFile(null)
+      setFileError(`“${chosen.name}” is larger than the ${MAX_UPLOAD_MB} MB limit.`)
+      return
+    }
+    setFileError(null)
+    setFile(chosen)
+  }
 
   const onSubmit = async (values: UploadFormValues) => {
     if (!file) return
@@ -443,12 +470,19 @@ function UploadDialog({ orgId, folder, onClose }: { orgId: string; folder: Compa
         <p style={{ fontSize: 13, color: '#585f67', margin: '0 0 24px' }}>Uploading into <strong style={{ color: '#0b1c30' }}>{folder.name}</strong> ({TIER_LABELS[folder.accessTier as 'internal' | 'external']})</p>
         <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>File (PDF, Word, or plain text)</label>
-            <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.txt" onChange={(e) => setFile(e.target.files?.[0] ?? null)} style={{ display: 'none' }} />
+            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>
+              File (PDF, Word .docx, .txt or .md — max {MAX_UPLOAD_MB} MB)
+            </label>
+            {/* Mirrors the server allowlist in shared/constants.ts. Legacy .doc
+                is deliberately absent — ingestion cannot parse it. */}
+            <input ref={fileInputRef} type="file" accept={Object.keys(UPLOAD_MIME_TYPES).join(',')} onChange={(e) => onFileChosen(e.target.files?.[0] ?? null)} style={{ display: 'none' }} />
             <button type="button" onClick={() => fileInputRef.current?.click()}
               style={{ ...inputStyle, border: '1px dashed #c3c6d7', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, color: file ? '#0b1c30' : '#737686' }}>
               <Paperclip size={14} />{file ? file.name : 'Choose file…'}
             </button>
+            {fileError && (
+              <p style={{ fontSize: 12, color: '#dc2626', margin: '8px 0 0' }}>{fileError}</p>
+            )}
           </div>
           <div>
             <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Source type</label>
@@ -1248,6 +1282,7 @@ export default function DocumentsPage() {
         <DetailPanel
           doc={selectedDoc}
           compartmentName={selectedDoc ? getCompartmentName(selectedDoc.compartmentId) : '—'}
+          orgId={orgId}
           canMove={!!selectedDoc && compartments.filter((c) => c.accessTier === selectedDoc.accessTier && c.id !== selectedDoc.compartmentId).length > 0}
           canManage={canManageDocs}
           onClose={() => setSelectedDoc(null)}

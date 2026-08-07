@@ -1,4 +1,4 @@
-import type { UserRole, Permission } from './types'
+import type { AccessTier, Permission, UserRole, VisibilityPolicy } from './types'
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   super_admin:     ['orgs:manage', 'documents:manage', 'documents:upload', 'documents:view', 'analytics:view', 'audit:view', 'users:manage', 'access:manage', 'roles:manage', 'billing:manage', 'queries:submit'],
@@ -140,3 +140,45 @@ export const STRIPE_PLATFORM_FEE_PERCENT = 15
 export const DOCUMENTS_PAGE_SIZE = 25
 export const AUDIT_LOAD_MORE_SIZE = 100
 export const CITATION_EXCERPT_LENGTH = 120
+
+// A document's chunks always carry the visibility policy of its access tier —
+// the tier itself comes from the document's compartment and is never chosen
+// independently. Used at ingest, on retry, and when a document moves folders.
+export function visibilityForTier(accessTier: AccessTier): VisibilityPolicy {
+  return accessTier === 'external'
+    ? {
+        allowedRoles: ['super_admin', 'org_admin', 'dept_admin', 'staff', 'external_client'],
+        deniedRoles: [],
+        allowedPrincipals: [],
+        classification: 'public',
+      }
+    : {
+        allowedRoles: ['super_admin', 'org_admin', 'dept_admin', 'staff'],
+        deniedRoles: [],
+        allowedPrincipals: [],
+        classification: 'restricted',
+      }
+}
+
+// ─── Uploads ──────────────────────────────────────────────────────────────────
+
+// Uploads are buffered whole in memory before parsing, on a 2 GB box shared
+// with another product — the cap bounds what a single request can allocate.
+export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+
+// The only extensions accepted at upload, and the Content-Type each is served
+// back as. The stored MIME type is never echoed from the client: a browser can
+// be told to render an uploaded file, so the type it renders under has to come
+// from this fixed table, keyed by an extension we validated.
+export const UPLOAD_MIME_TYPES: Record<string, string> = {
+  '.pdf': 'application/pdf',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.txt': 'text/plain',
+  '.md': 'text/markdown',
+}
+
+// Formats that may be served with `Content-Disposition: inline`. Only PDF —
+// browsers render it in their own sandboxed viewer. Everything else downloads,
+// so uploaded markup can never execute against the app origin and the session
+// cookie it carries.
+export const INLINE_VIEWABLE_MIME_TYPES = ['application/pdf']
