@@ -41,11 +41,15 @@ async function extractText(buffer: Buffer, filename: string): Promise<string> {
     return result.text
   }
 
-  if (lower.endsWith('.docx') || lower.endsWith('.doc')) {
-    const mammoth = await import('mammoth')
-    const result = await mammoth.extractRawText({ buffer })
-    return result.value
-  }
+if (lower.endsWith('.docx')) {
+  const mammoth = await import('mammoth')
+  const result = await mammoth.extractRawText({ buffer })
+  return result.value
+}
+
+if (lower.endsWith('.doc')) {
+  throw new Error('Legacy .doc files are not supported; please convert to .docx')
+}
 
   // Plain text fallback
   return buffer.toString('utf-8')

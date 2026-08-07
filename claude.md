@@ -543,6 +543,7 @@ SMTP_PASS=
 SMTP_FROM=
 
 NODE_ENV=development | production
+COOKIE_SECURE=                              # optional; overrides the auth-cookie Secure flag. Unset → Secure when NODE_ENV=production. Set "false" to allow login over plain HTTP (security downgrade — token travels in cleartext; use only until TLS is in place), "true" to force it on
 PORT=3002
 NEXT_PUBLIC_WEB_URL=http://localhost:3000   # CORS origin + links in emails
 API_INTERNAL_URL=http://localhost:3002      # Next.js proxy → Hono API (defaults to http://api:3002 for Docker)

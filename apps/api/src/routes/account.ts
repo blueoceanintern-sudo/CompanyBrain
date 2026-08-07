@@ -62,7 +62,7 @@ accountRoute.patch('/password', zValidator('json', changePasswordSchema), async 
     sameSite: 'Lax',
     path: '/',
     maxAge: SESSION_TTL_SECONDS,
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : process.env.NODE_ENV === 'production',
   })
 
   return c.json({ success: true, data: null })
