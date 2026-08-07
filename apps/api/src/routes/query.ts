@@ -7,7 +7,7 @@ import { eq, desc } from 'drizzle-orm'
 import { retrieveChunks } from '@company-brain/retrieval'
 import { synthesizeAnswer, contextualizeQuery } from '@company-brain/synthesis'
 import { CONFIDENCE_GATE_THRESHOLD } from '@company-brain/shared'
-import { canPublishExternal } from '@company-brain/access-control'
+import { canPublishExternal, hasPermission } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
 
 const queryRoute = new Hono<AuthVars>()
@@ -33,6 +33,10 @@ queryRoute.post('/', zValidator('json', querySchema), async (c) => {
   const userId = c.get('userId')
   const userRole = c.get('role')
   const { query, accessTier, sourceTypes, history } = c.req.valid('json')
+
+  if (!(await hasPermission(c.get('orgId'), userRole, 'queries:submit'))) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
+  }
 
   if (userRole === 'external_client' && accessTier !== 'external') {
     return c.json(

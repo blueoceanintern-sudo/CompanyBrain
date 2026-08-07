@@ -8,8 +8,12 @@ import { Users, Shield, UserCheck, MoreVertical, UserPlus, X } from 'lucide-reac
 import { useUsers, useInviteUser, useUpdateUserRole, useDeleteUser } from '@/hooks/use-users'
 import { useGroups, useSetUserGroups } from '@/hooks/use-groups'
 import type { UserSummary } from '@company-brain/shared'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, userCan } from '@/lib/auth'
 import { formatDate } from '@/lib/utils'
+import { GroupsSection } from '@/components/settings/groups-section'
+import { RolePermissionsSection } from '@/components/users/role-permissions-section'
+
+type UsersTab = 'members' | 'groups' | 'roles'
 
 interface PendingRoleChange {
   userId: string
@@ -25,8 +29,8 @@ interface PendingDelete {
 
 const ROLE_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   super_admin:     { bg: '#fee2e2', color: '#991b1b', label: 'Super Admin' },
-  org_admin:       { bg: '#dbeafe', color: '#1e40af', label: 'Admin' },
-  dept_admin:      { bg: '#ede9fe', color: '#6d28d9', label: 'Dept Admin' },
+  org_admin:       { bg: '#dbeafe', color: '#1e40af', label: 'Organisation Admin' },
+  dept_admin:      { bg: '#ede9fe', color: '#6d28d9', label: 'Department Admin' },
   staff:           { bg: '#f1f5f9', color: '#475569', label: 'Staff' },
   external_client: { bg: '#fed7aa', color: '#c2410c', label: 'External' },
 }
@@ -60,6 +64,11 @@ function RoleConfirmDialog({ pending, onConfirm, onCancel }: { pending: PendingR
           <strong style={{ color: '#0b1c30' }}>{pending.currentRole.replace(/_/g, ' ')}</strong> to{' '}
           <strong style={{ color: '#0b1c30' }}>{pending.pendingRole.replace(/_/g, ' ')}</strong>?
         </p>
+        {pending.pendingRole === 'external_client' && (
+          <p style={{ fontSize: 13, color: '#9a3412', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 12px', margin: '0 0 24px', lineHeight: 1.6 }}>
+            External clients can&rsquo;t belong to groups. This will remove them from all groups and revoke their folder access.
+          </p>
+        )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
           <button type="button" onClick={onCancel} style={{ height: 40, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>Cancel</button>
           <button type="button" onClick={onConfirm} style={{ height: 40, padding: '0 20px', border: 'none', borderRadius: 8, background: '#2563eb', color: '#ffffff', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Confirm</button>
@@ -125,7 +134,7 @@ function ManageGroupsDialog({ orgId, user, onClose }: { orgId: string; user: Use
         {isLoading ? (
           <Skel h={80} />
         ) : groups.length === 0 ? (
-          <p style={{ fontSize: 13, color: '#585f67', margin: 0 }}>No groups yet — create them in Settings → Groups.</p>
+          <p style={{ fontSize: 13, color: '#585f67', margin: 0 }}>No groups yet — create them in the Groups tab.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 280, overflowY: 'auto', border: '1px solid #eff4ff', borderRadius: 8, padding: 4 }}>
             {groups.map((g) => (
@@ -223,8 +232,8 @@ function InviteDialog({ orgId, onClose }: { orgId: string; onClose: () => void }
             <label style={{ fontSize: 14, fontWeight: 500, color: '#434655' }}>Assign Role</label>
             <select {...register('role')} style={{ ...inputBase, appearance: 'none' as const, cursor: 'pointer' }}>
               <option value="staff">Staff</option>
-              <option value="dept_admin">Dept Admin</option>
-              <option value="org_admin">Org Admin</option>
+              <option value="dept_admin">Department Admin</option>
+              <option value="org_admin">Organisation Admin</option>
               <option value="external_client">External Client</option>
             </select>
           </div>
@@ -275,6 +284,26 @@ export default function UsersPage() {
   const [cancelKey, setCancelKey] = useState(0)
   const [page, setPage] = useState(1)
 
+  const canManageUsers = userCan(user, 'users:manage')
+  const canManageAccess = userCan(user, 'access:manage')
+  // Editing the role→permission matrix is gated by roles:manage, separate from
+  // access:manage (groups + folder grants).
+  const canManageRoles = userCan(user, 'roles:manage')
+  const [tab, setTab] = useState<UsersTab>(
+    canManageUsers ? 'members' : canManageAccess ? 'groups' : 'roles'
+  )
+
+  const inputBase: React.CSSProperties = {
+    width: '100%', height: 48, padding: '0 16px', border: '1px solid #c3c6d7', borderRadius: 8,
+    background: '#ffffff', fontSize: 14, color: '#0b1c30', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const,
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+  }
+  const TABS = ([
+    canManageUsers ? { key: 'members' as const, label: 'Members' } : null,
+    canManageAccess ? { key: 'groups' as const, label: 'Groups' } : null,
+    canManageRoles ? { key: 'roles' as const, label: 'Roles & Permissions' } : null,
+  ].filter(Boolean)) as { key: UsersTab; label: string }[]
+
   const { data: users = [], isLoading } = useUsers(orgId)
   const updateRole = useUpdateUserRole(orgId)
   const deleteUserMut = useDeleteUser(orgId)
@@ -300,6 +329,18 @@ export default function UsersPage() {
       <div style={{ flex: 1, overflowY: 'auto', padding: 32, background: '#ffffff' }}>
         <div style={{ maxWidth: 1440, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
 
+          {/* Tabs */}
+          <div role="tablist" style={{ display: 'flex', gap: 32, borderBottom: '1px solid #c3c6d7' }}>
+            {TABS.map(({ key, label }) => (
+              <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
+                style={{ padding: '0 0 12px', border: 'none', borderBottom: tab === key ? '2px solid #2563eb' : '2px solid transparent', background: 'transparent', fontSize: 14, fontWeight: tab === key ? 600 : 400, color: tab === key ? '#004ac6' : '#585f67', cursor: 'pointer', fontFamily: 'inherit', transition: 'color 0.2s' }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'members' && (<>
           {/* Section header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
@@ -411,8 +452,8 @@ export default function UsersPage() {
                               style={{ height: 32, padding: '0 8px', border: '1px solid #c3c6d7', borderRadius: 6, background: '#ffffff', fontSize: 12, color: '#0b1c30', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}
                             >
                               <option value="staff">Staff</option>
-                              <option value="dept_admin">Dept Admin</option>
-                              <option value="org_admin">Org Admin</option>
+                              <option value="dept_admin">Department Admin</option>
+                              <option value="org_admin">Organisation Admin</option>
                               <option value="external_client">External Client</option>
                             </select>
                           )}
@@ -429,7 +470,7 @@ export default function UsersPage() {
                                 <>
                                   <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setMenuOpenId(null)} />
                                   <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', zIndex: 50, minWidth: 160, overflow: 'hidden' }}>
-                                    {u.role !== 'external_client' && (
+                                    {u.role !== 'external_client' && canManageAccess && (
                                       <button
                                         onClick={() => { setMenuOpenId(null); setGroupsFor(u) }}
                                         style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 14, color: '#0b1c30', cursor: 'pointer', fontFamily: 'inherit', display: 'block' }}
@@ -485,6 +526,19 @@ export default function UsersPage() {
               </div>
             </div>
           </div>
+          </>)}
+
+          {tab === 'groups' && (
+            <div style={{ maxWidth: 860, width: '100%', margin: '0 auto' }}>
+              <GroupsSection orgId={orgId} canManage={canManageAccess} inputBase={inputBase} />
+            </div>
+          )}
+
+          {tab === 'roles' && (
+            <div style={{ maxWidth: 860, width: '100%', margin: '0 auto' }}>
+              <RolePermissionsSection orgId={orgId} canManage={canManageRoles} />
+            </div>
+          )}
         </div>
       </div>
 

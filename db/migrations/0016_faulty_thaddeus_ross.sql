@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "session_invalidated_at" timestamp with time zone;

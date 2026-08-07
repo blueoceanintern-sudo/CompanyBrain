@@ -1,6 +1,8 @@
 import { createMiddleware } from 'hono/factory'
 import { verifyJwt } from '../lib/jwt'
 import { getCookie } from 'hono/cookie'
+import { db, users } from '@company-brain/db'
+import { eq } from 'drizzle-orm'
 import type { UserRole } from '@company-brain/shared'
 
 export type AuthVars = {
@@ -9,6 +11,15 @@ export type AuthVars = {
     orgId: string
     role: UserRole
   }
+}
+
+// A token is revoked if it was issued (iat, in seconds) before the account's
+// session_invalidated_at instant. Compared at 1-second granularity so a token
+// minted in the same second as the invalidation (e.g. the fresh cookie handed
+// back by the password-change route) is not caught by its own bump.
+export function isSessionRevoked(iat: unknown, sessionInvalidatedAt: Date | null): boolean {
+  if (!sessionInvalidatedAt || typeof iat !== 'number') return false
+  return iat < Math.floor(sessionInvalidatedAt.getTime() / 1000)
 }
 
 export const authMiddleware = createMiddleware<AuthVars>(async (c, next) => {
@@ -23,20 +34,47 @@ export const authMiddleware = createMiddleware<AuthVars>(async (c, next) => {
     )
   }
 
+  let payload: Record<string, unknown>
   try {
-    const payload = verifyJwt(token, process.env.JWT_SECRET!)
-
-    c.set('userId', payload['sub'] as string)
-    c.set('orgId', payload['orgId'] as string)
-    c.set('role', payload['role'] as UserRole)
-
-    await next()
+    payload = verifyJwt(token, process.env.JWT_SECRET!)
   } catch {
     return c.json(
       { success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token' } },
       401
     )
   }
+
+  // The JWT is only the first gate. Look the user up every request so that a
+  // deleted user, a revoked session (password reset/change, role change), or a
+  // demotion takes effect immediately rather than lingering until the token
+  // expires. The role is taken from the DB, not the token, so role-based checks
+  // (including the Layer-2 admin bypasses) always reflect the current role.
+  const userId = payload['sub'] as string
+  const [user] = await db
+    .select({ role: users.role, orgId: users.orgId, sessionInvalidatedAt: users.sessionInvalidatedAt })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1)
+
+  if (!user) {
+    return c.json(
+      { success: false, error: { code: 'UNAUTHORIZED', message: 'Session no longer valid' } },
+      401
+    )
+  }
+
+  if (isSessionRevoked(payload['iat'], user.sessionInvalidatedAt)) {
+    return c.json(
+      { success: false, error: { code: 'UNAUTHORIZED', message: 'Session no longer valid' } },
+      401
+    )
+  }
+
+  c.set('userId', userId)
+  c.set('orgId', user.orgId)
+  c.set('role', user.role)
+
+  await next()
 })
 
 // Cross-org, the super admin is a platform operator, not a tenant member:

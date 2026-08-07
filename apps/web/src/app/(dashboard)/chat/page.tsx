@@ -10,11 +10,10 @@ import {
 import { toast } from 'sonner'
 import { submitQuery as apiSubmitQuery } from '@/lib/api'
 import { useExternalPricing, useStartCheckout, useSubscription } from '@/hooks/use-payments'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, userCan } from '@/lib/auth'
 import { generateId } from '@/lib/utils'
 import { useChatHistory } from '@/lib/chat-history-context'
 import { DocumentPreview } from '@/components/document-preview'
-import { hasPermission } from '@company-brain/shared'
 import type { ConversationTurn } from '@company-brain/shared'
 import type { HistoryEntry, Plane } from '@/lib/chat-history-context'
 
@@ -391,7 +390,7 @@ export default function ChatPage() {
   const user = getAuthUser()
   const orgId = user?.orgId ?? ''
   const isExternalClient = user?.role === 'external_client'
-  const canPreviewPlanes = !!user?.role && hasPermission(user.role, 'documents:manage')
+  const canPreviewPlanes = userCan(user, 'documents:manage')
 
   const searchParams = useSearchParams()
   const router = useRouter()

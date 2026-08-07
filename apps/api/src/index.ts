@@ -11,6 +11,7 @@ import queryRoute from './routes/query'
 import adminRoute from './routes/admin'
 import accountRoute from './routes/account'
 import accessRoute from './routes/access'
+import rolesRoute from './routes/roles'
 import paymentsRoute from './routes/payments'
 import analyticsRoute from './routes/analytics'
 import stripeWebhookRoute from './routes/stripe-webhook'
@@ -50,6 +51,7 @@ orgApp.route('/query', queryRoute)
 orgApp.route('/', adminRoute)
 orgApp.route('/account', accountRoute)
 orgApp.route('/', accessRoute)
+orgApp.route('/roles', rolesRoute)
 orgApp.route('/', paymentsRoute)
 orgApp.route('/analytics', analyticsRoute)
 

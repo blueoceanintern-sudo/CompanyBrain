@@ -44,9 +44,18 @@ export function useUpdateUserRole(orgId: string) {
       if (!result.success) throw new Error(result.error.message)
       return null
     },
-    onSuccess: () => {
+    onSuccess: (_data, { role }) => {
       toast.success('Role updated')
       qc.invalidateQueries({ queryKey: ['users', orgId] })
+      // Demoting to external_client strips the user's group memberships and
+      // folder grants server-side; refresh the views that reflect them so the
+      // change appears immediately (prefix-matched keys cover per-group / folder).
+      if (role === 'external_client') {
+        qc.invalidateQueries({ queryKey: ['groups', orgId] })
+        qc.invalidateQueries({ queryKey: ['group-members', orgId] })
+        qc.invalidateQueries({ queryKey: ['compartment-grants', orgId] })
+        qc.invalidateQueries({ queryKey: ['compartments', orgId] })
+      }
     },
     onError: () => toast.error('Role update failed'),
   })
@@ -63,6 +72,14 @@ export function useDeleteUser(orgId: string) {
     onSuccess: () => {
       toast.success('User removed')
       qc.invalidateQueries({ queryKey: ['users', orgId] })
+      // Deleting a user cascades their group memberships and folder grants in the
+      // DB (ON DELETE CASCADE); refresh every view that reflects them so the
+      // removal shows up immediately, not on the next incidental refetch. These
+      // keys prefix-match, so the per-group / per-compartment queries are covered.
+      qc.invalidateQueries({ queryKey: ['groups', orgId] })              // member counts
+      qc.invalidateQueries({ queryKey: ['group-members', orgId] })       // per-group member lists
+      qc.invalidateQueries({ queryKey: ['compartment-grants', orgId] })  // per-folder granted users
+      qc.invalidateQueries({ queryKey: ['compartments', orgId] })        // grant counts + "no access" nudge
     },
     onError: (err: Error) => toast.error(err.message),
   })
