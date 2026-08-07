@@ -2,6 +2,7 @@
 
 > **Audience:** the next developer.
 > This document does **not** duplicate the repo docs. `README.md` (setup) and `CLAUDE.md` (conventions, schema, API routes, env vars, retrieval rules) are the source of truth for those topics. This document adds what the repo can't tell you: orientation, workflow, known issues, and roadmap.
+> This document does **not** duplicate the repo docs. `README.md` (setup) and `CLAUDE.md` (conventions, schema, API routes, env vars, retrieval rules) are the source of truth for those topics. This document adds what the repo can't tell you: orientation, workflow, known issues, and roadmap.
 
 ## Contents
 

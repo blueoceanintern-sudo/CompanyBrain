@@ -131,6 +131,9 @@ export const CHUNK_OVERLAP_CHARS = 200
 // with per-request session-invalidation checks (users.session_invalidated_at)
 // give timely deprovisioning without a stateful session store.
 export const SESSION_TTL_SECONDS = 8 * 60 * 60
+export const EMBEDDING_DIMENSIONS = 1536
+export const EMBEDDING_MODEL = 'text-embedding-3-large'
+export const SYNTHESIS_MODEL = 'claude-haiku-4-5-20251001'
 export const QUERY_LOG_RETENTION_DAYS = 90
 export const ORG_QUARANTINE_DAYS = 30
 export const STRIPE_PLATFORM_FEE_PERCENT = 15
