@@ -151,7 +151,7 @@ export async function getDocuments(orgId: string) {
 }
 
 export async function uploadDocument(orgId: string, formData: FormData) {
-  return apiUpload<{ documentId: string; chunksCreated: number }>(
+  return apiUpload<{ documentId: string; chunksCreated: number; extractedText: boolean }>(
     `/api/v1/orgs/${orgId}/documents`,
     formData
   )
@@ -168,7 +168,7 @@ export async function archiveDocument(orgId: string, docId: string) {
 export async function updateDocument(
   orgId: string,
   docId: string,
-  data: { compartmentId?: string; sourceType?: string }
+  data: { compartmentId?: string }
 ) {
   return apiFetch<null>(`/api/v1/orgs/${orgId}/documents/${docId}`, {
     method: 'PATCH',
@@ -180,7 +180,6 @@ export interface DocumentContent {
   documentId: string
   filename: string
   accessTier: string
-  sourceType: string
   content: string
   totalChunks: number
   accessibleChunks: number

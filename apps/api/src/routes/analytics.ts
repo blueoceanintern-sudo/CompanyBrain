@@ -1,8 +1,7 @@
 import { Hono } from 'hono'
 import { db } from '@company-brain/db'
-import { queries, auditLogs, users, orgs, documents } from '@company-brain/db'
+import { queries, auditLogs, users, orgs, documents, compartments } from '@company-brain/db'
 import { eq, and, gte, ne, desc, sql, count } from 'drizzle-orm'
-import type { SourceType } from '@company-brain/shared'
 import { CONFIDENCE_GATE_THRESHOLD } from '@company-brain/shared'
 import { hasPermission } from '@company-brain/access-control'
 import type { AuthVars } from '../middleware/auth'
@@ -30,7 +29,7 @@ analyticsRoute.get('/overview', async (c) => {
 
   const since = daysAgoDate(days)
 
-  const [totalResult, answeredResult, citedResult, docsBySourceType, volumeByDay] = await Promise.all([
+  const [totalResult, answeredResult, citedResult, docsByCompartment, volumeByDay] = await Promise.all([
     db
       .select({ total: count() })
       .from(queries)
@@ -55,11 +54,15 @@ analyticsRoute.get('/overview', async (c) => {
           sql`jsonb_typeof(citations) = 'array' AND jsonb_array_length(citations) > 0`
         )
       ),
+    // Coverage by folder. Inner join, so a folder only appears once it holds a
+    // document — an empty folder is not a coverage gap worth charting.
     db
-      .select({ sourceType: documents.sourceType, count: count() })
+      .select({ compartmentId: compartments.id, name: compartments.name, count: count() })
       .from(documents)
+      .innerJoin(compartments, eq(compartments.id, documents.compartmentId))
       .where(and(eq(documents.orgId, orgId), ne(documents.status, 'archived')))
-      .groupBy(documents.sourceType),
+      .groupBy(compartments.id, compartments.name)
+      .orderBy(desc(count())),
     db.execute(sql`
       SELECT d::date::text AS day, count(q.id)::int AS count
       FROM generate_series(date_trunc('day', ${since.toISOString()}::timestamptz), date_trunc('day', now()), interval '1 day') AS d
@@ -76,14 +79,6 @@ analyticsRoute.get('/overview', async (c) => {
   const answered = answeredResult[0]?.answered ?? 0
   const cited = citedResult[0]?.cited ?? 0
 
-  const documentsBySourceType = docsBySourceType.reduce<Partial<Record<SourceType, number>>>(
-    (acc, row) => {
-      acc[row.sourceType as SourceType] = Number(row.count)
-      return acc
-    },
-    {}
-  )
-
   return c.json({
     success: true,
     data: {
@@ -91,7 +86,11 @@ analyticsRoute.get('/overview', async (c) => {
       queryVolume: total,
       citationHitRate: answered > 0 ? Math.round((cited / answered) * 100) : 0,
       iDontKnowRate: total > 0 ? Math.round(((total - answered) / total) * 100) : 0,
-      documentsBySourceType,
+      documentsByCompartment: docsByCompartment.map((r) => ({
+        compartmentId: r.compartmentId,
+        name: r.name,
+        count: Number(r.count),
+      })),
       queryVolumeByDay: (volumeByDay as unknown[]).map((r: unknown) => {
         const row = r as Record<string, unknown>
         return { date: row['day'] as string, count: Number(row['count']) }

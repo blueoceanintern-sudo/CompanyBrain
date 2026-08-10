@@ -36,6 +36,16 @@ describe('original file serving rules', () => {
     }
   })
 
+  // The API picks Content-Disposition from this list and the preview modal
+  // decides whether to embed from the same one, so a type that is inline-
+  // viewable but not uploadable would be unreachable in both.
+  test('every inline-viewable type is one the upload allowlist accepts', () => {
+    const accepted = Object.values(UPLOAD_MIME_TYPES)
+    for (const mimeType of INLINE_VIEWABLE_MIME_TYPES) {
+      expect(accepted).toContain(mimeType)
+    }
+  })
+
   test('the upload allowlist excludes formats the browser would execute', () => {
     for (const extension of ['.html', '.htm', '.svg', '.xhtml', '.js']) {
       expect(UPLOAD_MIME_TYPES[extension]).toBeUndefined()

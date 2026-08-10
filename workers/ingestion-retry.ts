@@ -49,6 +49,17 @@ export async function runIngestionRetry(): Promise<void> {
       continue
     }
 
+    // Documents that produced no text are not retryable: the same parser on the
+    // same bytes finds the same nothing. Newer uploads never leave a failed job
+    // behind for this, but rows predating the `no_text` status can.
+    if (doc.status === 'no_text') {
+      await db
+        .update(ingestionJobs)
+        .set({ status: 'complete', completedAt: new Date() })
+        .where(eq(ingestionJobs.id, job.jobId))
+      continue
+    }
+
     // Documents uploaded before original-file storage existed have no bytes to
     // re-parse — those still need a manual re-upload.
     if (!doc.storageKey) {
@@ -87,7 +98,6 @@ export async function runIngestionRetry(): Promise<void> {
       documentId: doc.id,
       compartmentId: doc.compartmentId,
       accessTier: doc.accessTier,
-      sourceType: doc.sourceType,
       visibility: visibilityForTier(doc.accessTier),
       fileBuffer: stored.data,
       filename: doc.filename,

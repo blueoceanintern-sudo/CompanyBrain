@@ -253,7 +253,7 @@ All browser API calls go through the Next.js proxy routes (`/api/v1/...`) — th
 ```
 0. Store        Original file → services/storage (byte-for-byte, for viewing + retry)
 1. Ingest       Upload / parse PDF or Word doc
-2. Chunk + Tag  org_id, compartment, access_tier, source_type, visibility JSONB
+2. Chunk + Tag  org_id, compartment, access_tier, visibility JSONB
 3. Embed        OpenAI text-embedding-3-large (1536d) → HNSW index
 4. Store        Immutable chunk in Postgres + content hash dedup
 5. Retrieve     pgvector + tsvector in parallel
@@ -298,8 +298,10 @@ All tables in `db/schema/` (one file per table). Drizzle only — never raw `pg`
 access_tier:        internal | external
 chunk_status:       active | processing | error | archived
 org_plan:           free | paid
-source_type:        hr_policy | sop | faq | case_note | compliance | product_doc | other
-ingestion_status:   queued | running | complete | failed | archived
+ingestion_status:   queued | running | complete | failed | archived | no_text
+                    # no_text = stored and viewable, but nothing extractable (scanned /
+                    # image-only). Not a failure — the retry worker skips it, since the
+                    # same parser on the same bytes finds the same nothing. Needs OCR.
 user_role:          super_admin | org_admin | dept_admin | staff | external_client
 ```
 
@@ -337,7 +339,7 @@ id, org_id (FK), compartment_id (FK), user_id (FK, nullable), group_id (FK, null
 granted_by (FK → users), created_at    # one-of user/group enforced by SQL CHECK
 
 // documents
-id, org_id (FK), compartment_id (FK), filename, access_tier, source_type,
+id, org_id (FK), compartment_id (FK), filename, access_tier,
 content_hash (UNIQUE per org), status (ingestion_status), uploaded_by (FK → users), version,
 storage_key,                            # relative object key {orgId}/{documentId} for the original file;
                                         # NULL for documents uploaded before original storage existed
@@ -351,7 +353,6 @@ embedding (vector(1536)),               # HNSW-indexed via pgvector
 content_hash (TEXT),                    # SHA hash; unchanged re-upload is a no-op
 visibility (JSONB),                     # { allowedRoles, deniedRoles, allowedPrincipals, classification }
 access_tier (access_tier),              # enforced at SQL level
-source_type (source_type),
 chunk_index (INT),                      # position within document
 parent_chunk_id,                        # for small-to-big retrieval (currently never set — known gap)
 status (chunk_status),
@@ -430,10 +431,10 @@ POST   /orgs                                # create org + first org_admin
 
 ```
 GET    /orgs/:id/documents                  # list documents (paginated; filtered by caller's access)
-POST   /orgs/:id/documents                  # upload document (multipart form: file, compartmentId, accessTier, sourceType) — documents:upload
+POST   /orgs/:id/documents                  # upload document (multipart form: file, compartmentId) — documents:upload
 GET    /orgs/:id/documents/:docId/content   # stitched document text for preview
 GET    /orgs/:id/documents/:docId/file      # original uploaded file, streamed; inline only for PDF, attachment otherwise
-PATCH  /orgs/:id/documents/:docId           # update compartment / access tier / source type
+PATCH  /orgs/:id/documents/:docId           # move to another compartment (tier follows the target folder)
 POST   /orgs/:id/documents/:docId/archive   # archive (chunks excluded from retrieval)
 POST   /orgs/:id/documents/:docId/unarchive
 DELETE /orgs/:id/documents/:docId           # hard delete (typed confirmation in UI)
@@ -442,7 +443,7 @@ DELETE /orgs/:id/documents/:docId           # hard delete (typed confirmation in
 ### Query
 
 ```
-POST   /orgs/:id/query                      # { query, accessTier?, sourceTypes?, history? } → { answer, citations, confidence, missing }
+POST   /orgs/:id/query                      # { query, accessTier?, history? } → { answer, citations, confidence, missing }
 GET    /orgs/:id/query                      # query history
 ```
 
@@ -502,7 +503,7 @@ POST   /webhooks/stripe                     # Stripe webhook (public; signature-
 ### Analytics (`analytics:view`) + Audit (`audit:view`)
 
 ```
-GET    /orgs/:id/analytics/overview         # KB coverage, query volume, citation hit rate — analytics:view
+GET    /orgs/:id/analytics/overview         # KB coverage (broken down by folder), query volume, citation hit rate — analytics:view
 GET    /orgs/:id/analytics/queries          # top unanswered, low-confidence queries — analytics:view
 GET    /orgs/:id/analytics/audit-logs       # paginated audit log — audit:view
 GET    /orgs/:id/analytics/export           # export audit log (CSV) — audit:view

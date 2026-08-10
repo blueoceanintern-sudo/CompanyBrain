@@ -24,8 +24,18 @@ export function useUploadDocument(orgId: string) {
         if (!r.success) throw new Error(r.error.message)
         return r.data
       }),
-    onSuccess: () => {
-      toast.success('Document ingested successfully')
+    onSuccess: (data) => {
+      // The upload worked either way — but a file with no text layer is stored
+      // and viewable without being searchable, which is worth saying plainly
+      // rather than reporting as a success and leaving them to wonder why the
+      // document never turns up in answers.
+      if (data.extractedText === false) {
+        toast.warning('Uploaded, but no text could be extracted', {
+          description: 'It is stored and viewable, but cannot be used to answer questions. Scanned or image-only files need OCR.',
+        })
+      } else {
+        toast.success('Document ingested successfully')
+      }
       qc.invalidateQueries({ queryKey: ['documents', orgId] })
     },
     onError: (err: Error) => toast.error(`Ingestion failed: ${err.message}`),

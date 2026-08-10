@@ -1,0 +1,1 @@
+ALTER TYPE "ingestion_status" ADD VALUE 'no_text';

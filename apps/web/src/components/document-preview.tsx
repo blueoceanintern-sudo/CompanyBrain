@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { FileText, X, EyeOff, Download } from 'lucide-react'
 import { getDocumentContent, documentFileUrl, unwrap, ApiError } from '@/lib/api'
+import { INLINE_VIEWABLE_MIME_TYPES } from '@company-brain/shared'
 
 function useDocumentContent(orgId: string, docId: string) {
   return useQuery({
@@ -34,11 +35,12 @@ export function DocumentPreview({ orgId, docId, onClose }: {
   const { data, isLoading, error } = useDocumentContent(orgId, docId)
   const [tab, setTab] = useState<'original' | 'text'>('original')
 
-  // Only PDFs render inline — anything else downloads (see the API's
-  // Content-Disposition rules). Documents uploaded before original-file storage
-  // existed have no original at all, so they fall back to the text tab.
+  // Embed exactly what the API is willing to serve inline — reading the same
+  // constant it uses for Content-Disposition keeps the two decisions from
+  // drifting apart. Documents uploaded before original-file storage existed
+  // have no original at all, so they fall back to the text tab.
   const fileUrl = documentFileUrl(orgId, docId)
-  const canEmbed = data?.hasOriginal && data.mimeType === 'application/pdf'
+  const canEmbed = !!data?.hasOriginal && INLINE_VIEWABLE_MIME_TYPES.includes(data.mimeType ?? '')
   const activeTab = data?.hasOriginal ? tab : 'text'
 
   return (

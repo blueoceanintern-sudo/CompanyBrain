@@ -1,5 +1,5 @@
 import { pgTable, text, uuid, timestamp, integer, unique } from 'drizzle-orm/pg-core'
-import { accessTierEnum, sourceTypeEnum, ingestionStatusEnum } from './enums'
+import { accessTierEnum, ingestionStatusEnum } from './enums'
 import { orgs } from './orgs'
 import { compartments } from './compartments'
 import { users } from './users'
@@ -16,7 +16,6 @@ export const documents = pgTable(
       .references(() => compartments.id),
     filename: text('filename').notNull(),
     accessTier: accessTierEnum('access_tier').notNull().default('internal'),
-    sourceType: sourceTypeEnum('source_type').notNull().default('other'),
     contentHash: text('content_hash').notNull(),
     // Original file in object storage. Relative key ({orgId}/{documentId}) so
     // it stays valid across storage backends — see services/storage. Null for

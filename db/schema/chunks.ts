@@ -1,6 +1,6 @@
 import { pgTable, text, uuid, timestamp, integer, customType } from 'drizzle-orm/pg-core'
 import { jsonb } from './jsonb'
-import { accessTierEnum, sourceTypeEnum, chunkStatusEnum } from './enums'
+import { accessTierEnum, chunkStatusEnum } from './enums'
 import { orgs } from './orgs'
 import { documents } from './documents'
 import { compartments } from './compartments'
@@ -28,7 +28,6 @@ export const chunks = pgTable('chunks', {
   contentHash: text('content_hash').notNull(),
   visibility: jsonb('visibility').$type<VisibilityPolicy>().notNull(),
   accessTier: accessTierEnum('access_tier').notNull(),
-  sourceType: sourceTypeEnum('source_type').notNull(),
   chunkIndex: integer('chunk_index').notNull(),
   parentChunkId: uuid('parent_chunk_id'),
   status: chunkStatusEnum('status').notNull().default('active'),

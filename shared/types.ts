@@ -4,15 +4,7 @@ export type AccessTier = 'internal' | 'external'
 export type VisibilityClass = 'public' | 'restricted' | 'confidential'
 export type ChunkStatus = 'active' | 'processing' | 'error' | 'archived'
 export type OrgPlan = 'free' | 'paid'
-export type SourceType =
-  | 'hr_policy'
-  | 'sop'
-  | 'faq'
-  | 'case_note'
-  | 'compliance'
-  | 'product_doc'
-  | 'other'
-export type IngestionStatus = 'queued' | 'running' | 'complete' | 'failed' | 'archived'
+export type IngestionStatus = 'queued' | 'running' | 'complete' | 'failed' | 'archived' | 'no_text'
 export type UserRole =
   | 'super_admin'
   | 'org_admin'
@@ -102,7 +94,6 @@ export interface DocumentSummary {
   compartmentId: string
   filename: string
   accessTier: AccessTier
-  sourceType: SourceType
   contentHash: string
   // Null for documents uploaded before original-file storage existed — those
   // have only the extracted-text preview, no downloadable original.
@@ -180,7 +171,6 @@ export interface IngestParams {
   documentId: string
   compartmentId: string
   accessTier: AccessTier
-  sourceType: SourceType
   visibility: VisibilityPolicy
   fileBuffer: Buffer
   filename: string
@@ -194,7 +184,6 @@ export interface RetrieveParams {
   accessTier: AccessTier
   userRole: UserRole
   topK?: number
-  sourceTypes?: SourceType[]
 }
 
 export interface SynthesisParams {
@@ -215,12 +204,21 @@ export interface AnalyticsOverview {
   queryVolume: number
   citationHitRate: number
   iDontKnowRate: number
-  documentsBySourceType: Partial<Record<SourceType, number>>
+  documentsByCompartment: CompartmentCoveragePoint[]
   queryVolumeByDay: QueryVolumePoint[]
 }
 
 export interface QueryVolumePoint {
   date: string
+  count: number
+}
+
+// KB coverage broken down by folder. Replaces the old source-type breakdown:
+// folders are curated by the org and already govern access, so they describe
+// the knowledge base as it actually is.
+export interface CompartmentCoveragePoint {
+  compartmentId: string
+  name: string
   count: number
 }
 

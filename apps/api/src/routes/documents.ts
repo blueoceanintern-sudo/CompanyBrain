@@ -22,9 +22,6 @@ const documentsRoute = new Hono<AuthVars>()
 
 const updateDocSchema = z.object({
   compartmentId: z.string().uuid().optional(),
-  sourceType: z
-    .enum(['hr_policy', 'sop', 'faq', 'case_note', 'compliance', 'product_doc', 'other'])
-    .optional(),
 })
 
 const BAD_ORG = { success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } } as const
@@ -115,7 +112,6 @@ documentsRoute.post('/', async (c) => {
   const formData = await c.req.formData()
   const file = formData.get('file')
   const compartmentId = formData.get('compartmentId')?.toString()
-  const sourceType = (formData.get('sourceType')?.toString() ?? 'other') as Parameters<typeof ingestDocument>[0]['sourceType']
 
   if (!(file instanceof File) || !compartmentId) {
     return c.json(
@@ -250,7 +246,6 @@ documentsRoute.post('/', async (c) => {
       compartmentId,
       filename: file.name,
       accessTier,
-      sourceType,
       contentHash,
       storageKey,
       mimeType,
@@ -283,7 +278,6 @@ documentsRoute.post('/', async (c) => {
     documentId: doc.id,
     compartmentId,
     accessTier,
-    sourceType,
     visibility: visibilityPolicy,
     fileBuffer: buffer,
     filename: file.name,
@@ -302,12 +296,26 @@ documentsRoute.post('/', async (c) => {
     )
   }
 
+  // A file with no text layer still ingested successfully — the job ran and
+  // reached a definite answer. It is left `complete` (not `failed`) so the
+  // retry worker skips it; re-running the same parser cannot find text that
+  // isn't there. The document itself carries the `no_text` marker.
   await db
     .update(ingestionJobs)
     .set({ status: 'complete', completedAt: new Date() })
     .where(eq(ingestionJobs.documentId, doc.id))
 
-  return c.json({ success: true, data: { documentId: doc.id, chunksCreated: result.data.chunksCreated } }, 201)
+  return c.json(
+    {
+      success: true,
+      data: {
+        documentId: doc.id,
+        chunksCreated: result.data.chunksCreated,
+        extractedText: result.data.extractedText,
+      },
+    },
+    201
+  )
 })
 
 // Read access to one document's contents, shared by the text preview and the
@@ -404,7 +412,6 @@ documentsRoute.get('/:docId/content', async (c) => {
       documentId: doc.id,
       filename: doc.filename,
       accessTier: doc.accessTier,
-      sourceType: doc.sourceType,
       content: stitchChunks(accessible.map((ch) => ch.content)),
       totalChunks: chunkRows.length,
       accessibleChunks: accessible.length,
@@ -558,7 +565,6 @@ documentsRoute.patch('/:docId', zValidator('json', updateDocSchema), async (c) =
       updatedAt: new Date(),
       ...(updates.compartmentId !== undefined ? { compartmentId: updates.compartmentId } : {}),
       ...(newAccessTier !== undefined ? { accessTier: newAccessTier } : {}),
-      ...(updates.sourceType !== undefined ? { sourceType: updates.sourceType } : {}),
     })
     .where(and(eq(documents.id, docId), eq(documents.orgId, orgId)))
 
