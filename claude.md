@@ -16,6 +16,7 @@ The repo shares a VPS and Postgres instance with the Automated Marketing Solutio
 | Backend routes | `/api/v1/*` — auth, orgs, documents, query, admin (compartments/users), access (groups/grants), payments, analytics, Stripe webhook |
 | Auth | JWT (HS256, HttpOnly cookie) issued by `/api/v1/auth/login`; role-based permissions default in `shared/constants.ts` (`ROLE_PERMISSIONS`), editable per-org via the `role_permissions` table (resolved + enforced in `services/access-control`). Sessions are 8h for all roles; `authMiddleware` re-checks the user every request (existence + `users.session_invalidated_at` + live role), so removal/role-change/password-reset revoke sessions immediately. Cookies are `secure` in production; login is rate-limited (per email + per IP) |
 | Document ingestion | PDF (`pdf-parse`) and Word (`mammoth`) → chunk (2000 chars, 200 overlap) → embed → store; retry via ingestion_jobs |
+| Original file storage | `services/storage` keeps the uploaded file byte-for-byte alongside its chunks; viewable/downloadable via `GET /documents/:docId/file`. Local-filesystem driver behind a relative-key interface (`STORAGE_DRIVER`), so moving to S3/R2/MinIO is a file copy plus an env var — no DB change |
 | Vector search | pgvector HNSW + tsvector parallel retrieval, RRF fusion, golden-set eval harness |
 | AI provider layer | `services/ai-provider` abstracts chat + embedding calls behind capability interfaces (`ChatProvider`, `EmbeddingProvider`); adapters for Anthropic and OpenAI-compatible (OpenAI or any local runtime — Ollama, vLLM, LM Studio, llama.cpp — via `baseURL`); provider/model selection is env-driven, defaults unchanged from the previous hardcoded values |
 | Frontend | Login, chat, documents (upload/preview/archive/delete), users & groups, compartments (settings), audit log, analytics, orgs (super admin) |
@@ -83,6 +84,7 @@ When implementing anything in this project:
 │   ├── synthesis/            # Claude Haiku RAG answer generation + follow-up query rewriting
 │   ├── access-control/       # Visibility JSONB + compartment grant evaluation at query time
 │   ├── ai-provider/          # Chat + embedding capability interfaces; Anthropic / OpenAI-compatible adapters
+│   ├── storage/              # Original uploaded files; local-FS driver behind an S3-shaped key interface
 │   └── payments/             # Stripe Connect subscriptions + fee logic
 ├── workers/                  # node-cron jobs (ingestion-retry, retention purges, manual re-embed)
 ├── db/
@@ -135,7 +137,7 @@ bun run workers                      # start all cron jobs
 
 | Worker | Schedule | What it does |
 |---|---|---|
-| `ingestion-retry` | Daily 03:00 | Retry failed ingestion jobs under `max_retries` |
+| `ingestion-retry` | Daily 03:00 | Retry failed ingestion jobs under `max_retries` by re-parsing the stored original. Documents with no `storage_key` (pre-storage uploads) still need a manual re-upload |
 | `query-log-purge` (`retention.ts`) | Daily 03:30 | Delete query logs older than 90 days |
 | `org-data-purge` (`retention.ts`) | Daily 04:00 | Permanently delete org data 30 days after cancellation |
 | `re-embed-worker` | Manual (not scheduled) | Re-embeds all active chunks after an embedding model change |
@@ -249,8 +251,9 @@ All browser API calls go through the Next.js proxy routes (`/api/v1/...`) — th
 ## Ingestion Pipeline
 
 ```
+0. Store        Original file → services/storage (byte-for-byte, for viewing + retry)
 1. Ingest       Upload / parse PDF or Word doc
-2. Chunk + Tag  org_id, compartment, access_tier, source_type, visibility JSONB
+2. Chunk + Tag  org_id, compartment, access_tier, visibility JSONB
 3. Embed        OpenAI text-embedding-3-large (1536d) → HNSW index
 4. Store        Immutable chunk in Postgres + content hash dedup
 5. Retrieve     pgvector + tsvector in parallel
@@ -295,8 +298,10 @@ All tables in `db/schema/` (one file per table). Drizzle only — never raw `pg`
 access_tier:        internal | external
 chunk_status:       active | processing | error | archived
 org_plan:           free | paid
-source_type:        hr_policy | sop | faq | case_note | compliance | product_doc | other
-ingestion_status:   queued | running | complete | failed | archived
+ingestion_status:   queued | running | complete | failed | archived | no_text
+                    # no_text = stored and viewable, but nothing extractable (scanned /
+                    # image-only). Not a failure — the retry worker skips it, since the
+                    # same parser on the same bytes finds the same nothing. Needs OCR.
 user_role:          super_admin | org_admin | dept_admin | staff | external_client
 ```
 
@@ -334,8 +339,11 @@ id, org_id (FK), compartment_id (FK), user_id (FK, nullable), group_id (FK, null
 granted_by (FK → users), created_at    # one-of user/group enforced by SQL CHECK
 
 // documents
-id, org_id (FK), compartment_id (FK), filename, access_tier, source_type,
+id, org_id (FK), compartment_id (FK), filename, access_tier,
 content_hash (UNIQUE per org), status (ingestion_status), uploaded_by (FK → users), version,
+storage_key,                            # relative object key {orgId}/{documentId} for the original file;
+                                        # NULL for documents uploaded before original storage existed
+mime_type, size_bytes,                  # of the stored original
 previous_version_id, created_at, updated_at
 
 // chunks
@@ -345,7 +353,6 @@ embedding (vector(1536)),               # HNSW-indexed via pgvector
 content_hash (TEXT),                    # SHA hash; unchanged re-upload is a no-op
 visibility (JSONB),                     # { allowedRoles, deniedRoles, allowedPrincipals, classification }
 access_tier (access_tier),              # enforced at SQL level
-source_type (source_type),
 chunk_index (INT),                      # position within document
 parent_chunk_id,                        # for small-to-big retrieval (currently never set — known gap)
 status (chunk_status),
@@ -424,9 +431,10 @@ POST   /orgs                                # create org + first org_admin
 
 ```
 GET    /orgs/:id/documents                  # list documents (paginated; filtered by caller's access)
-POST   /orgs/:id/documents                  # upload document (multipart form: file, compartmentId, accessTier, sourceType) — documents:upload
+POST   /orgs/:id/documents                  # upload document (multipart form: file, compartmentId) — documents:upload
 GET    /orgs/:id/documents/:docId/content   # stitched document text for preview
-PATCH  /orgs/:id/documents/:docId           # update compartment / access tier / source type
+GET    /orgs/:id/documents/:docId/file      # original uploaded file, streamed; inline only for PDF, attachment otherwise
+PATCH  /orgs/:id/documents/:docId           # move to another compartment (tier follows the target folder)
 POST   /orgs/:id/documents/:docId/archive   # archive (chunks excluded from retrieval)
 POST   /orgs/:id/documents/:docId/unarchive
 DELETE /orgs/:id/documents/:docId           # hard delete (typed confirmation in UI)
@@ -435,7 +443,7 @@ DELETE /orgs/:id/documents/:docId           # hard delete (typed confirmation in
 ### Query
 
 ```
-POST   /orgs/:id/query                      # { query, accessTier?, sourceTypes?, history? } → { answer, citations, confidence, missing }
+POST   /orgs/:id/query                      # { query, accessTier?, history? } → { answer, citations, confidence, missing }
 GET    /orgs/:id/query                      # query history
 ```
 
@@ -495,7 +503,7 @@ POST   /webhooks/stripe                     # Stripe webhook (public; signature-
 ### Analytics (`analytics:view`) + Audit (`audit:view`)
 
 ```
-GET    /orgs/:id/analytics/overview         # KB coverage, query volume, citation hit rate — analytics:view
+GET    /orgs/:id/analytics/overview         # KB coverage (broken down by folder), query volume, citation hit rate — analytics:view
 GET    /orgs/:id/analytics/queries          # top unanswered, low-confidence queries — analytics:view
 GET    /orgs/:id/analytics/audit-logs       # paginated audit log — audit:view
 GET    /orgs/:id/analytics/export           # export audit log (CSV) — audit:view
@@ -542,6 +550,10 @@ SMTP_USER=
 SMTP_PASS=
 SMTP_FROM=
 
+# Original file storage (services/storage)
+STORAGE_DRIVER=local                        # default: local. "s3" is the swap point, not yet implemented
+STORAGE_ROOT=./.storage                     # local driver only; /data/documents in Docker — MUST be a persistent volume
+
 NODE_ENV=development | production
 COOKIE_SECURE=                              # optional; overrides the auth-cookie Secure flag. Unset → Secure when NODE_ENV=production. Set "false" to allow login over plain HTTP (security downgrade — token travels in cleartext; use only until TLS is in place), "true" to force it on
 PORT=3002
@@ -583,7 +595,7 @@ Non-negotiable:
 4. **RAG only** — no freeform generation permitted; explicit `"I don't know"` fallback when confidence below threshold
 5. **Audit log all admin actions** — permission changes, document access events; exportable for compliance orgs
 6. **Compliance** — PDPA (SG), GDPR, Australia Privacy Act; data processing agreements required per org before pilot
-7. **Data retention** — query logs purged after 90 days; org data quarantined 30 days on cancellation then permanently deleted
+7. **Data retention** — query logs purged after 90 days; org data quarantined 30 days on cancellation then permanently deleted. Stored originals live outside Postgres, so **no FK cascade reaches them** — every deletion path (document delete, compartment delete, org purge) must call `services/storage` explicitly or the permanent-deletion guarantee is false
 8. **External publishing locked to paid tier** — `org_plan = free` cannot expose external knowledge plane
 9. **Stripe platform fee** — BlueOcean automatically takes 15% via Stripe Connect; no manual payout logic
 
@@ -651,6 +663,7 @@ Response: { answer, citations, confidence, missing }
 | `services/synthesis` | Claude Haiku RAG generation; citation assembly; enforces no-freeform rule |
 | `services/access-control` | Visibility JSONB evaluation; restricted-compartment grant checks (user/group); role-to-chunk permission resolution at query time; per-org role→permission matrix (`role-permissions.ts`) — cached `hasPermission(orgId, role, perm)`, editable via `/orgs/:id/roles`, seeded from `ROLE_PERMISSIONS` defaults |
 | `services/ai-provider` | `ChatProvider`/`EmbeddingProvider` interfaces; Anthropic and OpenAI-compatible adapters; env-driven provider/model selection, config validation, error normalization. Only place that constructs an AI SDK client — `services/retrieval`, `services/ingestion`, `services/synthesis`, and `workers/re-embed-worker` consume it, never the SDKs directly |
+| `services/storage` | Original uploaded files. `putObject`/`getObject`/`deleteObject`/`deletePrefix` keyed by a **relative** `{orgId}/{documentId}` — never an absolute path, so the same key works against the filesystem, S3, R2, or MinIO. Local-FS driver today; `STORAGE_DRIVER=s3` is the swap point (Bun ships `Bun.S3Client`, so no new dependency) |
 | `services/payments` | Stripe Connect subscription management; platform fee routing |
 | `workers/` | node-cron only — ingestion retry, query-log purge (90d), org-data purge (30d quarantine); manual re-embed script |
 | `db/schema` | Drizzle models + migrations; all persistence |

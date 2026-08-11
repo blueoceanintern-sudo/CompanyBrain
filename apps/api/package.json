@@ -13,6 +13,7 @@
     "@company-brain/payments": "workspace:*",
     "@company-brain/retrieval": "workspace:*",
     "@company-brain/shared": "workspace:*",
+    "@company-brain/storage": "workspace:*",
     "@company-brain/synthesis": "workspace:*",
     "@hono/zod-validator": "^0.2.2",
     "drizzle-orm": "^0.31.4",

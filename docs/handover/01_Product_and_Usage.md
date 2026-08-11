@@ -1,7 +1,9 @@
 # Company's Brain — Product & Usage Guide
 
 > **Audience:** anyone — BlueOcean staff, Equest admins, end users.
-> Companion documents: `02_Technical_Handover.md` (developers), `03_Operations_and_Access.md` (successor + manager only).
+> Companion document: `02_Technical_Handover.md` — for developers. It covers architecture, known issues, the roadmap, and how production is deployed and operated.
+>
+> **Last verified against the app:** 2026-08-11.
 
 ## Contents
 
@@ -20,9 +22,10 @@ Company's Brain is a **B2B knowledge platform** built by BlueOcean. An organisat
 
 **Current status:**
 
-- All core flows are built and working: document ingestion, retrieval and AI answers, access control (roles, compartments, groups, grants), payments, audit logging, analytics, and automated data-retention purges.
+- All core flows are built and working: document ingestion, retrieval and AI answers, access control (roles, folders, groups, grants), original-file storage, payments, audit logging, and analytics.
 - v1 pilot customer: **Equest school network**.
 - The platform is multi-tenant and org-agnostic — nothing is Equest-specific in the code.
+- **Two things to know before a customer conversation:** the automated data-retention purges are written and tested but **not currently running in production** (the process that runs them isn't deployed — see `02_Technical_Handover.md`, Part V), and **scanned or photographed documents cannot be searched yet** because there is no OCR (`02_Technical_Handover.md`, Appendix A). Both are known, tracked, and fixable; neither should be discovered by a customer first.
 - Known limitations are tracked in `02_Technical_Handover.md`, Part III.
 
 **Where everything lives:**
@@ -30,7 +33,7 @@ Company's Brain is a **B2B knowledge platform** built by BlueOcean. An organisat
 | What | Where |
 |---|---|
 | Source code | https://github.com/blueoceanintern-sudo/CompanyBrain |
-| Hosting | AWS Lightsail VPS (shared with the Automated Marketing Solution) — see `03_Operations_and_Access.md` |
+| Hosting | AWS Lightsail VPS (shared with the Automated Marketing Solution) — see `02_Technical_Handover.md`, Part V |
 | Developer docs | `CLAUDE.md` and `README.md` in the repo root |
 | Design system | `DESIGN.md` in the repo root |
 
@@ -58,16 +61,22 @@ Many organisations share one deployment. Every piece of data is tagged with its 
 | Role | Can do |
 |---|---|
 | `super_admin` | Everything below, plus create and manage organisations (BlueOcean staff) |
-| `org_admin` | Manage documents, users, groups, compartments, billing, and analytics for their org |
-| `dept_admin` | Manage documents and ask questions |
+| `org_admin` | Manage documents, users, groups, folders, billing, and analytics for their org |
+| `dept_admin` | Upload documents and ask questions |
 | `staff` | Ask questions |
 | `external_client` | Ask questions on the external plane; subscribe and pay for access |
 
-## Compartments, groups, and grants
+These are **starting points, not fixed roles.** Each organisation has an editable role→permission matrix (Settings → roles), so an org can decide that, say, its `dept_admin` role also manages users. Two limits apply: you can only assign or edit roles below your own, and a couple of permissions (organisation and role management) are permanently reserved for admins.
 
-Documents live in **compartments** (e.g. "HR", "Operations", "Client FAQs"). Each compartment belongs to a single knowledge plane — internal or external — and can have **sub-compartments** (one level deep only). A compartment can be marked **restricted**, in which case only users or **groups** with an explicit **grant** can see its documents — including in search results and AI answers. Access narrows down the tree: reaching a sub-compartment always requires access to its parent.
+> ⚠️ **One important caveat, worth being straight with customers about:** the matrix controls *what actions a role can take and what UI it sees*. It does **not** restrict an org admin's reach over their organisation's data. `org_admin` and `super_admin` can always retrieve every document in their own organisation, in both planes, regardless of how the matrix is configured. Removing a permission from `org_admin` hides buttons; it does not create a data sandbox. (Access *between* organisations is a different matter and is absolutely enforced — no organisation can ever see another's data.)
 
-> 📊 **[DIAGRAM: org → compartments (+ one restricted, with a grant arrow from a group) → documents → "who sees what". This is the concept people struggle with most — draw it, don't describe it.]**
+## Folders (compartments), groups, and grants
+
+Documents live in **folders** — e.g. "HR", "Operations", "Client FAQs". (The code and developer docs call these *compartments*; the interface calls them folders. Same thing.) Each folder belongs to a single knowledge plane — internal or external — and can have **subfolders** (one level deep only). A folder can be marked **restricted**, in which case only users or **groups** with an explicit **grant** can see its documents — including in search results and AI answers. Access narrows down the tree: reaching a subfolder always requires access to its parent.
+
+A document's plane is inherited from its folder rather than set per document, and moving a document to a folder in the other plane moves it between planes.
+
+> 📊 **[DIAGRAM: org → folders (+ one restricted, with a grant arrow from a group) → documents → "who sees what". This is the concept people struggle with most — draw it, don't describe it.]**
 
 ## Plans and monetisation
 
@@ -91,6 +100,8 @@ Documents live in **compartments** (e.g. "HR", "Operations", "Client FAQs"). Eac
 Go to the app URL and sign in with your email and password. Accounts are created by your administrator — there is no self-signup. If you've been invited, you'll have received an email with your login details.
 
 The first time you sign in with an invited account, you are required to set a new password before you can use the app. If you forget your password, use the **Forgot password** link on the login page; you'll receive an email with a single-use reset link. The login page also has a **Contact Administrator** link for help.
+
+Sessions last **8 hours**, so you'll be asked to sign in again roughly once a working day. If an administrator changes your role, resets your password, or removes your account, you're signed out immediately rather than at the end of the 8 hours.
 
 > 📸 **[SCREENSHOT: login page]**
 
@@ -126,38 +137,58 @@ External clients see only the external plane. If your organisation charges for a
 
 ## Documents
 
-**Uploading.** Documents → Upload. Choose the file (PDF, Word `.docx`/`.doc`, or plain text), a **compartment**, an **access tier** (Internal or External), and a **source type** (HR policy, SOP, FAQ, case note, compliance, product doc, other). The document is parsed, split into passages, and indexed — status moves `queued → processing → complete`. Large documents take longer; the upload waits until processing finishes.
+**Uploading.** Open the folder you want the document to live in, then upload into it. **Accepted formats: PDF (`.pdf`), Word (`.docx`), plain text (`.txt`) and Markdown (`.md`).** Legacy `.doc` files are not supported — save them as `.docx` first.
+
+You don't choose an access tier per document: **the folder decides it.** A document uploaded into an Internal folder is internal; moving it to an External folder changes its tier with it. This is deliberate — one place to reason about who can see what.
+
+The document is parsed, split into passages, and indexed. Large documents take longer, and the upload waits until processing finishes.
 
 - Re-uploading an unchanged file is a no-op (the system detects identical content and skips it).
-- Uploading a changed file with the same name to the same compartment creates a **new version** and archives the previous one automatically.
-- If a document shows **failed**, delete and re-upload it. (A nightly retry job exists but cannot re-process a failed upload on its own — see the known-issues section of `02_Technical_Handover.md`.)
+- Uploading a changed file with the same name to the same folder creates a **new version** and archives the previous one automatically.
+- If a document shows **failed**, a nightly retry job will re-process it automatically from the stored original — you don't need to re-upload. If it's still failing after a day or two, tell your developer; the reason is recorded against the document.
 
-> 📊 **[DIAGRAM: small flowchart — uploaded → queued → processing → complete / failed → "what to do if failed"]**
-> 📸 **[SCREENSHOT: upload dialog with compartment/tier/source-type fields]**
+**Document statuses:**
 
-**Preview.** Each document row has a preview action showing the extracted text — useful to confirm a PDF parsed correctly.
+| Status | Meaning | What to do |
+|---|---|---|
+| Complete | Indexed and searchable | Nothing |
+| Processing | Being parsed and indexed | Wait |
+| Failed | Something went wrong during processing | Nothing immediately — a nightly job retries it automatically |
+| **No text found** | The file uploaded and is stored intact, but it contains **no readable text** — it's a scan or a picture of a document, not a text document | See below |
+| Archived | Deliberately excluded from search | Unarchive to restore |
+
+**"No text found" is the one worth understanding.** It means the file is an image as far as the computer is concerned — a scanned page, a photo, an image-only slide deck. You can still open and download it, but **it cannot be searched and will never appear in an answer.** Reading text out of scans (OCR) is designed but **not yet built** (`02_Technical_Handover.md`, Appendix A). Until it is, the workaround is to upload a text-based version of the document where one exists — the original Word file, or a PDF exported from it rather than scanned from paper.
+
+> 📊 **[DIAGRAM: small flowchart — uploaded → processing → complete / failed / no text found, with "what to do" under each]**
+> 📸 **[SCREENSHOT: upload dialog, showing that it uploads into the currently open folder]**
+
+**Preview and original.** Each document has a preview showing the extracted text — useful for confirming a PDF parsed correctly — and a **Download Original** action that gives you back the exact file that was uploaded, byte for byte.
 
 **Archive / unarchive.** Archiving removes a document's content from search and AI answers without deleting it. Unarchive restores it.
 
 **Delete.** Permanent, requires typing a confirmation. There is no undo — prefer archiving unless you're certain.
 
-> 📸 **[SCREENSHOT: documents list showing status, tier and compartment badges; delete confirmation dialog]**
+> 📸 **[SCREENSHOT: documents list showing status, tier and folder badges; delete confirmation dialog]**
 
 ## Users and groups
 
 **Inviting users.** Users → Invite. Enter an email and role; the person receives an invitation email with login details and is required to set their own password on first sign-in. You can change roles or remove users later.
 
-**Groups.** Create groups ("Leadership", "HR team") on the Users page and assign members. Groups exist to make compartment grants manageable — grant a compartment to a group once instead of to ten individuals.
+**Groups.** Create groups ("Leadership", "HR team") on the Users page and assign members. Groups exist to make folder grants manageable — grant a restricted folder to a group once instead of to ten individuals.
 
 > 📸 **[SCREENSHOT: users page with roles; group membership editor]**
 
-## Compartments and restricted access (Settings)
+## Folders and restricted access (Documents page)
 
-Create compartments and one level of sub-compartments in **Settings**. Each compartment belongs to one plane (internal or external). Mark a compartment **Restricted** to hide its documents from everyone except granted users and groups. Manage grants from the compartment's grant editor — grants can target individual users or groups.
+Folders are created and managed **on the Documents page**, not in Settings. Open a folder and use its actions menu for **New Subfolder**, **Manage** and **Delete** (one level of subfolders only). Each folder belongs to one plane — Internal or External — and every document in it inherits that plane.
 
-Deleting a compartment **deletes all its documents and indexed content** and requires typed confirmation. Sub-compartments must be deleted before their parent.
+Mark a folder **Restricted** to hide its documents from everyone except granted users and groups — including from search results and AI answers, not just from the folder listing. Grants are edited in the folder's access panel and can target individual **users** or **groups**.
 
-> 📸 **[SCREENSHOT: compartment list with a restricted badge; the grants editor]**
+Note that managing a folder and controlling who can reach it are the same permission (`documents:manage`) — if someone can rename or delete a folder, they can also change who sees it. That's intentional, but worth knowing when you assign the permission.
+
+Deleting a folder **deletes all its documents and indexed content** and requires typed confirmation. Subfolders must be deleted before their parent.
+
+> 📸 **[SCREENSHOT: folder list with a restricted badge; the folder access panel]**
 
 ## Audit log
 
@@ -175,7 +206,7 @@ The **Analytics** page shows knowledge-base coverage, query volume, citation hit
 
 In Settings → Billing:
 
-- **Subscription** — subscribe the org (unlocks the paid plan and external publishing), view status, cancel. On cancellation, org data is quarantined for 30 days and then permanently deleted (see compliance notes in `03_Operations_and_Access.md`).
+- **Subscription** — subscribe the org (unlocks the paid plan and external publishing), view status, cancel. On cancellation, org data is quarantined for 30 days and then permanently deleted (see the compliance table in `02_Technical_Handover.md`, Part V).
 - **Stripe Connect onboarding** — required before charging external clients; follow the onboarding link to Stripe.
 - **External pricing** — set the price external clients pay. BlueOcean's 15% platform fee is deducted automatically.
 - **Billing portal** — opens Stripe's self-serve portal for invoices and payment methods.

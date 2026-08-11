@@ -8,8 +8,9 @@ import { z } from 'zod'
 import {
   Search, Plus, Paperclip, X, FileText, Table2, Link, File, FolderPlus, Trash2,
   Archive, ArchiveRestore, MoreHorizontal, Folder, Lock, AlertTriangle, ChevronRight,
-  ChevronDown, Move, Shield, LayoutGrid, List as ListIcon,
+  ChevronDown, Move, Shield, LayoutGrid, List as ListIcon, Download,
 } from 'lucide-react'
+import { documentFileUrl } from '@/lib/api'
 import {
   useDocuments, useUploadDocument, useDeleteDocument, useArchiveDocument,
   useUnarchiveDocument, useMoveDocument,
@@ -23,12 +24,13 @@ import { formatDate, formatDateTime } from '@/lib/utils'
 import { DocumentPreview } from '@/components/document-preview'
 import { FolderAccessPanel } from '@/components/documents/folder-access'
 import type { CompartmentSummary } from '@company-brain/shared'
+import { MAX_UPLOAD_BYTES, UPLOAD_MIME_TYPES } from '@company-brain/shared'
 
-const SOURCE_TYPE_LABELS: Record<string, string> = {
-  hr_policy: 'HR Policy', sop: 'SOP', faq: 'FAQ',
-  case_note: 'Case Note', compliance: 'Compliance',
-  product_doc: 'Product Doc', other: 'Other',
-}
+const MAX_UPLOAD_MB = Math.floor(MAX_UPLOAD_BYTES / (1024 * 1024))
+// Both the picker's filter and the label it sits under come from the server's
+// allowlist, so adding a format there updates the UI without a second edit.
+const ACCEPTED_EXTENSIONS = Object.keys(UPLOAD_MIME_TYPES)
+const ACCEPTED_EXTENSIONS_LABEL = ACCEPTED_EXTENSIONS.join(', ')
 
 const TIER_LABELS: Record<'internal' | 'external', string> = { internal: 'Internal Knowledge', external: 'External Knowledge' }
 
@@ -57,9 +59,10 @@ function TierBadge({ tier }: { tier: string }) {
 
 // ─── Detail panel ─────────────────────────────────────────────────────────────
 
-function DetailPanel({ doc, compartmentName, canMove, canManage, onClose, onDelete, onArchive, onUnarchive, onMove, onPreview }: {
-  doc: { id: string; filename: string; accessTier: string; status: string; sourceType: string; createdAt: string; ingestionStartedAt: string | null; ingestionCompletedAt: string | null; ingestionError: string | null } | null
+function DetailPanel({ doc, compartmentName, orgId, canMove, canManage, onClose, onDelete, onArchive, onUnarchive, onMove, onPreview }: {
+  doc: { id: string; filename: string; accessTier: string; status: string; createdAt: string; storageKey: string | null; ingestionStartedAt: string | null; ingestionCompletedAt: string | null; ingestionError: string | null } | null
   compartmentName: string
+  orgId: string
   canMove: boolean
   canManage: boolean
   onClose: () => void
@@ -90,8 +93,17 @@ function DetailPanel({ doc, compartmentName, canMove, canManage, onClose, onDele
           {/* Preview */}
           <div style={{ aspectRatio: '4/3', width: '100%', background: '#eff4ff', borderRadius: 12, border: '1px solid #c3c6d7', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
             <FileText size={48} color="#c3c6d7" />
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <button onClick={() => onPreview(doc!.id)} style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid #c3c6d7', borderRadius: 8, padding: '8px 16px', fontSize: 14, fontWeight: 700, color: '#004ac6', cursor: 'pointer', fontFamily: 'inherit' }}>Full Preview</button>
+              {doc.storageKey && (
+                <a
+                  href={documentFileUrl(orgId, doc.id)}
+                  download={doc.filename}
+                  style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid #c3c6d7', borderRadius: 8, padding: '8px 16px', fontSize: 14, fontWeight: 700, color: '#004ac6', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Download size={14} /> Original
+                </a>
+              )}
             </div>
           </div>
 
@@ -148,7 +160,21 @@ function DetailPanel({ doc, compartmentName, canMove, canManage, onClose, onDele
                     </p>
                   </div>
                 </div>
-              ) : doc.ingestionCompletedAt ? (
+              ) : doc.status === 'no_text' ? (
+                <div style={{ display: 'flex', gap: 16 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#94a3b8', marginTop: 4 }} />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: '#0b1c30', margin: '0 0 2px' }}>No text found</p>
+                    <p style={{ fontSize: 12, color: '#585f67', margin: 0 }}>
+                      Stored and viewable, but it has no text layer — nothing was indexed, so it cannot contribute to answers.
+                    </p>
+                  </div>
+                </div>
+              /* Keyed off the status, not the timestamp: completed_at only says
+                 the job stopped, which is also true when it produced nothing. */
+              ) : doc.status === 'complete' && doc.ingestionCompletedAt ? (
                 <div style={{ display: 'flex', gap: 16 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#22c55e', marginTop: 4 }} />
@@ -232,6 +258,8 @@ function DeleteDocumentDialog({ doc, isPending, onCancel, onConfirm }: {
         <p style={{ fontSize: 13, color: '#585f67', margin: '0 0 20px', lineHeight: 1.5 }}>
           {doc.status === 'failed'
             ? 'This ingestion failed, so no content is searchable. Deleting removes it permanently; you can re-upload the file afterwards.'
+            : doc.status === 'no_text'
+            ? 'No text could be extracted from this file, so it never contributed to answers. The stored original will be deleted too.'
             : 'Archive instead to prevent it from being queried.'}
         </p>
         <form onSubmit={(e) => { e.preventDefault(); if (canDelete) onConfirm() }}>
@@ -406,27 +434,34 @@ function FolderActionsMenu({ isTopLevel, onNewSubfolder, onManage, onDelete }: {
 
 // ─── Upload dialog ────────────────────────────────────────────────────────────
 
-const uploadSchema = z.object({
-  sourceType: z.enum(['hr_policy', 'sop', 'faq', 'case_note', 'compliance', 'product_doc', 'other']),
-})
-type UploadFormValues = z.infer<typeof uploadSchema>
-
+// The only input left is the file itself, which is held in state rather than
+// registered as a form field — so there is nothing for react-hook-form to
+// validate here.
 function UploadDialog({ orgId, folder, onClose }: { orgId: string; folder: CompartmentSummary; onClose: () => void }) {
   const [file, setFile] = useState<File | null>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const upload = useUploadDocument(orgId)
-  const { register, handleSubmit } = useForm<UploadFormValues>({
-    resolver: zodResolver(uploadSchema),
-    defaultValues: { sourceType: 'other' },
-  })
 
-  const onSubmit = async (values: UploadFormValues) => {
+  // Caught here as well as on the server so an oversized file fails instantly
+  // instead of after a long upload the API will reject anyway.
+  const onFileChosen = (chosen: File | null) => {
+    if (chosen && chosen.size > MAX_UPLOAD_BYTES) {
+      setFile(null)
+      setFileError(`“${chosen.name}” is larger than the ${MAX_UPLOAD_MB} MB limit.`)
+      return
+    }
+    setFileError(null)
+    setFile(chosen)
+  }
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
     if (!file) return
     const fd = new FormData()
     fd.append('file', file)
     fd.append('compartmentId', folder.id)
-    fd.append('sourceType', values.sourceType)
-    upload.mutate(fd as unknown as FormData, { onSuccess: onClose })
+    upload.mutate(fd, { onSuccess: onClose })
   }
 
   const inputStyle: React.CSSProperties = {
@@ -441,20 +476,21 @@ function UploadDialog({ orgId, folder, onClose }: { orgId: string; folder: Compa
       <div style={{ background: '#ffffff', border: '1px solid #c3c6d7', borderRadius: 16, padding: 32, width: 'min(480px, 90vw)', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
         <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px', color: '#0b1c30' }}>Upload Document</h2>
         <p style={{ fontSize: 13, color: '#585f67', margin: '0 0 24px' }}>Uploading into <strong style={{ color: '#0b1c30' }}>{folder.name}</strong> ({TIER_LABELS[folder.accessTier as 'internal' | 'external']})</p>
-        <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>File (PDF, Word, or plain text)</label>
-            <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.txt" onChange={(e) => setFile(e.target.files?.[0] ?? null)} style={{ display: 'none' }} />
+            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>
+              File ({ACCEPTED_EXTENSIONS_LABEL} — max {MAX_UPLOAD_MB} MB)
+            </label>
+            {/* Mirrors the server allowlist in shared/constants.ts. Legacy .doc
+                is deliberately absent — ingestion cannot parse it. */}
+            <input ref={fileInputRef} type="file" accept={ACCEPTED_EXTENSIONS.join(',')} onChange={(e) => onFileChosen(e.target.files?.[0] ?? null)} style={{ display: 'none' }} />
             <button type="button" onClick={() => fileInputRef.current?.click()}
               style={{ ...inputStyle, border: '1px dashed #c3c6d7', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, color: file ? '#0b1c30' : '#737686' }}>
               <Paperclip size={14} />{file ? file.name : 'Choose file…'}
             </button>
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#434655', marginBottom: 8 }}>Source type</label>
-            <select {...register('sourceType')} style={inputStyle}>
-              {Object.entries(SOURCE_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
+            {fileError && (
+              <p style={{ fontSize: 12, color: '#dc2626', margin: '8px 0 0' }}>{fileError}</p>
+            )}
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
             <button type="button" onClick={onClose} style={{ height: 44, padding: '0 20px', border: '1px solid #c3c6d7', borderRadius: 8, background: 'transparent', fontSize: 14, cursor: 'pointer', color: '#0b1c30', fontFamily: 'inherit' }}>Cancel</button>
@@ -705,11 +741,19 @@ function FolderCard({ folder, docCount, canManage, parentRestricted = false, onO
 
 const STATUS_DOT: Record<string, string> = {
   complete: '#16a34a', running: '#2563eb', queued: '#94a3b8', failed: '#dc2626', archived: '#a1a1aa',
+  // Stored and viewable, but contributes nothing to answers — grey rather than
+  // red, because nothing went wrong.
+  no_text: '#94a3b8',
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  complete: 'Indexed', running: 'Processing', queued: 'Queued', failed: 'Ingestion failed',
+  archived: 'Archived', no_text: 'No text found',
 }
 
 function DocumentIconCard({ doc, docIcon, subLabel, onOpen }: {
-  doc: { id: string; filename: string; status: string; sourceType: string }
-  docIcon: (sourceType: string) => React.ReactNode
+  doc: { id: string; filename: string; status: string }
+  docIcon: (filename: string) => React.ReactNode
   subLabel?: string | undefined
   onOpen: () => void
 }) {
@@ -721,19 +765,19 @@ function DocumentIconCard({ doc, docIcon, subLabel, onOpen }: {
       onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#f8faff' }}
       onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#ffffff' }}
     >
-      {docIcon(doc.sourceType)}
+      {docIcon(doc.filename)}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flex: 1, minWidth: 0 }}>
         <span style={{ fontSize: 13, fontWeight: 500, color: '#0b1c30', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.filename}</span>
         {subLabel && <span style={{ fontSize: 11, color: '#737686', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subLabel}</span>}
       </div>
-      <span title={doc.status} style={{ width: 7, height: 7, borderRadius: '50%', background: STATUS_DOT[doc.status] ?? STATUS_DOT['queued'], flexShrink: 0 }} />
+      <span title={STATUS_LABEL[doc.status] ?? doc.status} style={{ width: 7, height: 7, borderRadius: '50%', background: STATUS_DOT[doc.status] ?? STATUS_DOT['queued'], flexShrink: 0 }} />
     </button>
   )
 }
 
 function DocumentListRow({ doc, docIcon, onOpen }: {
-  doc: { id: string; filename: string; status: string; sourceType: string; createdAt: string }
-  docIcon: (sourceType: string) => React.ReactNode
+  doc: { id: string; filename: string; status: string; createdAt: string }
+  docIcon: (filename: string) => React.ReactNode
   onOpen: () => void
 }) {
   return (
@@ -743,9 +787,9 @@ function DocumentListRow({ doc, docIcon, onOpen }: {
       onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#f8faff' }}
       onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none' }}
     >
-      {docIcon(doc.sourceType)}
+      {docIcon(doc.filename)}
       <span style={{ fontSize: 13, fontWeight: 500, color: '#0b1c30', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{doc.filename}</span>
-      <span title={doc.status} style={{ width: 7, height: 7, borderRadius: '50%', background: STATUS_DOT[doc.status] ?? STATUS_DOT['queued'], flexShrink: 0 }} />
+      <span title={STATUS_LABEL[doc.status] ?? doc.status} style={{ width: 7, height: 7, borderRadius: '50%', background: STATUS_DOT[doc.status] ?? STATUS_DOT['queued'], flexShrink: 0 }} />
       <span style={{ fontSize: 12, color: '#585f67', flexShrink: 0 }}>{formatDate(doc.createdAt)}</span>
     </button>
   )
@@ -753,8 +797,8 @@ function DocumentListRow({ doc, docIcon, onOpen }: {
 
 function SubfolderListGroup({ folder, docs, docIcon, canManage, parentRestricted = false, expanded, onToggle, onOpenDoc, onManageAccess, onDelete }: {
   folder: CompartmentSummary
-  docs: Array<{ id: string; filename: string; status: string; sourceType: string; createdAt: string }>
-  docIcon: (sourceType: string) => React.ReactNode
+  docs: Array<{ id: string; filename: string; status: string; createdAt: string }>
+  docIcon: (filename: string) => React.ReactNode
   canManage: boolean
   parentRestricted?: boolean
   expanded: boolean
@@ -997,10 +1041,13 @@ export default function DocumentsPage() {
       : []
   const isParentLevel = !!openCompartment && !openCompartment.parentCompartmentId
 
-  const docIcon = (sourceType: string) => {
-    if (sourceType === 'hr_policy' || sourceType === 'compliance') return <FileText size={18} color="#585f67" />
-    if (sourceType === 'sop' || sourceType === 'product_doc') return <Table2 size={18} color="#585f67" />
-    if (sourceType === 'faq') return <Link size={18} color="#585f67" />
+  // Keyed off the file extension rather than a category the uploader picked:
+  // the format is a fact about the file, and it matches what opening it does.
+  const docIcon = (filename: string) => {
+    const ext = filename.slice(filename.lastIndexOf('.')).toLowerCase()
+    if (ext === '.pdf') return <FileText size={18} color="#585f67" />
+    if (ext === '.docx') return <Table2 size={18} color="#585f67" />
+    if (ext === '.md') return <Link size={18} color="#585f67" />
     return <File size={18} color="#585f67" />
   }
 
@@ -1248,6 +1295,7 @@ export default function DocumentsPage() {
         <DetailPanel
           doc={selectedDoc}
           compartmentName={selectedDoc ? getCompartmentName(selectedDoc.compartmentId) : '—'}
+          orgId={orgId}
           canMove={!!selectedDoc && compartments.filter((c) => c.accessTier === selectedDoc.accessTier && c.id !== selectedDoc.compartmentId).length > 0}
           canManage={canManageDocs}
           onClose={() => setSelectedDoc(null)}

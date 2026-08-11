@@ -21,6 +21,7 @@
         "@company-brain/payments": "workspace:*",
         "@company-brain/retrieval": "workspace:*",
         "@company-brain/shared": "workspace:*",
+        "@company-brain/storage": "workspace:*",
         "@company-brain/synthesis": "workspace:*",
         "@hono/zod-validator": "^0.2.2",
         "drizzle-orm": "^0.31.4",
@@ -136,6 +137,12 @@
         "drizzle-orm": "^0.31.4",
       },
     },
+    "services/storage": {
+      "name": "@company-brain/storage",
+      "dependencies": {
+        "@company-brain/shared": "workspace:*",
+      },
+    },
     "services/synthesis": {
       "name": "@company-brain/synthesis",
       "dependencies": {
@@ -153,6 +160,7 @@
         "@company-brain/db": "workspace:*",
         "@company-brain/ingestion": "workspace:*",
         "@company-brain/shared": "workspace:*",
+        "@company-brain/storage": "workspace:*",
         "drizzle-orm": "^0.31.4",
         "node-cron": "^3.0.3",
       },
@@ -237,6 +245,8 @@
     "@company-brain/retrieval": ["@company-brain/retrieval@workspace:services/retrieval"],
 
     "@company-brain/shared": ["@company-brain/shared@workspace:shared"],
+
+    "@company-brain/storage": ["@company-brain/storage@workspace:services/storage"],
 
     "@company-brain/synthesis": ["@company-brain/synthesis@workspace:services/synthesis"],
 

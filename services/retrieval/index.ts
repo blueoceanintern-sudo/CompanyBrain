@@ -1,7 +1,7 @@
 import { db } from '@company-brain/db'
 import { documents, compartments } from '@company-brain/db'
 import { eq, sql, type SQL } from 'drizzle-orm'
-import type { RetrieveParams, ServiceResult, ChunkContext, SourceType, UserRole } from '@company-brain/shared'
+import type { RetrieveParams, ServiceResult, ChunkContext, UserRole } from '@company-brain/shared'
 import { CONFIDENCE_GATE_THRESHOLD, RRF_K, TOP_K_CHUNKS } from '@company-brain/shared'
 import { canAccessChunk } from '@company-brain/access-control'
 import { getEmbeddingProvider, AiProviderError } from '@company-brain/ai-provider'
@@ -96,13 +96,9 @@ async function semanticSearch(
   accessTier: 'internal' | 'external',
   queryEmbedding: number[],
   limit: number,
-  compartmentFilter: SQL,
-  sourceTypes?: SourceType[]
+  compartmentFilter: SQL
 ): Promise<Array<{ id: string; documentId: string; compartmentId: string; content: string; score: number; chunkIndex: number }>> {
   const vectorLiteral = `[${queryEmbedding.join(',')}]`
-  const sourceFilter = sourceTypes && sourceTypes.length > 0
-    ? sql` AND c.source_type::text = ANY(ARRAY[${sql.join(sourceTypes.map((t) => sql`${t}`), sql`, `)}])`
-    : sql``
 
   const rows = await db.execute(sql`
     SELECT
@@ -117,7 +113,6 @@ async function semanticSearch(
     WHERE c.org_id = ${orgId}
       AND c.access_tier = ${accessTier}
       AND c.status = 'active'
-      ${sourceFilter}
       ${compartmentFilter}
     ORDER BY c.embedding <=> ${vectorLiteral}::vector
     LIMIT ${limit * 3}
@@ -150,12 +145,8 @@ async function fullTextSearch(
   accessTier: 'internal' | 'external',
   query: string,
   limit: number,
-  compartmentFilter: SQL,
-  sourceTypes?: SourceType[]
+  compartmentFilter: SQL
 ): Promise<Array<{ id: string; documentId: string; compartmentId: string; content: string; rank: number; chunkIndex: number }>> {
-  const sourceFilter = sourceTypes && sourceTypes.length > 0
-    ? sql` AND c.source_type::text = ANY(ARRAY[${sql.join(sourceTypes.map((t) => sql`${t}`), sql`, `)}])`
-    : sql``
 
   const rows = await db.execute(sql`
     SELECT
@@ -177,7 +168,6 @@ async function fullTextSearch(
       AND c.access_tier = ${accessTier}
       AND c.status = 'active'
       AND to_tsvector('english', c.content) @@ q.tsq
-      ${sourceFilter}
       ${compartmentFilter}
     ORDER BY rank DESC
     LIMIT ${limit * 3}
@@ -237,7 +227,7 @@ async function getCompartmentName(compartmentId: string): Promise<string> {
 export async function retrieveChunks(
   params: RetrieveParams
 ): Promise<ServiceResult<{ chunks: ChunkContext[]; confidence: number }>> {
-  const { orgId, userId, query, accessTier, userRole, topK = TOP_K_CHUNKS, sourceTypes } = params
+  const { orgId, userId, query, accessTier, userRole, topK = TOP_K_CHUNKS } = params
 
   try {
     const queryEmbedding = await embedQuery(query)
@@ -245,8 +235,8 @@ export async function retrieveChunks(
 
     // Run semantic + full-text search in parallel
     const [semanticResults, ftsResults] = await Promise.all([
-      semanticSearch(orgId, accessTier, queryEmbedding, topK, compartmentFilter, sourceTypes),
-      fullTextSearch(orgId, accessTier, query, topK, compartmentFilter, sourceTypes),
+      semanticSearch(orgId, accessTier, queryEmbedding, topK, compartmentFilter),
+      fullTextSearch(orgId, accessTier, query, topK, compartmentFilter),
     ])
 
     // Fuse the two ranked lists with Reciprocal Rank Fusion. RRF works on
