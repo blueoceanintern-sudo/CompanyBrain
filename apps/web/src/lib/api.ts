@@ -151,7 +151,7 @@ export async function getDocuments(orgId: string) {
 }
 
 export async function uploadDocument(orgId: string, formData: FormData) {
-  return apiUpload<{ documentId: string; chunksCreated: number }>(
+  return apiUpload<{ documentId: string; chunksCreated: number; extractedText: boolean }>(
     `/api/v1/orgs/${orgId}/documents`,
     formData
   )
@@ -168,7 +168,7 @@ export async function archiveDocument(orgId: string, docId: string) {
 export async function updateDocument(
   orgId: string,
   docId: string,
-  data: { compartmentId?: string; sourceType?: string }
+  data: { compartmentId?: string }
 ) {
   return apiFetch<null>(`/api/v1/orgs/${orgId}/documents/${docId}`, {
     method: 'PATCH',
@@ -180,14 +180,22 @@ export interface DocumentContent {
   documentId: string
   filename: string
   accessTier: string
-  sourceType: string
   content: string
   totalChunks: number
   accessibleChunks: number
+  hasOriginal: boolean
+  mimeType: string | null
 }
 
 export async function getDocumentContent(orgId: string, docId: string) {
   return apiFetch<DocumentContent>(`/api/v1/orgs/${orgId}/documents/${docId}/content`)
+}
+
+// The original file is streamed by the API, not parsed as JSON — this is the
+// URL an <iframe> or a download link points at. Access is re-checked server
+// side on every request, so the URL is not a capability by itself.
+export function documentFileUrl(orgId: string, docId: string) {
+  return `/api/v1/orgs/${orgId}/documents/${docId}/file`
 }
 
 export async function unarchiveDocument(orgId: string, docId: string) {

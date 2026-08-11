@@ -12,8 +12,6 @@ import type { AuthVars } from '../middleware/auth'
 
 const queryRoute = new Hono<AuthVars>()
 
-const SOURCE_TYPES = ['hr_policy', 'sop', 'faq', 'case_note', 'compliance', 'product_doc', 'other'] as const
-
 const conversationTurnSchema = z.object({
   role: z.enum(['user', 'assistant']),
   content: z.string(),
@@ -22,7 +20,6 @@ const conversationTurnSchema = z.object({
 const querySchema = z.object({
   query: z.string().min(1).max(2000),
   accessTier: z.enum(['internal', 'external']).default('internal'),
-  sourceTypes: z.array(z.enum(SOURCE_TYPES)).optional(),
   history: z.array(conversationTurnSchema).max(40).optional(),
 })
 
@@ -32,7 +29,7 @@ queryRoute.post('/', zValidator('json', querySchema), async (c) => {
   if (!orgId) return c.json({ success: false, error: { code: 'BAD_REQUEST', message: 'Missing org ID' } }, 400)
   const userId = c.get('userId')
   const userRole = c.get('role')
-  const { query, accessTier, sourceTypes, history } = c.req.valid('json')
+  const { query, accessTier, history } = c.req.valid('json')
 
   if (!(await hasPermission(c.get('orgId'), userRole, 'queries:submit'))) {
     return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, 403)
@@ -80,7 +77,6 @@ queryRoute.post('/', zValidator('json', querySchema), async (c) => {
       query: retrievalQuery,
       accessTier,
       userRole,
-      ...(sourceTypes !== undefined ? { sourceTypes } : {}),
     })
 
     if (!retrievalResult.success) {

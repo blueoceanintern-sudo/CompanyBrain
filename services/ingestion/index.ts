@@ -119,13 +119,12 @@ async function embedBatch(texts: string[]): Promise<number[][]> {
 
 export async function ingestDocument(
   params: IngestParams
-): Promise<ServiceResult<{ chunksCreated: number }>> {
+): Promise<ServiceResult<{ chunksCreated: number; extractedText: boolean }>> {
   const {
     orgId,
     documentId,
     compartmentId,
     accessTier,
-    sourceType,
     visibility,
     fileBuffer,
     filename,
@@ -135,7 +134,15 @@ export async function ingestDocument(
     // 1. Extract text
     const rawText = await extractText(fileBuffer, filename)
     if (!rawText.trim()) {
-      return { success: false, error: { code: 'EMPTY_DOCUMENT', message: 'Document produced no extractable text' } }
+      // Not a failure: the file uploaded and is stored intact, it just has no
+      // text layer (scanned pages, image-only slides). Retrying the same parser
+      // would produce the same nothing, so it is marked `no_text` rather than
+      // `failed` — the retry worker only picks up failed jobs.
+      await db
+        .update(documents)
+        .set({ status: 'no_text', updatedAt: new Date() })
+        .where(eq(documents.id, documentId))
+      return { success: true, data: { chunksCreated: 0, extractedText: false } }
     }
 
     // 2. Chunk
@@ -160,7 +167,7 @@ export async function ingestDocument(
 
     if (newChunks.length === 0) {
       await db.update(documents).set({ status: 'complete' }).where(eq(documents.id, documentId))
-      return { success: true, data: { chunksCreated: 0 } }
+      return { success: true, data: { chunksCreated: 0, extractedText: true } }
     }
 
     // 4. Embed in batches of 20
@@ -182,7 +189,6 @@ export async function ingestDocument(
       contentHash: c.hash,
       visibility: sql`${JSON.stringify(visibility)}::jsonb`,
       accessTier,
-      sourceType,
       chunkIndex: c.index,
       status: 'active' as const,
     }))
@@ -195,7 +201,7 @@ export async function ingestDocument(
       .set({ status: 'complete', updatedAt: new Date() })
       .where(eq(documents.id, documentId))
 
-    return { success: true, data: { chunksCreated: newChunks.length } }
+    return { success: true, data: { chunksCreated: newChunks.length, extractedText: true } }
   } catch (err) {
     console.error(`[ingestion] document ${documentId} failed:`, err)
     await db

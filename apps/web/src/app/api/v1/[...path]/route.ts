@@ -24,8 +24,20 @@ async function proxy(request: NextRequest, path: string[]) {
     })
 
     const responseHeaders = new Headers()
-    const resContentType = res.headers.get('content-type')
-    if (resContentType) responseHeaders.set('content-type', resContentType)
+    // File downloads depend on more than content-type: the disposition decides
+    // download-vs-inline, and the two security headers are what keep an
+    // uploaded file from rendering as markup on this origin.
+    for (const header of [
+      'content-type',
+      'content-disposition',
+      'content-length',
+      'content-security-policy',
+      'x-content-type-options',
+      'cache-control',
+    ]) {
+      const value = res.headers.get(header)
+      if (value) responseHeaders.set(header, value)
+    }
     const setCookie = res.headers.get('set-cookie')
     if (setCookie) responseHeaders.set('set-cookie', setCookie)
 

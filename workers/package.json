@@ -10,6 +10,7 @@
     "@company-brain/shared": "workspace:*",
     "@company-brain/ingestion": "workspace:*",
     "@company-brain/ai-provider": "workspace:*",
+    "@company-brain/storage": "workspace:*",
     "drizzle-orm": "^0.31.4",
     "node-cron": "^3.0.3"
   },
