@@ -7,7 +7,11 @@ WORKDIR /app
 COPY package.json ./
 COPY tsconfig.base.json ./
 
-# Copy ALL workspace manifests so Bun can resolve the full project graph
+# Copy ALL workspace manifests so Bun can resolve the full project graph.
+# Bun resolves `workspace:*` deps for every manifest present, including ones the
+# web build never imports (apps/api, workers) — so a service missing from this
+# list fails the build here even though nothing in apps/web uses it.
+# ⚠️ Adding a package under services/ means adding it here AND in apps/api/Dockerfile.
 COPY shared/package.json ./shared/
 COPY db/package.json ./db/
 COPY workers/package.json ./workers/
@@ -17,6 +21,7 @@ COPY services/synthesis/package.json ./services/synthesis/
 COPY services/access-control/package.json ./services/access-control/
 COPY services/payments/package.json ./services/payments/
 COPY services/ai-provider/package.json ./services/ai-provider/
+COPY services/storage/package.json ./services/storage/
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 RUN bun install
